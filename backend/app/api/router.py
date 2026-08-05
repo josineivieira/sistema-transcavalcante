@@ -1,0 +1,11 @@
+from fastapi import APIRouter
+from app.api.v1 import auth, companies, users, customers, freights, closings, fiscal_documents
+
+api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(companies.router, prefix="/companies", tags=["companies"])
+api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
+api_router.include_router(freights.router, prefix="/freights", tags=["freights"])
+api_router.include_router(closings.router, prefix="/closings", tags=["closings"])
+api_router.include_router(fiscal_documents.router, prefix="/fiscal-documents", tags=["fiscal-documents"])
