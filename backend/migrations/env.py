@@ -1,6 +1,15 @@
 from logging.config import fileConfig
+from pathlib import Path
+import sys
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+backend_dir = Path(__file__).resolve().parents[1]
+backend_path = str(backend_dir)
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
+
 from app.core.config import settings
 from app.database.base import Base
 from app import models  # noqa
