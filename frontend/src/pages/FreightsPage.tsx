@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Save, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 
@@ -106,41 +107,8 @@ export function FreightsPage() {
           </div>
         </div>
 
-        {showForm && (
-          <div className="grid gap-3 border-b border-zinc-300 bg-zinc-50 p-3 md:grid-cols-8">
-            <select value={form.customer} onChange={(event) => setForm({ ...form, customer: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2">
-              {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
-            </select>
-            <input value={form.process} onChange={(event) => setForm({ ...form, process: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Processo" />
-            <select value={form.container} onChange={(event) => setForm({ ...form, container: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              {containers.map((container) => <option key={container.id}>{container.number}</option>)}
-            </select>
-            <select value={form.driver} onChange={(event) => setForm({ ...form, driver: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              {drivers.map((driver) => <option key={driver.id}>{driver.name}</option>)}
-            </select>
-            <select value={form.tractorId} onChange={(event) => setForm({ ...form, tractorId: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              <option value="">Cavalo</option>
-              {tractors.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.tractorPlate}</option>)}
-            </select>
-            <select value={form.trailerId} onChange={(event) => setForm({ ...form, trailerId: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              <option value="">Carreta</option>
-              {trailers.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.trailerPlate}</option>)}
-            </select>
-            <input value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" type="number" placeholder="Valor" />
-            <input value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Origem" />
-            <input value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Destino" />
-            <div className="border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-600 md:col-span-2">
-              Cavalo: {selectedTractor?.tractorPlate ?? '-'} | Carreta: {selectedTrailer?.trailerPlate ?? '-'}
-            </div>
-            <div className="flex gap-2 md:col-span-2">
-              <button onClick={saveFreight} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white">Salvar</button>
-              <button onClick={() => setShowForm(false)} className="border border-zinc-400 bg-white px-3 py-1.5 text-sm font-medium">Cancelar</button>
-            </div>
-          </div>
-        )}
-
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1320px] text-sm">
+          <table className="system-grid w-full min-w-[1320px] text-xs">
             <thead className="bg-zinc-50">
               <tr>
                 {['Número', 'Data', 'Cliente', 'Processo', 'Contêiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor', 'Operacional', 'Fiscal', 'Fechamento', 'Ações'].map((h) => (
@@ -178,6 +146,62 @@ export function FreightsPage() {
           </table>
         </div>
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/30 px-4 py-6">
+          <div className="system-modal max-h-[calc(100vh-48px)] w-full max-w-6xl overflow-hidden border border-zinc-500 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Frete</h3>
+              <div className="flex items-center gap-3 text-xs">
+                <button onClick={saveFreight} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
+                <button onClick={() => setShowForm(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+              </div>
+            </div>
+            <div className="grid items-start gap-x-12 gap-y-2 p-3 md:grid-cols-2">
+              <div className="grid content-start grid-cols-[130px_1fr] items-center gap-1 text-xs">
+                <label className="text-right text-red-600">Cliente</label>
+                <select value={form.customer} onChange={(event) => setForm({ ...form, customer: event.target.value })} className="h-7 border border-zinc-300 px-2">
+                  {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
+                </select>
+                <label className="text-right text-red-600">Processo</label>
+                <input value={form.process} onChange={(event) => setForm({ ...form, process: event.target.value.toUpperCase() })} className="h-7 border border-zinc-300 px-2" />
+                <label className="text-right">Conteiner</label>
+                <select value={form.container} onChange={(event) => setForm({ ...form, container: event.target.value })} className="h-7 border border-zinc-300 px-2">
+                  {containers.map((container) => <option key={container.id}>{container.number}</option>)}
+                </select>
+                <label className="text-right text-red-600">Motorista</label>
+                <select value={form.driver} onChange={(event) => setForm({ ...form, driver: event.target.value })} className="h-7 border border-zinc-300 px-2">
+                  {drivers.map((driver) => <option key={driver.id}>{driver.name}</option>)}
+                </select>
+              </div>
+              <div className="grid content-start grid-cols-[130px_1fr] items-center gap-1 text-xs">
+                <label className="text-right text-red-600">Cavalo</label>
+                <select value={form.tractorId} onChange={(event) => setForm({ ...form, tractorId: event.target.value })} className="h-7 border border-zinc-300 px-2">
+                  <option value="">Selecione...</option>
+                  {tractors.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.tractorPlate}</option>)}
+                </select>
+                <label className="text-right">Carreta</label>
+                <select value={form.trailerId} onChange={(event) => setForm({ ...form, trailerId: event.target.value })} className="h-7 border border-zinc-300 px-2">
+                  <option value="">Selecione...</option>
+                  {trailers.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.trailerPlate}</option>)}
+                </select>
+                <label className="text-right text-red-600">Valor</label>
+                <input value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} className="h-7 border border-zinc-300 px-2" type="number" />
+                <label className="text-right">Composicao</label>
+                <div className="h-7 border border-zinc-400 bg-white px-2 leading-7 text-zinc-700">
+                  Cavalo: {selectedTractor?.tractorPlate ?? '-'} | Carreta: {selectedTrailer?.trailerPlate ?? '-'}
+                </div>
+              </div>
+              <div className="grid content-start grid-cols-[130px_1fr] items-center gap-1 text-xs md:col-span-2">
+                <label className="text-right">Origem</label>
+                <input value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value.toUpperCase() })} className="h-7 border border-zinc-300 px-2" />
+                <label className="text-right">Destino</label>
+                <input value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value.toUpperCase() })} className="h-7 border border-zinc-300 px-2" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -39,12 +39,12 @@ export function SettingsPage() {
     <div className="space-y-4">
       <div className="flex items-end justify-between border-b border-zinc-300 pb-3">
         <div>
-          <h2 className="text-[22px] font-semibold text-zinc-900">Configuracoes</h2>
-          <p className="text-sm text-zinc-600">Dados da empresa emissora, parametros NFS-e e checklist para producao fiscal.</p>
+          <h2 className="text-sm font-semibold text-zinc-900">Configuracoes</h2>
+          <p className="text-xs text-zinc-600">Dados da empresa emissora, parametros NFS-e e checklist para producao fiscal.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={restore} className="inline-flex h-8 items-center gap-2 border border-zinc-400 bg-white px-3 text-sm text-zinc-700"><RotateCcw size={15} />Restaurar</button>
-          <button onClick={save} className="inline-flex h-8 items-center gap-2 border border-[#003469] bg-[#004080] px-3 text-sm font-medium text-white"><Save size={15} />Salvar</button>
+          <button onClick={restore} className="inline-flex h-8 items-center gap-2 border border-zinc-400 bg-white px-3 text-xs text-zinc-700"><RotateCcw size={15} />Restaurar</button>
+          <button onClick={save} className="inline-flex h-8 items-center gap-2 border border-[#003469] bg-[#004080] px-3 text-xs font-medium text-white"><Save size={15} />Salvar</button>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export function SettingsPage() {
           <ShieldCheck size={18} className="text-[#004080]" />
           <h3 className="text-sm font-semibold">Checklist para levar para producao</h3>
         </div>
-        <div className="grid gap-2 p-4 text-sm md:grid-cols-2">
+        <div className="grid gap-2 p-4 text-xs md:grid-cols-2">
           {productionChecklist.map((item) => (
             <div key={item} className="border border-zinc-300 bg-[#f7f9fc] px-3 py-2">{item}</div>
           ))}

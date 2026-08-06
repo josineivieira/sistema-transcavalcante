@@ -239,7 +239,7 @@ export function FiscalDocumentsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-sm">
+            <table className="system-grid w-full min-w-[1120px] text-xs">
               <thead className="bg-zinc-50">
                 <tr>
                   {['Numero', 'Data', 'Processo', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor'].map((heading) => (
@@ -277,7 +277,7 @@ export function FiscalDocumentsPage() {
 
       <div className="border border-zinc-300 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-sm">
+          <table className="system-grid w-full min-w-[1050px] text-xs">
             <thead className="bg-zinc-50">
               <tr>
                 {['Tipo', 'Numero', 'Serie', 'Cliente', 'Data', 'Valor', 'Ambiente', 'Situacao', 'Protocolo', 'Fechamento', 'Acoes'].map((heading) => (

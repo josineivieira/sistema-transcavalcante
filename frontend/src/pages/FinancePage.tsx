@@ -39,7 +39,7 @@ export function FinancePage() {
         <div><h2 className="text-sm font-semibold">Financeiro</h2><p className="text-xs text-zinc-500">Contas a receber vinculadas a fechamentos, documentos fiscais e pagamentos.</p></div>
         <button onClick={generateReceivables} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">Gerar contas</button>
       </div>
-      <table className="w-full text-sm">
+      <table className="system-grid w-full text-xs">
         <thead className="bg-zinc-50"><tr>{['Cliente', 'Fechamento', 'Documento', 'Vencimento', 'Valor líquido', 'Pago', 'Saldo', 'Situação', 'Ações'].map((h) => <th key={h} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">{h}</th>)}</tr></thead>
         <tbody>
           {data.receivables.map((item) => (

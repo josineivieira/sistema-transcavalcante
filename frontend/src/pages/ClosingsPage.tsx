@@ -208,7 +208,7 @@ export function ClosingsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-sm">
+            <table className="system-grid w-full min-w-[1120px] text-xs">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">
@@ -255,7 +255,7 @@ export function ClosingsPage() {
       )}
 
       <div className="border border-zinc-300 bg-white">
-        <table className="w-full text-sm">
+        <table className="system-grid w-full text-xs">
           <thead className="bg-zinc-50">
             <tr>
               {['Numero', 'Cliente', 'Periodo', 'Fretes', 'Subtotal', 'Retencoes', 'Liquido', 'Situacao', 'Acoes'].map((heading) => (
@@ -344,7 +344,7 @@ export function ClosingsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-sm">
+            <table className="system-grid w-full min-w-[1120px] text-xs">
               <thead className="bg-zinc-50">
                 <tr>
                   {['Numero', 'Data', 'Processo', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor', 'Fiscal'].map((heading) => (

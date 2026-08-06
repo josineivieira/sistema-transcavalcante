@@ -24,7 +24,7 @@ export function PlaceholderPage({ title, description, columns }: PlaceholderPage
         <button className="border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-sm font-medium">Filtrar</button>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="system-grid w-full min-w-[900px] text-xs">
           <thead className="bg-zinc-50">
             <tr>
               {columns.map((column) => (
