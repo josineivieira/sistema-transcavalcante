@@ -1,4 +1,6 @@
+import json
 from typing import List, Literal
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +36,18 @@ class Settings(BaseSettings):
     fiscal_xml_storage_path: str = "./storage/fiscal/xml"
     fiscal_pdf_storage_path: str = "./storage/fiscal/pdf"
     cors_origins: List[str] = ["http://localhost:3000"]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                return []
+            if cleaned.startswith("["):
+                return json.loads(cleaned)
+            return [origin.strip() for origin in cleaned.split(",") if origin.strip()]
+        return value
 
 
 settings = Settings()
