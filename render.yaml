@@ -20,9 +20,9 @@ services:
       - key: APP_NAME
         value: Transcavalcante
       - key: APP_URL
-        value: https://transcavalcante-web.onrender.com
+        value: https://sistema-transcavalcante-1.onrender.com
       - key: API_URL
-        value: https://transcavalcante-api.onrender.com
+        value: https://sistema-transcavalcante.onrender.com
       - key: API_V1_PREFIX
         value: /api/v1
       - key: DATABASE_URL
@@ -42,7 +42,7 @@ services:
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: 7
       - key: CORS_ORIGINS
-        value: '["https://transcavalcante-web.onrender.com"]'
+        value: '["https://sistema-transcavalcante-1.onrender.com"]'
       - key: FISCAL_DEFAULT_PROVIDER
         value: mock
       - key: FISCAL_ENVIRONMENT
@@ -70,7 +70,7 @@ services:
       - key: VITE_APP_NAME
         value: Transcavalcante
       - key: VITE_API_URL
-        value: https://transcavalcante-api.onrender.com/api/v1
+        value: https://sistema-transcavalcante.onrender.com/api/v1
     routes:
       - type: rewrite
         source: /*

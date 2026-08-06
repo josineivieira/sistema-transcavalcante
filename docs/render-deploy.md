@@ -40,7 +40,7 @@ Para producao fiscal real, tambem sera necessario configurar:
 
 O frontend esta configurado para chamar:
 
-`https://transcavalcante-api.onrender.com/api/v1`
+`https://sistema-transcavalcante.onrender.com/api/v1`
 
 Se o Render alterar o nome da URL porque ja existe outro servico com esse nome, ajuste `VITE_API_URL` em `transcavalcante-web` e rode um novo deploy.
 
@@ -92,8 +92,8 @@ alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```env
 APP_ENV=production
 APP_NAME=Transcavalcante
-APP_URL=https://transcavalcante-web.onrender.com
-API_URL=https://transcavalcante-api.onrender.com
+APP_URL=https://sistema-transcavalcante-1.onrender.com
+API_URL=https://sistema-transcavalcante.onrender.com
 API_V1_PREFIX=/api/v1
 DATABASE_URL=<Internal Database URL do Postgres>
 REDIS_URL=redis://localhost:6379/0
@@ -102,7 +102,7 @@ JWT_SECRET=<gerar segredo>
 ENCRYPTION_KEY=<gerar segredo>
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
-CORS_ORIGINS=["https://transcavalcante-web.onrender.com"]
+CORS_ORIGINS=["https://sistema-transcavalcante-1.onrender.com"]
 FISCAL_DEFAULT_PROVIDER=mock
 FISCAL_ENVIRONMENT=homologation
 ALLOW_MOCK_IN_PRODUCTION=false
@@ -135,7 +135,7 @@ dist
 
 ```env
 VITE_APP_NAME=Transcavalcante
-VITE_API_URL=https://transcavalcante-api.onrender.com/api/v1
+VITE_API_URL=https://sistema-transcavalcante.onrender.com/api/v1
 ```
 
 8. Adicione uma Rewrite Rule:
