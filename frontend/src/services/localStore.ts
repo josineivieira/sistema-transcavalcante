@@ -40,13 +40,40 @@ export type Driver = {
 export type Vehicle = {
   id: string
   vehicleType: 'Cavalo' | 'Carreta'
+  fleetNumber?: string
+  fleetRelation?: string
+  fleetType?: string
+  denatranType?: string
+  description?: string
   tractorPlate: string
   trailerPlate: string
   type: string
   rntrc: string
   owner: string
+  ownerDocument?: string
   carrier: string
   capacity: string
+  brand?: string
+  model?: string
+  yearModel?: string
+  manufactureYear?: string
+  chassis?: string
+  grExpiration?: string
+  licensingExpiration?: string
+  cityPlate?: string
+  statePlate?: string
+  color?: string
+  axles?: string
+  bodyType?: string
+  renavam?: string
+  tare?: string
+  capacityM3?: string
+  capacityKg?: string
+  trackerUsed?: boolean
+  trackerBrand?: string
+  trackerProtocol?: string
+  smFleet?: string
+  driver?: string
   status: string
 }
 
@@ -224,8 +251,35 @@ function normalizeData(data: Partial<AppData>): AppData {
     if (legacyVehicle.vehicleType) {
       return [{
         ...legacyVehicle,
+        fleetNumber: legacyVehicle.fleetNumber ?? '',
+        fleetRelation: legacyVehicle.fleetRelation ?? (legacyVehicle.vehicleType === 'Cavalo' ? 'TAC' : 'Equiparado'),
+        fleetType: legacyVehicle.fleetType ?? legacyVehicle.type ?? (legacyVehicle.vehicleType === 'Cavalo' ? 'CAVALO MECANICO' : 'PORTA CONTEINER 40'),
+        description: legacyVehicle.description ?? legacyVehicle.type ?? '',
+        denatranType: legacyVehicle.denatranType ?? '',
         tractorPlate: legacyVehicle.tractorPlate ?? '',
         trailerPlate: legacyVehicle.trailerPlate ?? '',
+        ownerDocument: legacyVehicle.ownerDocument ?? '',
+        brand: legacyVehicle.brand ?? '',
+        model: legacyVehicle.model ?? '',
+        yearModel: legacyVehicle.yearModel ?? '',
+        manufactureYear: legacyVehicle.manufactureYear ?? '',
+        chassis: legacyVehicle.chassis ?? '',
+        grExpiration: legacyVehicle.grExpiration ?? '',
+        licensingExpiration: legacyVehicle.licensingExpiration ?? '',
+        cityPlate: legacyVehicle.cityPlate ?? '',
+        statePlate: legacyVehicle.statePlate ?? '',
+        color: legacyVehicle.color ?? '',
+        axles: legacyVehicle.axles ?? '',
+        bodyType: legacyVehicle.bodyType ?? '',
+        renavam: legacyVehicle.renavam ?? '',
+        tare: legacyVehicle.tare ?? '',
+        capacityM3: legacyVehicle.capacityM3 ?? '',
+        capacityKg: legacyVehicle.capacityKg ?? '',
+        trackerUsed: legacyVehicle.trackerUsed ?? false,
+        trackerBrand: legacyVehicle.trackerBrand ?? '',
+        trackerProtocol: legacyVehicle.trackerProtocol ?? '',
+        smFleet: legacyVehicle.smFleet ?? '',
+        driver: legacyVehicle.driver ?? '',
       } as Vehicle]
     }
 
