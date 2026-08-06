@@ -13,6 +13,7 @@ import { FinancePage } from './pages/FinancePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LoginPage } from './pages/LoginPage'
+import { UsersPage } from './pages/UsersPage'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => localStorage.getItem('transcavalcante.authenticated') === 'true')
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="containers" element={authenticated ? <ContainersPage /> : <Navigate to="/login" replace />} />
         <Route path="finance" element={authenticated ? <FinancePage /> : <Navigate to="/login" replace />} />
         <Route path="reports" element={authenticated ? <ReportsPage /> : <Navigate to="/login" replace />} />
+        <Route path="users" element={authenticated ? <UsersPage /> : <Navigate to="/login" replace />} />
         <Route path="settings" element={authenticated ? <SettingsPage /> : <Navigate to="/login" replace />} />
       </Route>
     </Routes>

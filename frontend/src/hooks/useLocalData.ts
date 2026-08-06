@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadData, saveData } from '../services/localStore'
 import { api } from '../services/api'
-import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, Receivable, Vehicle } from '../services/localStore'
+import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, Receivable, SystemUser, Vehicle } from '../services/localStore'
 
 export function useLocalData() {
   const [data, setData] = useState(loadData)
@@ -48,6 +48,7 @@ export function useLocalData() {
     setClosings: (closings: Closing[]) => update({ ...data, closings }),
     setFiscalDocuments: (fiscalDocuments: FiscalDocument[]) => update({ ...data, fiscalDocuments }),
     setReceivables: (receivables: Receivable[]) => update({ ...data, receivables }),
+    setUsers: (users: SystemUser[]) => update({ ...data, users }),
     update,
   }
 }

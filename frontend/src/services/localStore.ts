@@ -222,6 +222,18 @@ export type Receivable = {
   status: string
 }
 
+export type UserPermission = 'none' | 'view' | 'edit'
+
+export type SystemUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  department: string
+  status: string
+  permissions: Record<string, UserPermission>
+}
+
 export type AppData = {
   customers: Customer[]
   drivers: Driver[]
@@ -231,6 +243,7 @@ export type AppData = {
   closings: Closing[]
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
+  users: SystemUser[]
 }
 
 const storageKey = 'transcavalcante.appData.v2'
@@ -321,6 +334,30 @@ const seedData: AppData = {
   closings: [],
   fiscalDocuments: [],
   receivables: [],
+  users: [
+    {
+      id: 'usr-1',
+      name: 'Administrador SF',
+      email: 'admin@transcavalcante.local',
+      role: 'Administrador',
+      department: 'Administracao',
+      status: 'Ativo',
+      permissions: {
+        dashboard: 'view',
+        freights: 'edit',
+        customers: 'edit',
+        drivers: 'edit',
+        vehicles: 'edit',
+        containers: 'edit',
+        closings: 'edit',
+        fiscalDocuments: 'edit',
+        finance: 'edit',
+        reports: 'view',
+        users: 'edit',
+        settings: 'edit',
+      },
+    },
+  ],
 }
 
 function normalizeData(data: Partial<AppData>): AppData {
@@ -503,6 +540,7 @@ function normalizeData(data: Partial<AppData>): AppData {
     closings: data.closings ?? [],
     fiscalDocuments: data.fiscalDocuments ?? [],
     receivables: data.receivables ?? [],
+    users: data.users ?? seedData.users,
   }
 }
 

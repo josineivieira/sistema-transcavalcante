@@ -46,7 +46,10 @@ const groups = [
   },
   {
     title: 'Administração',
-    items: [['Configurações', '/settings', Settings]],
+    items: [
+      ['Usuários', '/users', UserCog],
+      ['Configurações', '/settings', Settings],
+    ],
   },
 ]
 
@@ -61,6 +64,7 @@ const pageTitles: Record<string, string> = {
   '/containers': 'Contêineres',
   '/finance': 'Financeiro',
   '/reports': 'Relatórios',
+  '/users': 'Usuários',
   '/settings': 'Configurações',
 }
 
@@ -230,3 +234,4 @@ export function AppLayout() {
     </div>
   )
 }
+
