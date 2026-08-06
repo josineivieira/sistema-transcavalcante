@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Save, X } from 'lucide-react'
+import { MoreVertical, Save, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 
@@ -7,6 +7,7 @@ export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, setFreights } = useLocalData()
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [form, setForm] = useState({
     customer: customers[0]?.name ?? '',
     process: '',
@@ -81,6 +82,12 @@ export function FreightsPage() {
 
   function updateFreight(id: string, patch: Partial<(typeof freights)[number]>) {
     setFreights(freights.map((freight) => (freight.id === id ? { ...freight, ...patch } : freight)))
+    setOpenActionId(null)
+  }
+
+  function duplicateFreight(freight: (typeof freights)[number]) {
+    setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
+    setOpenActionId(null)
   }
 
   return (
@@ -133,12 +140,27 @@ export function FreightsPage() {
                   <td className="border-b border-zinc-200 px-3 py-2">{freight.operationalStatus}</td>
                   <td className="border-b border-zinc-200 px-3 py-2">{freight.fiscalStatus}</td>
                   <td className="border-b border-zinc-200 px-3 py-2">{freight.closing || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">
-                    <div className="flex gap-1">
-                      <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="border border-zinc-300 px-2 py-1 text-xs">Aprovar</button>
-                      <button onClick={() => setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])} className="border border-zinc-300 px-2 py-1 text-xs">Duplicar</button>
-                      <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="border border-zinc-300 px-2 py-1 text-xs text-red-700">Cancelar</button>
-                    </div>
+                  <td className="relative border-b border-zinc-200 px-3 py-2">
+                    <button
+                      onClick={() => setOpenActionId(openActionId === freight.id ? null : freight.id)}
+                      className="grid h-7 w-8 place-items-center border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+                      aria-label={`Acoes do frete ${freight.number}`}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    {openActionId === freight.id && (
+                      <div className="absolute right-3 top-9 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
+                        <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
+                          Aprovar
+                        </button>
+                        <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
+                          Duplicar
+                        </button>
+                        <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
