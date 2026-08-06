@@ -14,19 +14,18 @@ import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LoginPage } from './pages/LoginPage'
 import { UsersPage } from './pages/UsersPage'
+import { isAuthenticated } from './services/authSession'
 
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(() => localStorage.getItem('transcavalcante.authenticated') === 'true')
+  const [authenticated, setAuthenticated] = useState(isAuthenticated)
 
   useEffect(() => {
     function syncAuth() {
-      setAuthenticated(localStorage.getItem('transcavalcante.authenticated') === 'true')
+      setAuthenticated(isAuthenticated())
     }
 
-    window.addEventListener('storage', syncAuth)
     window.addEventListener('transcavalcante.auth-changed', syncAuth)
     return () => {
-      window.removeEventListener('storage', syncAuth)
       window.removeEventListener('transcavalcante.auth-changed', syncAuth)
     }
   }, [])

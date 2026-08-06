@@ -38,8 +38,6 @@ export type IssuerSettings = {
   productionReady: string
 }
 
-const issuerKey = 'transcavalcante.issuerSettings.v1'
-
 export const defaultIssuerSettings: IssuerSettings = {
   legalName: 'TRANSCAVALCANTE TRANSPORTES DE CARGAS LTDA',
   tradeName: 'Transcavalcante',
@@ -78,20 +76,4 @@ export const defaultIssuerSettings: IssuerSettings = {
   certificateName: 'Nao instalado',
   certificateExpiration: '',
   productionReady: 'Nao',
-}
-
-export function loadIssuerSettings(): IssuerSettings {
-  const raw = localStorage.getItem(issuerKey)
-  if (!raw) return defaultIssuerSettings
-
-  try {
-    return { ...defaultIssuerSettings, ...(JSON.parse(raw) as Partial<IssuerSettings>) }
-  } catch {
-    return defaultIssuerSettings
-  }
-}
-
-export function saveIssuerSettings(settings: IssuerSettings) {
-  localStorage.setItem(issuerKey, JSON.stringify(settings))
-  window.dispatchEvent(new Event('issuer-settings-changed'))
 }

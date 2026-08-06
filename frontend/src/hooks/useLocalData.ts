@@ -1,45 +1,65 @@
 import { useEffect, useState } from 'react'
-import { loadData, saveData } from '../services/localStore'
+import { loadData, normalizeData, seedData } from '../services/localStore'
 import { api } from '../services/api'
 import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, Receivable, SystemUser, Vehicle } from '../services/localStore'
+import type { IssuerSettings } from '../services/fiscalSettings'
 
 export function useLocalData() {
   const [data, setData] = useState(loadData)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
 
     api.get<{ data: AppData | null }>('/operational-data')
-      .then((response) => {
-        if (!active || !response.data.data) {
+      .then(async (response) => {
+        if (!active) {
           return
         }
 
-        setData(response.data.data)
-        saveData(response.data.data)
+        if (response.data.data) {
+          setData(normalizeData(response.data.data))
+          setError('')
+          return
+        }
+
+        const initialData = normalizeData(seedData)
+        await api.put('/operational-data', { data: initialData })
+        if (active) {
+          setData(initialData)
+          setError('')
+        }
       })
       .catch(() => {
-        setData(loadData())
+        if (active) {
+          setError('Nao foi possivel conectar ao banco de dados.')
+        }
       })
-
-    const sync = () => setData(loadData())
-    window.addEventListener('app-data-changed', sync)
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
     return () => {
       active = false
-      window.removeEventListener('app-data-changed', sync)
     }
   }, [])
 
   function update(nextData: AppData) {
-    setData(nextData)
-    saveData(nextData)
-    api.put('/operational-data', { data: nextData }).catch(() => {
-      window.dispatchEvent(new Event('app-data-save-failed'))
+    const normalized = normalizeData(nextData)
+    setData(normalized)
+    api.put('/operational-data', { data: normalized }).then(() => {
+      setError('')
+    }).catch(() => {
+      setError('Nao foi possivel salvar no banco de dados.')
     })
   }
 
   return {
     ...data,
+    loading,
+    error,
     setCustomers: (customers: Customer[]) => update({ ...data, customers }),
     setDrivers: (drivers: Driver[]) => update({ ...data, drivers }),
     setVehicles: (vehicles: Vehicle[]) => update({ ...data, vehicles }),
@@ -49,6 +69,7 @@ export function useLocalData() {
     setFiscalDocuments: (fiscalDocuments: FiscalDocument[]) => update({ ...data, fiscalDocuments }),
     setReceivables: (receivables: Receivable[]) => update({ ...data, receivables }),
     setUsers: (users: SystemUser[]) => update({ ...data, users }),
+    setIssuerSettings: (issuerSettings: IssuerSettings, settingsSavedAt = data.settingsSavedAt) => update({ ...data, issuerSettings, settingsSavedAt }),
     update,
   }
 }

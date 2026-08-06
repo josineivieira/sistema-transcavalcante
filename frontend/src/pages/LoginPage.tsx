@@ -2,7 +2,9 @@ import { ArrowRight, BarChart3, Clock3, Eye, EyeOff, Lock, ShieldCheck, UserRoun
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loadData } from '../services/localStore'
+import { api } from '../services/api'
+import { normalizeData, seedData, type AppData } from '../services/localStore'
+import { setAuthSession } from '../services/authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -13,7 +15,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const normalizedEmail = email.trim()
@@ -24,34 +26,39 @@ export function LoginPage() {
       return
     }
 
-    const data = loadData()
-    const user = data.users.find((item) => item.email.toLowerCase() === normalizedEmail.toLowerCase())
-
-    if (!user || user.status !== 'Ativo' || user.password !== normalizedPassword) {
-      setMessage('Usuario ou senha invalido.')
-      return
-    }
-
     setLoading(true)
     setMessage('Validando acesso...')
 
-    window.setTimeout(() => {
-      localStorage.setItem('transcavalcante.authenticated', 'true')
-      localStorage.setItem(
-        'transcavalcante.user',
-        JSON.stringify({
-          email: normalizedEmail,
-          name: user.name,
-          role: user.role,
-          permissions: user.permissions,
-          company: 'Transcavalcante - Matriz Manaus/AM',
-          remember,
-        }),
-      )
-      window.dispatchEvent(new Event('transcavalcante.auth-changed'))
+    try {
+      const response = await api.get<{ data: AppData | null }>('/operational-data')
+      let data = normalizeData(response.data.data ?? seedData)
+
+      if (!response.data.data) {
+        await api.put('/operational-data', { data })
+      }
+
+      const user = data.users.find((item) => item.email.toLowerCase() === normalizedEmail.toLowerCase())
+
+      if (!user || user.status !== 'Ativo' || user.password !== normalizedPassword) {
+        setMessage('Usuario ou senha invalido.')
+        return
+      }
+
+      setAuthSession({
+        email: normalizedEmail,
+        name: user.name,
+        role: user.role,
+        permissions: user.permissions,
+        company: 'Transcavalcante - Matriz Manaus/AM',
+        remember,
+      })
       setLoading(false)
       navigate('/dashboard', { replace: true })
-    }, 450)
+    } catch {
+      setMessage('Nao foi possivel conectar ao banco de dados.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

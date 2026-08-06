@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { clearAuthSession, getAuthUser } from '../services/authSession'
 
 const groups = [
   {
@@ -71,22 +72,28 @@ const pageTitles: Record<string, string> = {
 export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [collapsed, setCollapsed] = useState(localStorage.getItem('sidebar.collapsed') === 'true')
+  const [collapsed, setCollapsed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const title = pageTitles[location.pathname] ?? 'Sistema'
+  const authUser = getAuthUser()
+  const initials = authUser?.name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'AS'
 
   function toggleSidebar() {
-    const next = !collapsed
-    setCollapsed(next)
-    localStorage.setItem('sidebar.collapsed', String(next))
+    setCollapsed(!collapsed)
   }
 
   function logout() {
-    localStorage.removeItem('transcavalcante.authenticated')
+    clearAuthSession()
     setProfileOpen(false)
     navigate('/login')
   }
@@ -196,13 +203,13 @@ export function AppLayout() {
                     title="Perfil do usuário"
                     className="grid h-9 w-9 place-items-center rounded-full border border-[#004080] bg-[#004080] text-xs font-bold text-white"
                   >
-                    AS
+                    {initials}
                   </button>
                   {profileOpen && (
                     <div className="absolute right-0 top-11 z-20 w-56 border border-zinc-300 bg-white py-1 text-sm shadow-md">
                       <div className="border-b border-zinc-200 px-3 py-2">
-                        <div className="font-semibold text-zinc-900">Administrador SF</div>
-                        <div className="text-xs text-zinc-500">Transcavalcante</div>
+                        <div className="font-semibold text-zinc-900">{authUser?.name ?? 'Usuario'}</div>
+                        <div className="text-xs text-zinc-500">{authUser?.company ?? 'Transcavalcante'}</div>
                       </div>
                       <button onClick={() => window.alert('Tela de perfil será conectada ao cadastro de usuários.')} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-50">
                         <UserCog size={16} /> Perfil do usuário

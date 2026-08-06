@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
-import { loadIssuerSettings } from '../services/fiscalSettings'
 
 export function FiscalDocumentsPage() {
   const data = useLocalData()
   const { customers, closings, freights, fiscalDocuments } = data
-  const issuer = loadIssuerSettings()
+  const issuer = data.issuerSettings
   const [showPreview, setShowPreview] = useState(false)
   const [selectedClosingNumber, setSelectedClosingNumber] = useState('')
   const [documentType, setDocumentType] = useState('NFS-e')

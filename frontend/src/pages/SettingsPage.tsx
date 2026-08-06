@@ -1,6 +1,7 @@
 import { Building2, FileKey2, RotateCcw, Save, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
-import { defaultIssuerSettings, loadIssuerSettings, saveIssuerSettings, type IssuerSettings } from '../services/fiscalSettings'
+import { useEffect, useState } from 'react'
+import { defaultIssuerSettings, type IssuerSettings } from '../services/fiscalSettings'
+import { useLocalData } from '../hooks/useLocalData'
 
 const productionChecklist = [
   'CNPJ, razao social e inscricao municipal do prestador conferidos',
@@ -14,8 +15,14 @@ const productionChecklist = [
 ]
 
 export function SettingsPage() {
-  const [issuer, setIssuer] = useState<IssuerSettings>(() => loadIssuerSettings())
-  const [savedAt, setSavedAt] = useState(localStorage.getItem('settings.savedAt') || '-')
+  const { issuerSettings, settingsSavedAt, setIssuerSettings, loading, error } = useLocalData()
+  const [issuer, setIssuer] = useState<IssuerSettings>(issuerSettings)
+  const [savedAt, setSavedAt] = useState(settingsSavedAt)
+
+  useEffect(() => {
+    setIssuer(issuerSettings)
+    setSavedAt(settingsSavedAt)
+  }, [issuerSettings, settingsSavedAt])
 
   function updateIssuer(patch: Partial<IssuerSettings>) {
     setIssuer((current) => ({ ...current, ...patch }))
@@ -23,12 +30,9 @@ export function SettingsPage() {
 
   function save() {
     const now = new Date().toLocaleString('pt-BR')
-    saveIssuerSettings(issuer)
-    localStorage.setItem('settings.savedAt', now)
-    localStorage.setItem('fiscal.environment', issuer.nfseEnvironment)
-    localStorage.setItem('fiscal.provider', issuer.nfseProvider)
+    setIssuerSettings(issuer, now)
     setSavedAt(now)
-    window.alert('Configuracoes fiscais salvas.')
+    window.alert('Configuracoes fiscais salvas no banco de dados.')
   }
 
   function restore() {
@@ -37,6 +41,8 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-4">
+      {error && <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+      {loading && <div className="border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-600">Carregando dados do banco...</div>}
       <div className="flex items-end justify-between border-b border-zinc-300 pb-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-900">Configuracoes</h2>

@@ -1,3 +1,5 @@
+import { defaultIssuerSettings, type IssuerSettings } from './fiscalSettings'
+
 export type Customer = {
   id: string
   document: string
@@ -245,11 +247,11 @@ export type AppData = {
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
   users: SystemUser[]
+  issuerSettings: IssuerSettings
+  settingsSavedAt: string
 }
 
-const storageKey = 'transcavalcante.appData.v2'
-
-const seedData: AppData = {
+export const seedData: AppData = {
   customers: [
     {
       id: 'cli-1',
@@ -360,9 +362,11 @@ const seedData: AppData = {
       },
     },
   ],
+  issuerSettings: defaultIssuerSettings,
+  settingsSavedAt: '-',
 }
 
-function normalizeData(data: Partial<AppData>): AppData {
+export function normalizeData(data: Partial<AppData>): AppData {
   const normalizedVehicles = (data.vehicles ?? seedData.vehicles).flatMap((vehicle) => {
     const legacyVehicle = vehicle as Partial<Vehicle>
     if (legacyVehicle.vehicleType) {
@@ -547,6 +551,8 @@ function normalizeData(data: Partial<AppData>): AppData {
       password: user.password ?? (user.email === 'admin@transcavalcante.local' ? 'admin123' : ''),
       permissions: { ...emptyUserPermissions(), ...(user.permissions ?? {}) },
     })),
+    issuerSettings: { ...defaultIssuerSettings, ...(data.issuerSettings ?? {}) },
+    settingsSavedAt: data.settingsSavedAt ?? '-',
   }
 }
 
@@ -568,20 +574,11 @@ function emptyUserPermissions(): Record<string, UserPermission> {
 }
 
 export function loadData(): AppData {
-  const raw = localStorage.getItem(storageKey) || localStorage.getItem('transcavalcante.appData.v1')
-  if (!raw) {
-    return seedData
-  }
-
-  try {
-    return normalizeData(JSON.parse(raw) as Partial<AppData>)
-  } catch {
-    return seedData
-  }
+  return normalizeData(seedData)
 }
 
 export function saveData(data: AppData) {
-  localStorage.setItem(storageKey, JSON.stringify(data))
+  void data
   window.dispatchEvent(new Event('app-data-changed'))
 }
 
