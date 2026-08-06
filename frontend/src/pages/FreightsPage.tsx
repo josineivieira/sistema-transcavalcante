@@ -194,8 +194,22 @@ export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
   const [showForm, setShowForm] = useState(false)
+  const [editingFreightId, setEditingFreightId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
   const [search, setSearch] = useState('')
+  const [filters, setFilters] = useState({
+    processNumber: '',
+    processCode: '',
+    dateStart: '',
+    dateEnd: '',
+    processDescription: '',
+    status: '',
+    supplier: '',
+    processType: '',
+    container: '',
+    originDateStart: '',
+    originDateEnd: '',
+  })
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
@@ -241,9 +255,17 @@ export function FreightsPage() {
     const term = search.toLowerCase()
     return freights.filter((freight) =>
       [freight.customer, freight.process, freight.container, freight.driver, freight.tractorPlate, freight.trailerPlate, freight.origin, freight.destination]
-        .some((value) => value.toLowerCase().includes(term)),
+        .some((value) => value.toLowerCase().includes(term))
+      && (!filters.processNumber || freight.number.toLowerCase().includes(filters.processNumber.toLowerCase()))
+      && (!filters.processCode || freight.process.toLowerCase().includes(filters.processCode.toLowerCase()))
+      && (!filters.processDescription || [freight.customer, freight.origin, freight.destination].join(' ').toLowerCase().includes(filters.processDescription.toLowerCase()))
+      && (!filters.status || freight.operationalStatus.toLowerCase().includes(filters.status.toLowerCase()))
+      && (!filters.supplier || freight.customer.toLowerCase().includes(filters.supplier.toLowerCase()))
+      && (!filters.container || freight.container.toLowerCase().includes(filters.container.toLowerCase()))
+      && (!filters.dateStart || freight.date >= filters.dateStart)
+      && (!filters.dateEnd || freight.date <= filters.dateEnd),
     )
-  }, [freights, search])
+  }, [filters, freights, search])
 
   function updateForm(field: keyof FreightForm, value: string | boolean) {
     setForm((current) => {
@@ -260,6 +282,7 @@ export function FreightsPage() {
   }
 
   function resetForm() {
+    setEditingFreightId(null)
     setForm({
       ...emptyForm,
       customer: customers[0]?.name ?? '',
@@ -279,6 +302,31 @@ export function FreightsPage() {
       return
     }
     resetForm()
+    setShowForm(true)
+  }
+
+  function openFreightDetail(freight: (typeof freights)[number]) {
+    const tractor = tractors.find((vehicle) => vehicle.tractorPlate === freight.tractorPlate)
+    const trailer = trailers.find((vehicle) => vehicle.trailerPlate === freight.trailerPlate)
+    setEditingFreightId(freight.id)
+    setForm({
+      ...emptyForm,
+      customer: freight.customer,
+      process: freight.process,
+      status: freight.operationalStatus,
+      serviceTaker: freight.customer,
+      recipient: freight.customer,
+      routeName: `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
+      origin: freight.origin,
+      destination: freight.destination,
+      driver: freight.driver,
+      tractorId: tractor?.id ?? '',
+      trailerId: trailer?.id ?? '',
+      container: freight.container,
+      plannedFreightCost: String(freight.value),
+      value: String(freight.value),
+    })
+    setActiveTab('GERAIS')
     setShowForm(true)
   }
 
@@ -303,12 +351,9 @@ export function FreightsPage() {
       return
     }
 
-    const nextNumber = `FRT-${String(freights.length + 1).padStart(6, '0')}`
-    setFreights([
-      ...freights,
-      {
+    const nextRecord = {
         id: nextId('fr'),
-        number: nextNumber,
+        number: `FRT-${String(freights.length + 1).padStart(6, '0')}`,
         date: new Date().toISOString().slice(0, 10),
         customer: form.customer,
         process: form.process,
@@ -321,8 +366,24 @@ export function FreightsPage() {
         value,
         operationalStatus: 'Aguardando aprovacao',
         fiscalStatus: 'Pendente',
-      },
-    ])
+    }
+
+    setFreights(editingFreightId
+      ? freights.map((freight) => freight.id === editingFreightId ? {
+        ...freight,
+        customer: nextRecord.customer,
+        process: nextRecord.process,
+        container: nextRecord.container,
+        driver: nextRecord.driver,
+        tractorPlate: nextRecord.tractorPlate,
+        trailerPlate: nextRecord.trailerPlate,
+        origin: nextRecord.origin,
+        destination: nextRecord.destination,
+        value: nextRecord.value,
+        operationalStatus: form.status || freight.operationalStatus,
+      } : freight)
+      : [...freights, nextRecord],
+    )
 
     if (closeAfterSave) {
       setShowForm(false)
@@ -575,71 +636,120 @@ export function FreightsPage() {
 
   return (
     <div className="space-y-4">
-      {!showForm && <div className="border border-zinc-300 bg-white">
-        <div className="grid gap-3 border-b border-zinc-300 p-3 md:grid-cols-6">
-          <input value={search} onChange={(event) => setSearch(event.target.value)} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Processo, cliente, motorista, placa ou conteiner" />
-          <select className="border border-zinc-300 px-2 py-1.5 text-sm">
-            <option>Situacao</option>
-            <option>Aguardando aprovacao</option>
-            <option>Aprovado para faturamento</option>
-          </select>
-          <input className="border border-zinc-300 px-2 py-1.5 text-sm" type="date" />
-          <button onClick={() => setSearch('')} className="border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-sm font-medium">Limpar</button>
-        </div>
-        <div className="flex items-center justify-between border-b border-zinc-300 px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold">Fretes</h2>
-            <p className="text-xs text-zinc-500">Controle operacional completo com processo, rota, frota, conteiner, datas, despesas e documentos.</p>
+      {!showForm && (
+        <div className="border border-zinc-500 bg-zinc-100">
+          <div className="flex items-center justify-between border-b-4 border-zinc-400 px-2 py-1">
+            <h2 className="text-lg font-normal text-red-600">Transportes de container no destino</h2>
+            <button onClick={openNewFreight} className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white" title="Novo transporte">+</button>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => canEditPage ? window.alert('Importacao CSV sera ligada ao backend na proxima etapa.') : denyNoPrivilege()} className="border border-zinc-400 bg-white px-3 py-1.5 text-xs font-medium">Importar CSV</button>
-            <button onClick={openNewFreight} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">Novo frete</button>
-          </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="system-grid w-full min-w-[1320px] text-xs">
-            <thead className="bg-zinc-50">
-              <tr>
-                {['Numero', 'Data', 'Cliente', 'Processo', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor', 'Operacional', 'Fiscal', 'Fechamento', 'Acoes'].map((heading) => (
-                  <th key={heading} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibleFreights.map((freight) => (
-                <tr key={freight.id}>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.number}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.date}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.customer}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.process}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.container || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.driver || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.tractorPlate || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.trailerPlate || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.origin || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.destination || '-'}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{formatMoney(freight.value)}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.operationalStatus}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.fiscalStatus}</td>
-                  <td className="border-b border-zinc-200 px-3 py-2">{freight.closing || '-'}</td>
-                  <td className="relative border-b border-zinc-200 px-3 py-2">
-                    <button onClick={() => setOpenActionId(openActionId === freight.id ? null : freight.id)} className="grid h-7 w-8 place-items-center border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50" aria-label={`Acoes do frete ${freight.number}`}><MoreVertical size={16} /></button>
-                    {openActionId === freight.id && (
-                      <div className="absolute right-3 top-9 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
-                        <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Aprovar</button>
-                        <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Duplicar</button>
-                        <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!visibleFreights.length && <tr><td colSpan={15} className="px-3 py-10 text-center text-zinc-500">Nenhum frete encontrado.</td></tr>}
-            </tbody>
-          </table>
+          <div className="grid min-h-[calc(100vh-150px)] grid-cols-[430px_minmax(0,1fr)]">
+            <aside className="border-r border-zinc-500 bg-zinc-100">
+              <div className="flex h-7 items-center justify-between border-b border-zinc-400 px-2 text-xs">
+                <span>Filtro</span>
+                <div className="flex gap-2 text-zinc-800"><Settings size={15} /><X size={15} /></div>
+              </div>
+              <div className="p-2 text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</div>
+              <div className="grid gap-1 px-2 text-xs">
+                <Field label="Nr. do processo"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
+                <Field label="Codigo do processo"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
+                <Field label="Data inicial"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
+                <Field label="Descricao do Processo"><input value={filters.processDescription} onChange={(event) => setFilters({ ...filters, processDescription: event.target.value })} className={textInputClass()} /></Field>
+                <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
+                <div className="mt-2 border border-zinc-400">
+                  <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Settings size={14} /><X size={14} /></div></div>
+                  <select value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} className="h-7 w-full border-t border-zinc-300 bg-white px-2 text-xs">
+                    <option value="">Selecione...</option>
+                    {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
+                  </select>
+                </div>
+                <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
+                <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                <Field label="Dt. origem"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.originDateStart} onChange={(event) => setFilters({ ...filters, originDateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.originDateEnd} onChange={(event) => setFilters({ ...filters, originDateEnd: event.target.value })} className={textInputClass()} /></div></Field>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} className="border border-zinc-400 bg-white px-3 py-1">Limpar</button>
+                </div>
+              </div>
+            </aside>
+
+            <section className="min-w-0 bg-white">
+              <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
+                <div className="px-2 font-semibold">Transportes de carga rodoviario</div>
+                <div className="ml-auto px-2">{visibleFreights.length} registros</div>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
+                <div className="flex items-center gap-2 pr-2"><Settings size={18} /><span>↔</span><span>☑</span><span>1:1</span><span>XLS</span><button onClick={openNewFreight} className="grid h-6 w-6 place-items-center bg-black text-white">+</button></div>
+              </div>
+              <div className="overflow-auto">
+                <table className="w-full min-w-[2550px] text-xs">
+                  <thead className="bg-white">
+                    <tr>
+                      {['', '', 'Codigo', '', '', '', 'Dt. inicio', 'Situacao', 'Cliente', 'Remetente', 'Destinatario', 'Contratado', 'Tipo', 'Motorista', 'Tracao', 'Reboque', 'Origem', 'UF coleta', 'Destino', 'UF entrega', 'Pagamento', 'Vl. frete lista', 'Vl. abastecimento', 'Dt. agendamento descarga', 'Dt. chegada', 'Dt.Inicio Descarg.', 'Hr.Inicio Descarg', 'Dt. descida CNTR', 'Dt. retirada P.D.', 'Dt. fim descarga', 'Dt. devolucao CNTR', 'Estab. CT-e/NFS-e', 'No CT-e/NFS-e', 'No averbacao CTE', 'No CIOT', 'Situacao CIOT'].map((heading, index) => (
+                        <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
+                          <span>{heading}</span>
+                          {heading && <span className="float-right text-zinc-400">▼</span>}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleFreights.map((freight, index) => (
+                      <tr key={freight.id} onDoubleClick={() => openFreightDetail(freight)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" /></td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-400">⋮</td>
+                        <td onClick={() => openFreightDetail(freight)} className="border-b border-r border-zinc-200 px-2 py-1 font-medium text-blue-950">{freight.process || freight.number}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-center">▪</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-red-600">▶</td>
+                        <td className="relative border-b border-r border-zinc-200 px-2 py-1">
+                          <button onClick={() => setOpenActionId(openActionId === freight.id ? null : freight.id)} className="grid h-5 w-6 place-items-center border border-zinc-300 bg-white"><MoreVertical size={14} /></button>
+                          {openActionId === freight.id && (
+                            <div className="absolute left-0 top-7 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
+                              <button onClick={() => openFreightDetail(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
+                              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Aprovar</button>
+                              <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Duplicar</button>
+                              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 07:50</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.operationalStatus || 'OPERACAO ENCERRADA'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.customer}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.customer}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.destination || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">TRANS CAVALCANTE</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">ETC</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.driver || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.tractorPlate || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.trailerPlate || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.origin || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">AM</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.destination || '-'}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">AM</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">7 DIAS</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-right">{freight.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-right">0,00</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 10:00</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">07:30</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 15:30</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">LAM</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.fiscalStatus === 'Emitido' ? '1296' : ''}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.fiscalStatus === 'Emitido' ? '0572007261938274900068' : ''}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.closing ? '5200029452035879' : ''}</td>
+                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.closing ? 'REGISTRADO' : ''}</td>
+                      </tr>
+                    ))}
+                    {!visibleFreights.length && <tr><td colSpan={36} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </div>
-      </div>}
+      )}
 
       {showForm && (
         <div className="border border-zinc-500 bg-zinc-100">
