@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Driver } from '../services/localStore'
@@ -94,6 +94,7 @@ export function DriversPage() {
   const [mainTab, setMainTab] = useState('GERAIS')
   const [subTab, setSubTab] = useState('ENDERECOS')
   const [query, setQuery] = useState('')
+  const [topSectionHeight, setTopSectionHeight] = useState(190)
 
   const rows = useMemo(() => {
     return drivers.filter((driver) => {
@@ -152,6 +153,29 @@ export function DriversPage() {
       setDrivers(drivers.filter((item) => item.id !== driver.id))
       setEditing(null)
     }
+  }
+
+  function startTopResize(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const startY = event.clientY
+    const startHeight = topSectionHeight
+
+    function resize(moveEvent: MouseEvent) {
+      const nextHeight = Math.min(230, Math.max(72, startHeight + moveEvent.clientY - startY))
+      setTopSectionHeight(nextHeight)
+    }
+
+    function stopResize() {
+      window.removeEventListener('mousemove', resize)
+      window.removeEventListener('mouseup', stopResize)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', resize)
+    window.addEventListener('mouseup', stopResize)
   }
 
   return (
@@ -231,7 +255,10 @@ export function DriversPage() {
             </div>
 
             <div className="max-h-[calc(100vh-92px)] overflow-y-auto p-2">
-              <div className="grid items-start gap-x-12 gap-y-2 pb-1 md:grid-cols-2">
+              <div
+                className="grid items-start gap-x-12 gap-y-2 overflow-hidden pb-1 md:grid-cols-2"
+                style={{ height: topSectionHeight }}
+              >
                 <div className="grid content-start grid-cols-[128px_1fr] items-center gap-1 text-xs">
                   <label className="text-right text-red-600">Tipo de pessoa</label>
                   <select value={editing.personType} onChange={(event) => updateEditing('personType', event.target.value)} className="h-7 border border-zinc-300 px-2">
@@ -264,7 +291,12 @@ export function DriversPage() {
                 </div>
               </div>
 
-              <div className="relative my-2 h-2 border-t-4 border-zinc-400">
+              <div
+                onMouseDown={startTopResize}
+                onDoubleClick={() => setTopSectionHeight(topSectionHeight > 90 ? 72 : 190)}
+                className="relative my-1 h-3 cursor-row-resize border-t-4 border-zinc-400"
+                title="Arraste para ajustar a area superior"
+              >
                 <span className="absolute left-1/2 top-[-4px] h-2 w-12 -translate-x-1/2 border-x border-zinc-400 bg-zinc-100" />
               </div>
 
