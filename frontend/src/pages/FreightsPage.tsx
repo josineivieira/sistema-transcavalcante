@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import { MoreVertical, Save, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, setFreights } = useLocalData()
+  const canEditPage = canEdit('freights')
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
   const [openActionId, setOpenActionId] = useState<string | null>(null)
@@ -48,6 +50,10 @@ export function FreightsPage() {
   }
 
   function saveFreight() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     const value = Number(form.value)
     const tractor = tractors.find((item) => item.id === form.tractorId)
     const trailer = trailers.find((item) => item.id === form.trailerId)
@@ -81,11 +87,19 @@ export function FreightsPage() {
   }
 
   function updateFreight(id: string, patch: Partial<(typeof freights)[number]>) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setFreights(freights.map((freight) => (freight.id === id ? { ...freight, ...patch } : freight)))
     setOpenActionId(null)
   }
 
   function duplicateFreight(freight: (typeof freights)[number]) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
     setOpenActionId(null)
   }
@@ -109,8 +123,8 @@ export function FreightsPage() {
             <p className="text-xs text-zinc-500">Controle operacional com motorista, cavalo, carreta, contêiner e elegibilidade para fechamento.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => window.alert('Importação CSV será ligada ao backend na próxima etapa.')} className="border border-zinc-400 bg-white px-3 py-1.5 text-xs font-medium">Importar CSV</button>
-            <button onClick={() => setShowForm(true)} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">Novo frete</button>
+            <button onClick={() => canEditPage ? window.alert('Importação CSV será ligada ao backend na próxima etapa.') : denyNoPrivilege()} className="border border-zinc-400 bg-white px-3 py-1.5 text-xs font-medium">Importar CSV</button>
+            <button onClick={() => canEditPage ? setShowForm(true) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">Novo frete</button>
           </div>
         </div>
 

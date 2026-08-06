@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Driver } from '../services/localStore'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const emptyDriver: Driver = {
   id: '',
@@ -90,6 +91,7 @@ function driverForEdit(driver?: Driver): Driver {
 
 export function DriversPage() {
   const { drivers, setDrivers } = useLocalData()
+  const canEditPage = canEdit('drivers')
   const [editing, setEditing] = useState<Driver | null>(null)
   const [mainTab, setMainTab] = useState('GERAIS')
   const [subTab, setSubTab] = useState('ENDERECOS')
@@ -128,6 +130,10 @@ export function DriversPage() {
   }
 
   function saveDriver(closeAfterSave = true) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     if (!editing.name || !editing.cpf) {
       window.alert('Informe nome completo e CPF.')
@@ -149,6 +155,10 @@ export function DriversPage() {
   }
 
   function deleteDriver(driver: Driver) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (window.confirm(`Excluir condutor ${driver.name}?`)) {
       setDrivers(drivers.filter((item) => item.id !== driver.id))
       setEditing(null)
@@ -185,7 +195,7 @@ export function DriversPage() {
           <h2 className="text-sm font-semibold">Condutores</h2>
           <p className="text-xs text-zinc-500">Cadastro de motoristas, ficha de pessoa, comunicacoes, CNH e dados operacionais.</p>
         </div>
-        <button onClick={() => setEditing(driverForEdit())} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+        <button onClick={() => canEditPage ? setEditing(driverForEdit()) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
           Novo condutor
         </button>
       </div>
@@ -221,7 +231,7 @@ export function DriversPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.state || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(driver.registrationDate)}</td>
                 <td className="border-b border-zinc-200 px-2 py-1">
-                  <button onClick={() => setEditing(driverForEdit(driver))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                  <button onClick={() => canEditPage ? setEditing(driverForEdit(driver)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                     <Pencil size={14} />
                   </button>
                 </td>

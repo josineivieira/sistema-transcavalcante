@@ -12,6 +12,8 @@ export type AuthUser = {
 let currentUser: AuthUser | null = null
 let currentToken = ''
 
+export const noPrivilegeMessage = 'Você não tem privilégio para essa ação.'
+
 export const routePermissions: Record<string, string> = {
   '/dashboard': 'dashboard',
   '/freights': 'freights',
@@ -76,6 +78,10 @@ export function canView(moduleKey: string) {
 
 export function canEdit(moduleKey: string) {
   return getPermission(moduleKey) === 'edit'
+}
+
+export function denyNoPrivilege() {
+  window.alert(noPrivilegeMessage)
 }
 
 export function canAccessPath(path: string) {

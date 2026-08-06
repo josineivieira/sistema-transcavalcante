@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Pencil, Save, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type SystemUser, type UserPermission } from '../services/localStore'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const modules = [
   ['dashboard', 'Visao geral'],
@@ -63,6 +64,7 @@ function userForEdit(user?: SystemUser): SystemUser {
 
 export function UsersPage() {
   const { users, setUsers } = useLocalData()
+  const canEditPage = canEdit('users')
   const [editing, setEditing] = useState<SystemUser | null>(null)
   const [query, setQuery] = useState('')
 
@@ -72,11 +74,19 @@ export function UsersPage() {
   }, [query, users])
 
   function updateEditing(field: keyof SystemUser, value: string) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     setEditing({ ...editing, [field]: value })
   }
 
   function updatePermission(module: string, permission: UserPermission) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     setEditing({
       ...editing,
@@ -88,6 +98,10 @@ export function UsersPage() {
   }
 
   function applyPreset(permission: UserPermission) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     setEditing({
       ...editing,
@@ -96,6 +110,10 @@ export function UsersPage() {
   }
 
   function saveUser() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     if (!editing.name || !editing.email) {
       window.alert('Informe nome e e-mail do usuario.')
@@ -112,6 +130,10 @@ export function UsersPage() {
   }
 
   function deleteUser(user: SystemUser) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (window.confirm(`Excluir usuario ${user.name}?`)) {
       setUsers(users.filter((item) => item.id !== user.id))
       setEditing(null)
@@ -125,7 +147,7 @@ export function UsersPage() {
           <h2 className="text-sm font-semibold">Usuarios</h2>
           <p className="text-xs text-zinc-500">Cadastro de usuarios e permissao por tela: visualizar ou editar.</p>
         </div>
-        <button onClick={() => setEditing(userForEdit())} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+        <button onClick={() => canEditPage ? setEditing(userForEdit()) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
           Novo usuario
         </button>
       </div>
@@ -154,7 +176,7 @@ export function UsersPage() {
                   <td className="border-b border-zinc-200">{editable}</td>
                   <td className="border-b border-zinc-200 text-emerald-700">{user.status}</td>
                   <td className="border-b border-zinc-200">
-                    <button onClick={() => setEditing(userForEdit(user))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                    <button onClick={() => canEditPage ? setEditing(userForEdit(user)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                       <Pencil size={14} />
                     </button>
                   </td>

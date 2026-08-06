@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const emptyCustomer: Customer = {
   id: '',
@@ -86,6 +87,7 @@ function customerForEdit(customer?: Customer): Customer {
 
 export function CustomersPage() {
   const { customers, setCustomers } = useLocalData()
+  const canEditPage = canEdit('customers')
   const [editing, setEditing] = useState<Customer | null>(null)
   const [mainTab, setMainTab] = useState('GERAIS')
   const [subTab, setSubTab] = useState('ENDERECO')
@@ -119,6 +121,10 @@ export function CustomersPage() {
   }
 
   function saveCustomer(closeAfterSave = true) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     if (!editing.document || !editing.name) {
       window.alert('Informe CPF/CNPJ e razao social/nome.')
@@ -137,6 +143,10 @@ export function CustomersPage() {
   }
 
   function deleteCustomer(customer: Customer) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (window.confirm(`Excluir cliente ${customer.name}?`)) {
       setCustomers(customers.filter((item) => item.id !== customer.id))
       setEditing(null)
@@ -169,7 +179,7 @@ export function CustomersPage() {
           <h2 className="text-sm font-semibold">Clientes</h2>
           <p className="text-xs text-zinc-500">Cadastro de tomadores, comunicacao, endereco e dados fiscais para NFS-e.</p>
         </div>
-        <button onClick={() => setEditing(customerForEdit())} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+        <button onClick={() => canEditPage ? setEditing(customerForEdit()) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
           Novo cliente
         </button>
       </div>
@@ -221,7 +231,7 @@ export function CustomersPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.stateRegistration || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(customer.registrationDate)}</td>
                 <td className="border-b border-zinc-200 px-2 py-1">
-                  <button onClick={() => setEditing(customerForEdit(customer))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                  <button onClick={() => canEditPage ? setEditing(customerForEdit(customer)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                     <Pencil size={14} />
                   </button>
                 </td>

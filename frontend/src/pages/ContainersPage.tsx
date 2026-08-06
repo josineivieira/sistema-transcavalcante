@@ -2,16 +2,22 @@ import { useState } from 'react'
 import { Pencil, Save, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId } from '../services/localStore'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const emptyContainer = { number: '', type: 'Dry', size: '40 HC', seal: '', shippingLine: '', grossWeight: '', tare: '', condition: 'Cheio' }
 
 export function ContainersPage() {
   const { containers, setContainers } = useLocalData()
+  const canEditPage = canEdit('containers')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyContainer)
 
   function openContainer(container?: (typeof containers)[number]) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (container) {
       setEditingId(container.id)
       setForm({
@@ -32,6 +38,10 @@ export function ContainersPage() {
   }
 
   function saveContainer() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!form.number) {
       window.alert('Informe o numero do conteiner.')
       return

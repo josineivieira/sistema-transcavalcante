@@ -2,6 +2,7 @@ import { Building2, FileKey2, RotateCcw, Save, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { defaultIssuerSettings, type IssuerSettings } from '../services/fiscalSettings'
 import { useLocalData } from '../hooks/useLocalData'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const productionChecklist = [
   'CNPJ, razao social e inscricao municipal do prestador conferidos',
@@ -16,6 +17,7 @@ const productionChecklist = [
 
 export function SettingsPage() {
   const { issuerSettings, settingsSavedAt, setIssuerSettings, loading, error } = useLocalData()
+  const canEditPage = canEdit('settings')
   const [issuer, setIssuer] = useState<IssuerSettings>(issuerSettings)
   const [savedAt, setSavedAt] = useState(settingsSavedAt)
 
@@ -25,10 +27,18 @@ export function SettingsPage() {
   }, [issuerSettings, settingsSavedAt])
 
   function updateIssuer(patch: Partial<IssuerSettings>) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setIssuer((current) => ({ ...current, ...patch }))
   }
 
   function save() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     const now = new Date().toLocaleString('pt-BR')
     setIssuerSettings(issuer, now)
     setSavedAt(now)
@@ -36,6 +46,10 @@ export function SettingsPage() {
   }
 
   function restore() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setIssuer(defaultIssuerSettings)
   }
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 const steps = [
   ['1', 'Selecao', 'Cliente e periodo'],
@@ -15,6 +16,7 @@ const steps = [
 export function ClosingsPage() {
   const data = useLocalData()
   const { freights, closings } = data
+  const canEditPage = canEdit('closings')
   const [showPreview, setShowPreview] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [period, setPeriod] = useState('Semana atual')
@@ -47,6 +49,10 @@ export function ClosingsPage() {
   const viewingFreights = freights.filter((freight) => freight.closing === viewingClosingNumber)
 
   function openPreview() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!eligibleFreights.length) {
       window.alert('Nao ha fretes aprovados disponiveis para fechamento.')
       return
@@ -66,16 +72,28 @@ export function ClosingsPage() {
   }
 
   function toggleFreight(id: string) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setSelectedFreightIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     )
   }
 
   function toggleAll(checked: boolean) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     setSelectedFreightIds(checked ? previewRows.map((freight) => freight.id) : [])
   }
 
   function confirmClosing() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!selectedFreights.length) {
       window.alert('Selecione pelo menos um frete para fechar.')
       return
@@ -111,6 +129,10 @@ export function ClosingsPage() {
   }
 
   function approveClosing(id: string) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     data.update({
       ...data,
       closings: closings.map((closing) => closing.id === id ? { ...closing, status: 'Aprovado' } : closing),
@@ -119,6 +141,10 @@ export function ClosingsPage() {
   }
 
   function cancelClosing(id: string) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     const closing = closings.find((item) => item.id === id)
     if (!closing) return
 

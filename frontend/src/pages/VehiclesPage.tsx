@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, Pencil, Save, Search, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Vehicle } from '../services/localStore'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 type VehicleType = 'Cavalo' | 'Carreta'
 
@@ -91,6 +92,7 @@ function openVehicle(type: VehicleType, vehicle?: Vehicle): Vehicle {
 
 export function VehiclesPage() {
   const { vehicles, setVehicles } = useLocalData()
+  const canEditPage = canEdit('vehicles')
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [modalTab, setModalTab] = useState('GERAL')
   const [query, setQuery] = useState('')
@@ -131,6 +133,10 @@ export function VehiclesPage() {
   }
 
   function saveVehicle(closeAfterSave = true) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!editing) return
     const plate = plateOf(editing).trim()
     if (!plate) {
@@ -152,6 +158,10 @@ export function VehiclesPage() {
   }
 
   function deleteVehicle(vehicle: Vehicle) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (window.confirm(`Excluir veiculo ${plateOf(vehicle)}?`)) {
       setVehicles(vehicles.filter((item) => item.id !== vehicle.id))
       setEditing(null)
@@ -166,7 +176,7 @@ export function VehiclesPage() {
             <h2 className="text-sm font-semibold">Frota de veiculos</h2>
             <p className="text-xs text-zinc-500">Cadastro de cavalos, carretas, proprietarios, documentos e licenciamento.</p>
           </div>
-          <button onClick={() => setEditing(openVehicle('Cavalo'))} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+          <button onClick={() => canEditPage ? setEditing(openVehicle('Cavalo')) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
             Novo veiculo
           </button>
         </div>
@@ -207,7 +217,7 @@ export function VehiclesPage() {
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.yearModel || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.chassis || '-'}</td>
                   <td className="border-b border-zinc-200 px-2 py-1">
-                    <button onClick={() => setEditing(openVehicle(vehicle.vehicleType, vehicle))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                    <button onClick={() => canEditPage ? setEditing(openVehicle(vehicle.vehicleType, vehicle)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                       <Pencil size={14} />
                     </button>
                   </td>

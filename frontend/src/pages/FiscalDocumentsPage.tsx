@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
+import { canEdit, denyNoPrivilege } from '../services/authSession'
 
 export function FiscalDocumentsPage() {
   const data = useLocalData()
   const { customers, closings, freights, fiscalDocuments } = data
+  const canEditPage = canEdit('fiscalDocuments')
   const issuer = data.issuerSettings
   const [showPreview, setShowPreview] = useState(false)
   const [selectedClosingNumber, setSelectedClosingNumber] = useState('')
@@ -63,6 +65,10 @@ export function FiscalDocumentsPage() {
   ].filter(([, value]) => !value || value === 'Nao instalado')
 
   function openPreview() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!approvedClosings.length) {
       window.alert('Aprove um fechamento sem documento fiscal antes de emitir.')
       return
@@ -74,6 +80,10 @@ export function FiscalDocumentsPage() {
   }
 
   function confirmIssueDocument() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
     if (!selectedClosing) {
       window.alert('Selecione um fechamento para emitir.')
       return
