@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import { normalizeData, seedData, type AppData } from '../services/localStore'
-import { setAuthSession } from '../services/authSession'
+import { firstAllowedPath, setAuthSession } from '../services/authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -53,7 +53,7 @@ export function LoginPage() {
         remember,
       })
       setLoading(false)
-      navigate('/dashboard', { replace: true })
+      navigate(firstAllowedPath(), { replace: true })
     } catch {
       setMessage('Nao foi possivel conectar ao banco de dados.')
     } finally {

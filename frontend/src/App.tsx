@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { AppLayout } from './layouts/AppLayout'
 import { DashboardPage } from './pages/DashboardPage'
 import { FreightsPage } from './pages/FreightsPage'
@@ -14,7 +15,19 @@ import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LoginPage } from './pages/LoginPage'
 import { UsersPage } from './pages/UsersPage'
-import { isAuthenticated } from './services/authSession'
+import { canAccessPath, firstAllowedPath, isAuthenticated } from './services/authSession'
+
+function ProtectedPage({ path, children }: { path: string, children: ReactNode }) {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!canAccessPath(path)) {
+    return <Navigate to={firstAllowedPath()} replace />
+  }
+
+  return children
+}
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated)
@@ -34,19 +47,19 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<AppLayout />}>
-        <Route index element={<Navigate to={authenticated ? '/dashboard' : '/login'} replace />} />
-        <Route path="dashboard" element={authenticated ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path="freights" element={authenticated ? <FreightsPage /> : <Navigate to="/login" replace />} />
-        <Route path="closings" element={authenticated ? <ClosingsPage /> : <Navigate to="/login" replace />} />
-        <Route path="fiscal-documents" element={authenticated ? <FiscalDocumentsPage /> : <Navigate to="/login" replace />} />
-        <Route path="customers" element={authenticated ? <CustomersPage /> : <Navigate to="/login" replace />} />
-        <Route path="drivers" element={authenticated ? <DriversPage /> : <Navigate to="/login" replace />} />
-        <Route path="vehicles" element={authenticated ? <VehiclesPage /> : <Navigate to="/login" replace />} />
-        <Route path="containers" element={authenticated ? <ContainersPage /> : <Navigate to="/login" replace />} />
-        <Route path="finance" element={authenticated ? <FinancePage /> : <Navigate to="/login" replace />} />
-        <Route path="reports" element={authenticated ? <ReportsPage /> : <Navigate to="/login" replace />} />
-        <Route path="users" element={authenticated ? <UsersPage /> : <Navigate to="/login" replace />} />
-        <Route path="settings" element={authenticated ? <SettingsPage /> : <Navigate to="/login" replace />} />
+        <Route index element={<Navigate to={authenticated ? firstAllowedPath() : '/login'} replace />} />
+        <Route path="dashboard" element={<ProtectedPage path="/dashboard"><DashboardPage /></ProtectedPage>} />
+        <Route path="freights" element={<ProtectedPage path="/freights"><FreightsPage /></ProtectedPage>} />
+        <Route path="closings" element={<ProtectedPage path="/closings"><ClosingsPage /></ProtectedPage>} />
+        <Route path="fiscal-documents" element={<ProtectedPage path="/fiscal-documents"><FiscalDocumentsPage /></ProtectedPage>} />
+        <Route path="customers" element={<ProtectedPage path="/customers"><CustomersPage /></ProtectedPage>} />
+        <Route path="drivers" element={<ProtectedPage path="/drivers"><DriversPage /></ProtectedPage>} />
+        <Route path="vehicles" element={<ProtectedPage path="/vehicles"><VehiclesPage /></ProtectedPage>} />
+        <Route path="containers" element={<ProtectedPage path="/containers"><ContainersPage /></ProtectedPage>} />
+        <Route path="finance" element={<ProtectedPage path="/finance"><FinancePage /></ProtectedPage>} />
+        <Route path="reports" element={<ProtectedPage path="/reports"><ReportsPage /></ProtectedPage>} />
+        <Route path="users" element={<ProtectedPage path="/users"><UsersPage /></ProtectedPage>} />
+        <Route path="settings" element={<ProtectedPage path="/settings"><SettingsPage /></ProtectedPage>} />
       </Route>
     </Routes>
   )

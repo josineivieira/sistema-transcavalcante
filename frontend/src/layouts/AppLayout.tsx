@@ -22,34 +22,34 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { clearAuthSession, getAuthUser } from '../services/authSession'
+import { canView, clearAuthSession, getAuthUser } from '../services/authSession'
 
 const groups = [
   {
     title: 'Operação',
     items: [
-      ['Visão geral', '/dashboard', Gauge],
-      ['Fretes', '/freights', Truck],
-      ['Clientes', '/customers', Building2],
-      ['Motoristas', '/drivers', UserRound],
-      ['Veículos', '/vehicles', Boxes],
-      ['Contêineres', '/containers', Container],
+      ['dashboard', 'Visão geral', '/dashboard', Gauge],
+      ['freights', 'Fretes', '/freights', Truck],
+      ['customers', 'Clientes', '/customers', Building2],
+      ['drivers', 'Motoristas', '/drivers', UserRound],
+      ['vehicles', 'Veículos', '/vehicles', Boxes],
+      ['containers', 'Contêineres', '/containers', Container],
     ],
   },
   {
     title: 'Faturamento',
     items: [
-      ['Fechamentos', '/closings', ClipboardList],
-      ['Documentos fiscais', '/fiscal-documents', ReceiptText],
-      ['Financeiro', '/finance', WalletCards],
-      ['Relatórios', '/reports', FileText],
+      ['closings', 'Fechamentos', '/closings', ClipboardList],
+      ['fiscalDocuments', 'Documentos fiscais', '/fiscal-documents', ReceiptText],
+      ['finance', 'Financeiro', '/finance', WalletCards],
+      ['reports', 'Relatórios', '/reports', FileText],
     ],
   },
   {
     title: 'Administração',
     items: [
-      ['Usuários', '/users', UserCog],
-      ['Configurações', '/settings', Settings],
+      ['users', 'Usuários', '/users', UserCog],
+      ['settings', 'Configurações', '/settings', Settings],
     ],
   },
 ]
@@ -137,10 +137,14 @@ export function AppLayout() {
           </div>
 
           <nav className="sidebar-nav w-full overflow-y-auto px-2 py-3">
-            {groups.map((group) => (
+            {groups.map((group) => {
+              const allowedItems = group.items.filter(([moduleKey]) => canView(moduleKey as string))
+              if (!allowedItems.length) return null
+
+              return (
               <div key={group.title} className="mb-4">
                 {!collapsed && <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[#8da5cb]">{group.title}</div>}
-                {group.items.map(([label, href, Icon]) => (
+                {allowedItems.map(([, label, href, Icon]) => (
                   <NavLink
                     key={href as string}
                     to={href as string}
@@ -160,7 +164,8 @@ export function AppLayout() {
                   </NavLink>
                 ))}
               </div>
-            ))}
+              )
+            })}
           </nav>
 
           <div className={collapsed ? 'w-full border-t border-[#1c315a] px-2 py-3 text-[#9db7dc]' : 'w-full border-t border-[#1c315a] px-4 py-3 text-[11px] text-[#9db7dc]'}>
