@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-too"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    login_max_attempts: int = 5
+    login_lockout_seconds: int = 900
     database_url: str = "sqlite:///./app.db"
     redis_url: str = "redis://localhost:6379/0"
     encryption_key: str = "change-me-encryption"

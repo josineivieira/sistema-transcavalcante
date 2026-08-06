@@ -101,12 +101,12 @@ export function UsersPage() {
       window.alert('Informe nome e e-mail do usuario.')
       return
     }
-    if (!editing.password) {
+    const exists = users.some((user) => user.id === editing.id)
+    if (!exists && !editing.password) {
       window.alert('Informe uma senha para o usuario acessar o sistema.')
       return
     }
 
-    const exists = users.some((user) => user.id === editing.id)
     setUsers(exists ? users.map((user) => user.id === editing.id ? editing : user) : [...users, editing])
     setEditing(null)
   }
@@ -185,7 +185,7 @@ export function UsersPage() {
                 <label className="text-right text-red-600">E-mail</label>
                 <input value={editing.email} onChange={(event) => updateEditing('email', event.target.value)} className="h-7 border border-zinc-300 px-2" />
                 <label className="text-right text-red-600">Senha</label>
-                <input value={editing.password} onChange={(event) => updateEditing('password', event.target.value)} className="h-7 border border-zinc-300 px-2" type="password" />
+                <input value={editing.password} onChange={(event) => updateEditing('password', event.target.value)} className="h-7 border border-zinc-300 px-2" type="password" placeholder={editing.passwordConfigured ? 'Manter senha atual' : ''} />
                 <label className="text-right">Setor</label>
                 <input value={editing.department} onChange={(event) => updateEditing('department', event.target.value)} className="h-7 border border-zinc-300 px-2" />
               </div>

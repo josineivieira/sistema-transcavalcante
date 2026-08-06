@@ -231,6 +231,7 @@ export type SystemUser = {
   name: string
   email: string
   password: string
+  passwordConfigured?: boolean
   role: string
   department: string
   status: string
@@ -342,7 +343,8 @@ export const seedData: AppData = {
       id: 'usr-1',
       name: 'Administrador SF',
       email: 'admin@transcavalcante.local',
-      password: 'admin123',
+      password: '',
+      passwordConfigured: true,
       role: 'Administrador',
       department: 'Administracao',
       status: 'Ativo',
@@ -548,7 +550,8 @@ export function normalizeData(data: Partial<AppData>): AppData {
     receivables: data.receivables ?? [],
     users: (data.users ?? seedData.users).map((user) => ({
       ...user,
-      password: user.password ?? (user.email === 'admin@transcavalcante.local' ? 'admin123' : ''),
+      password: user.password ?? '',
+      passwordConfigured: user.passwordConfigured ?? Boolean(user.password),
       permissions: { ...emptyUserPermissions(), ...(user.permissions ?? {}) },
     })),
     issuerSettings: { ...defaultIssuerSettings, ...(data.issuerSettings ?? {}) },

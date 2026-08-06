@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getAuthToken } from './authSession'
 
 function resolveApiUrl() {
   if (
@@ -17,4 +18,12 @@ function resolveApiUrl() {
 
 export const api = axios.create({
   baseURL: resolveApiUrl(),
+})
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })

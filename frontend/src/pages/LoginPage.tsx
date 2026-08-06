@@ -3,8 +3,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
-import { normalizeData, seedData, type AppData } from '../services/localStore'
 import { firstAllowedPath, setAuthSession } from '../services/authSession'
+import type { AuthUser } from '../services/authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -30,32 +30,20 @@ export function LoginPage() {
     setMessage('Validando acesso...')
 
     try {
-      const response = await api.get<{ data: AppData | null }>('/operational-data')
-      let data = normalizeData(response.data.data ?? seedData)
-
-      if (!response.data.data) {
-        await api.put('/operational-data', { data })
-      }
-
-      const user = data.users.find((item) => item.email.toLowerCase() === normalizedEmail.toLowerCase())
-
-      if (!user || user.status !== 'Ativo' || user.password !== normalizedPassword) {
-        setMessage('Usuario ou senha invalido.')
-        return
-      }
+      const response = await api.post<{ access_token: string, user: AuthUser }>('/operational-data/login', {
+        email: normalizedEmail,
+        password: normalizedPassword,
+      })
 
       setAuthSession({
-        email: normalizedEmail,
-        name: user.name,
-        role: user.role,
-        permissions: user.permissions,
-        company: 'Transcavalcante - Matriz Manaus/AM',
+        ...response.data.user,
+        company: response.data.user.company ?? 'Transcavalcante - Matriz Manaus/AM',
         remember,
-      })
+      }, response.data.access_token)
       setLoading(false)
       navigate(firstAllowedPath(), { replace: true })
-    } catch {
-      setMessage('Nao foi possivel conectar ao banco de dados.')
+    } catch (error: any) {
+      setMessage(error.response?.data?.detail || 'Nao foi possivel validar o acesso no backend.')
     } finally {
       setLoading(false)
     }

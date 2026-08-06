@@ -10,6 +10,7 @@ export type AuthUser = {
 }
 
 let currentUser: AuthUser | null = null
+let currentToken = ''
 
 export const routePermissions: Record<string, string> = {
   '/dashboard': 'dashboard',
@@ -41,13 +42,15 @@ export const moduleDefaultRoutes = [
   '/settings',
 ]
 
-export function setAuthSession(user: AuthUser) {
+export function setAuthSession(user: AuthUser, accessToken: string) {
   currentUser = user
+  currentToken = accessToken
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
 
 export function clearAuthSession() {
   currentUser = null
+  currentToken = ''
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
 
@@ -57,6 +60,10 @@ export function isAuthenticated() {
 
 export function getAuthUser() {
   return currentUser
+}
+
+export function getAuthToken() {
+  return currentToken
 }
 
 export function getPermission(moduleKey: string) {
