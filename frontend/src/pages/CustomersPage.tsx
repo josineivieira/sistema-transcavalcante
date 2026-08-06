@@ -1,183 +1,416 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 
-type CustomerForm = Omit<Customer, 'id' | 'status'>
-
-const emptyForm: CustomerForm = {
+const emptyCustomer: Customer = {
+  id: '',
   document: '',
   name: '',
   tradeName: '',
+  participantType: 'Juridica',
+  market: '',
+  category: '',
+  shortName: '',
   emailFiscal: '',
   phone: '',
+  phoneDdd: '',
+  phoneExtension: '',
+  hasWhatsapp: 'S',
+  contactEmail: '',
   municipalRegistration: '',
   stateRegistration: '',
   zipCode: '',
   street: '',
   number: '',
   complement: '',
+  reference: '',
   district: '',
   city: 'Manaus',
   cityCode: '1302603',
   state: 'AM',
-  country: 'Brasil',
+  country: 'BR',
   taxRegime: 'Simples Nacional',
   serviceCode: '16.02',
   serviceDescription: 'Servico de transporte municipal de cargas e apoio logistico operacional.',
   issRate: '5',
   issWithheld: 'Nao',
   paymentTerm: '7 dias',
+  birthDate: '',
+  anniversary: '',
+  gender: '',
+  rg: '',
+  rgIssuer: '',
+  rgState: '',
+  notes: '',
+  website: '',
+  economicGroup: '',
+  groupedCode: '',
+  occupation: '',
+  educationLevel: '',
+  civilStatus: '',
+  spouseName: '',
+  employerDocument: '',
+  employer: '',
+  jobTitle: '',
+  birthplace: '',
+  nationality: 'Brasil',
+  motherName: '',
+  fatherName: '',
+  registrationDate: '',
+  status: 'Ativo',
+}
+
+function formatDate(value?: string) {
+  if (!value) return ''
+  const [year, month, day] = value.split('-')
+  if (!year || !month || !day) return value
+  return `${day}/${month}/${year}`
+}
+
+function customerForEdit(customer?: Customer): Customer {
+  if (!customer) {
+    return { ...emptyCustomer, id: nextId('cli'), registrationDate: new Date().toISOString().slice(0, 10) }
+  }
+
+  return {
+    ...emptyCustomer,
+    ...customer,
+    tradeName: customer.tradeName || customer.name,
+    shortName: customer.shortName || customer.tradeName || customer.name,
+    participantType: customer.participantType || (customer.document.length > 14 ? 'Juridica' : 'Fisica'),
+    contactEmail: customer.contactEmail || customer.emailFiscal,
+    country: customer.country || 'BR',
+  }
 }
 
 export function CustomersPage() {
   const { customers, setCustomers } = useLocalData()
-  const [showForm, setShowForm] = useState(false)
-  const [search, setSearch] = useState('')
-  const [form, setForm] = useState<CustomerForm>(emptyForm)
+  const [editing, setEditing] = useState<Customer | null>(null)
+  const [mainTab, setMainTab] = useState('GERAIS')
+  const [subTab, setSubTab] = useState('ENDERECO')
+  const [query, setQuery] = useState('')
+  const [topSectionHeight, setTopSectionHeight] = useState(190)
 
-  const visibleCustomers = useMemo(() => {
-    const term = search.toLowerCase()
-    return customers.filter((customer) =>
-      customer.name.toLowerCase().includes(term)
-      || customer.document.includes(search)
-      || (customer.city ?? '').toLowerCase().includes(term),
-    )
-  }, [customers, search])
+  const rows = useMemo(() => {
+    const term = query.toLowerCase()
+    return customers.filter((customer) => [
+      customer.name,
+      customer.tradeName,
+      customer.emailFiscal,
+      customer.phone,
+      customer.document,
+      customer.stateRegistration,
+      customer.street,
+      customer.city,
+      customer.state,
+    ].join(' ').toLowerCase().includes(term))
+  }, [customers, query])
 
-  function saveCustomer() {
-    if (!form.document || !form.name || !form.emailFiscal || !form.city || !form.state) {
-      window.alert('Informe documento, razao social, e-mail fiscal, municipio e UF.')
+  function updateEditing(field: keyof Customer, value: string) {
+    if (!editing) return
+    const next = { ...editing, [field]: value }
+    if (field === 'name') {
+      next.tradeName = next.tradeName || value
+      next.shortName = next.shortName || value
+    }
+    if (field === 'emailFiscal') next.contactEmail = value
+    setEditing(next)
+  }
+
+  function saveCustomer(closeAfterSave = true) {
+    if (!editing) return
+    if (!editing.document || !editing.name) {
+      window.alert('Informe CPF/CNPJ e razao social/nome.')
       return
     }
-
-    if (!form.street || !form.number || !form.district || !form.zipCode || !form.cityCode) {
-      window.alert('Para NFS-e, informe endereco completo e codigo IBGE do municipio.')
-      return
+    const normalized = {
+      ...editing,
+      tradeName: editing.tradeName || editing.name,
+      shortName: editing.shortName || editing.tradeName || editing.name,
+      contactEmail: editing.contactEmail || editing.emailFiscal,
+      status: editing.status || 'Ativo',
     }
+    const exists = customers.some((customer) => customer.id === normalized.id)
+    setCustomers(exists ? customers.map((customer) => customer.id === normalized.id ? normalized : customer) : [...customers, normalized])
+    if (closeAfterSave) setEditing(null)
+  }
 
-    setCustomers([
-      ...customers,
-      {
-        id: nextId('cli'),
-        ...form,
-        status: 'Ativo',
-      },
-    ])
-    setShowForm(false)
-    setForm(emptyForm)
+  function deleteCustomer(customer: Customer) {
+    if (window.confirm(`Excluir cliente ${customer.name}?`)) {
+      setCustomers(customers.filter((item) => item.id !== customer.id))
+      setEditing(null)
+    }
+  }
+
+  function startTopResize(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const startY = event.clientY
+    const startHeight = topSectionHeight
+    function resize(moveEvent: MouseEvent) {
+      setTopSectionHeight(Math.min(230, Math.max(72, startHeight + moveEvent.clientY - startY)))
+    }
+    function stopResize() {
+      window.removeEventListener('mousemove', resize)
+      window.removeEventListener('mouseup', stopResize)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', resize)
+    window.addEventListener('mouseup', stopResize)
   }
 
   return (
     <div className="border border-zinc-300 bg-white">
-      <div className="flex items-center justify-between border-b border-zinc-300 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold">Clientes</h2>
-          <p className="text-xs text-zinc-500">Cadastro do tomador com dados exigidos para simulacao de NFS-e.</p>
+          <p className="text-xs text-zinc-500">Cadastro de tomadores, comunicacao, endereco e dados fiscais para NFS-e.</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">Novo cliente</button>
+        <button onClick={() => setEditing(customerForEdit())} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+          Novo cliente
+        </button>
       </div>
 
-      {showForm && (
-        <div className="border-b border-zinc-300 bg-zinc-50">
-          <div className="border-b border-zinc-300 px-4 py-2 text-xs font-semibold uppercase text-zinc-500">Dados fiscais do tomador</div>
-          <div className="grid gap-3 p-3 md:grid-cols-6">
-            <input value={form.document} onChange={(event) => setForm({ ...form, document: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="CPF/CNPJ" />
-            <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Razao social / Nome" />
-            <input value={form.tradeName} onChange={(event) => setForm({ ...form, tradeName: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Nome fantasia" />
-            <input value={form.emailFiscal} onChange={(event) => setForm({ ...form, emailFiscal: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="E-mail fiscal" />
-            <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Telefone" />
-            <input value={form.municipalRegistration} onChange={(event) => setForm({ ...form, municipalRegistration: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Inscricao municipal" />
-            <input value={form.stateRegistration} onChange={(event) => setForm({ ...form, stateRegistration: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Inscricao estadual" />
-            <select value={form.taxRegime} onChange={(event) => setForm({ ...form, taxRegime: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              <option>Simples Nacional</option>
-              <option>Lucro Presumido</option>
-              <option>Lucro Real</option>
-              <option>MEI</option>
-              <option>Exterior</option>
-            </select>
-            <select value={form.paymentTerm} onChange={(event) => setForm({ ...form, paymentTerm: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              <option>7 dias</option>
-              <option>15 dias</option>
-              <option>30 dias</option>
-              <option>A vista</option>
-            </select>
-          </div>
-
-          <div className="border-y border-zinc-300 px-4 py-2 text-xs font-semibold uppercase text-zinc-500">Endereco do tomador</div>
-          <div className="grid gap-3 p-3 md:grid-cols-8">
-            <input value={form.zipCode} onChange={(event) => setForm({ ...form, zipCode: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="CEP" />
-            <input value={form.street} onChange={(event) => setForm({ ...form, street: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-3" placeholder="Logradouro" />
-            <input value={form.number} onChange={(event) => setForm({ ...form, number: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Numero" />
-            <input value={form.complement} onChange={(event) => setForm({ ...form, complement: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Complemento" />
-            <input value={form.district} onChange={(event) => setForm({ ...form, district: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Bairro" />
-            <input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-2" placeholder="Municipio" />
-            <input value={form.cityCode} onChange={(event) => setForm({ ...form, cityCode: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Codigo IBGE" />
-            <input value={form.state} onChange={(event) => setForm({ ...form, state: event.target.value.toUpperCase() })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="UF" maxLength={2} />
-            <input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Pais" />
-          </div>
-
-          <div className="border-y border-zinc-300 px-4 py-2 text-xs font-semibold uppercase text-zinc-500">Padrao de servico para NFS-e</div>
-          <div className="grid gap-3 p-3 md:grid-cols-8">
-            <input value={form.serviceCode} onChange={(event) => setForm({ ...form, serviceCode: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Item servico" />
-            <input value={form.issRate} onChange={(event) => setForm({ ...form, issRate: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Aliquota ISS %" />
-            <select value={form.issWithheld} onChange={(event) => setForm({ ...form, issWithheld: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm">
-              <option>Nao</option>
-              <option>Sim</option>
-            </select>
-            <input value={form.serviceDescription} onChange={(event) => setForm({ ...form, serviceDescription: event.target.value })} className="border border-zinc-300 px-2 py-1.5 text-sm md:col-span-4" placeholder="Discriminacao padrao do servico" />
-            <div className="flex gap-2">
-              <button onClick={saveCustomer} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white">Salvar</button>
-              <button onClick={() => setShowForm(false)} className="border border-zinc-400 bg-white px-3 py-1.5 text-sm font-medium">Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-3 border-b border-zinc-300 p-3 md:grid-cols-5">
-        <input value={search} onChange={(event) => setSearch(event.target.value)} className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="CPF/CNPJ, razao social ou municipio" />
-        <input className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Municipio" />
-        <select className="border border-zinc-300 px-2 py-1.5 text-sm">
-          <option>Situacao</option>
-          <option>Ativo</option>
-        </select>
-        <button onClick={() => setSearch('')} className="border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-sm font-medium">Limpar</button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
+        <div className="text-xs text-zinc-600">{rows.length} de {customers.length} registros</div>
+        <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
+          <Search size={15} className="mr-2" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-full w-64 border-0 p-0 outline-none" placeholder="Busca rapida" />
+        </label>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] text-sm">
-          <thead className="bg-zinc-50">
+        <table className="w-full min-w-[1420px] text-xs">
+          <thead className="bg-zinc-100">
             <tr>
-              {['Documento', 'Razao social', 'E-mail fiscal', 'Municipio', 'UF', 'Cod. IBGE', 'Item servico', 'ISS', 'Pagamento', 'Situacao', 'Acoes'].map((heading) => (
-                <th key={heading} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">{heading}</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Razao Social/Nome</th>
+              <th colSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-semibold text-zinc-800">COMUNICACAO</th>
+              <th colSpan={7} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-semibold text-zinc-800">ENDERECO</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Nome fantasia</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Tipo de participante</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">CNPJ/CPF/Codigo</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Inscricao estadual</th>
+              <th rowSpan={2} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Dt. cadastro</th>
+              <th rowSpan={2} className="border-b border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">Acoes</th>
+            </tr>
+            <tr>
+              {['E-mail', 'Telefone', 'Logradouro', 'Numero', 'Complemento', 'Bairro', 'Cidade', 'Estado', 'Sg. pais'].map((heading) => (
+                <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">{heading}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {visibleCustomers.map((customer) => (
-              <tr key={customer.id}>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.document}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.name}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.emailFiscal || '-'}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.city || '-'}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.state}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.cityCode || '-'}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.serviceCode || '-'}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.issRate ? `${customer.issRate}%` : '-'}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">{customer.paymentTerm}</td>
-                <td className="border-b border-zinc-200 px-3 py-2 text-emerald-700">{customer.status}</td>
-                <td className="border-b border-zinc-200 px-3 py-2">
-                  <button onClick={() => window.alert(`Cliente: ${customer.name}\nCNPJ/CPF: ${customer.document}\nEndereco: ${customer.street ?? '-'}, ${customer.number ?? '-'} - ${customer.city ?? '-'}\nServico: ${customer.serviceCode ?? '-'} | ISS ${customer.issRate ?? '-'}%`)} className="border border-zinc-300 px-2 py-1 text-xs">Ver</button>
+            {rows.map((customer) => (
+              <tr key={customer.id} className="hover:bg-sky-50">
+                <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{customer.name}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.emailFiscal || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.phone || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.street || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.number || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.complement || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.district || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.city || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.state || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.country || 'BR'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.tradeName || customer.name}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.participantType || 'Juridica'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.document}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.stateRegistration || '-'}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(customer.registrationDate)}</td>
+                <td className="border-b border-zinc-200 px-2 py-1">
+                  <button onClick={() => setEditing(customerForEdit(customer))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                    <Pencil size={14} />
+                  </button>
                 </td>
               </tr>
             ))}
-            {!visibleCustomers.length && (
-              <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-zinc-500">Nenhum cliente encontrado.</td>
-              </tr>
+            {rows.length === 0 && (
+              <tr><td colSpan={16} className="px-3 py-10 text-center text-zinc-500">Nenhum cliente encontrado.</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/30 px-4 py-6">
+          <div className="max-h-[calc(100vh-48px)] w-full max-w-7xl overflow-hidden border border-zinc-500 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Cliente</h3>
+              <div className="flex items-center gap-3 text-xs">
+                <button onClick={() => saveCustomer(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
+                <button onClick={() => saveCustomer(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
+                <button onClick={() => deleteCustomer(editing)} className="inline-flex items-center gap-1"><Trash2 size={15} /> EXCLUIR</button>
+                <Settings size={16} />
+                <button onClick={() => setEditing(null)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+              </div>
+            </div>
+
+            <div className="max-h-[calc(100vh-92px)] overflow-y-auto p-2">
+              <div className="grid items-start gap-x-12 overflow-hidden pb-1 md:grid-cols-2" style={{ height: topSectionHeight }}>
+                <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                  <label className="text-right">Mercado</label>
+                  <input value={editing.market} onChange={(event) => updateEditing('market', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                  <label className="text-right text-red-600">Tipo de participante</label>
+                  <select value={editing.participantType} onChange={(event) => updateEditing('participantType', event.target.value)} className="h-7 border border-zinc-300 px-2">
+                    <option>Fisica</option><option>Juridica</option><option>Exterior</option>
+                  </select>
+                  <label className="text-right text-red-600">Nome completo</label>
+                  <input value={editing.name} onChange={(event) => updateEditing('name', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                  <label className="text-right">E-mail principal</label>
+                  <input value={editing.emailFiscal} onChange={(event) => updateEditing('emailFiscal', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                </div>
+                <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                  <label className="text-right">Categoria</label>
+                  <input value={editing.category} onChange={(event) => updateEditing('category', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                  <label className="text-right text-red-600">CPF/CNPJ</label>
+                  <input value={editing.document} onChange={(event) => updateEditing('document', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                  <label />
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" /> Informar pesquisar por?</label>
+                  <label className="text-right">Pesquisar por</label>
+                  <input value={editing.name} readOnly className="h-7 border border-zinc-300 bg-zinc-200 px-2" />
+                  <label className="text-right">Indicado por</label>
+                  <input className="h-7 border border-zinc-300 px-2" />
+                  <label className="text-right">Desativar?</label>
+                  <input type="checkbox" checked={editing.status !== 'Ativo'} onChange={(event) => updateEditing('status', event.target.checked ? 'Inativo' : 'Ativo')} className="h-4 w-4" />
+                  <label />
+                  <div className="h-7 border border-zinc-400 bg-white px-2 leading-7 text-emerald-700">Registro ativo</div>
+                </div>
+              </div>
+
+              <div onMouseDown={startTopResize} onDoubleClick={() => setTopSectionHeight(topSectionHeight > 90 ? 72 : 190)} className="relative my-1 h-3 cursor-row-resize border-t-4 border-zinc-400" title="Arraste para ajustar a area superior">
+                <span className="absolute left-1/2 top-[-4px] h-2 w-12 -translate-x-1/2 border-x border-zinc-400 bg-zinc-100" />
+              </div>
+
+              <div className="flex border-b border-zinc-400 text-xs">
+                {['GERAIS', 'FICHA CADASTRO', 'CONSELHO'].map((tab) => (
+                  <button key={tab} onClick={() => setMainTab(tab)} className={`border border-b-0 px-3 py-1 ${mainTab === tab ? 'bg-zinc-300' : 'border-transparent bg-zinc-100'}`}>{tab}</button>
+                ))}
+              </div>
+
+              {mainTab === 'GERAIS' && (
+                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
+                  <div className="grid content-start grid-cols-[140px_1fr_130px] items-center gap-1 text-xs">
+                    <label className="text-right">Dt. nascimento</label>
+                    <input type="date" value={editing.birthDate} onChange={(event) => updateEditing('birthDate', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <span />
+                    <label className="text-right">Aniversario</label>
+                    <input value={editing.anniversary} onChange={(event) => updateEditing('anniversary', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <span />
+                    <label className="text-right">Sexo</label>
+                    <select value={editing.gender} onChange={(event) => updateEditing('gender', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Masculino</option><option>Feminino</option></select>
+                    <span />
+                    <label className="text-right">RG</label>
+                    <div className="grid grid-cols-[1fr_70px_60px] gap-1">
+                      <input value={editing.rg} onChange={(event) => updateEditing('rg', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                      <input value={editing.rgIssuer} onChange={(event) => updateEditing('rgIssuer', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" placeholder="Orgao" />
+                      <input value={editing.rgState} onChange={(event) => updateEditing('rgState', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    </div>
+                    <span />
+                    <label className="text-right">Observacao</label>
+                    <textarea value={editing.notes} onChange={(event) => updateEditing('notes', event.target.value)} className="h-20 border border-zinc-300 px-2 py-1" />
+                  </div>
+                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                    <label className="text-right">Nome reduzido</label>
+                    <input value={editing.shortName} onChange={(event) => updateEditing('shortName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Sitio (site) sem http://</label>
+                    <input value={editing.website} onChange={(event) => updateEditing('website', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Grupo economico</label>
+                    <input value={editing.economicGroup} onChange={(event) => updateEditing('economicGroup', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Codigo agrupador</label>
+                    <input value={editing.groupedCode} onChange={(event) => updateEditing('groupedCode', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Ocupacao</label>
+                    <input value={editing.occupation} onChange={(event) => updateEditing('occupation', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Grau escolaridade</label>
+                    <select value={editing.educationLevel} onChange={(event) => updateEditing('educationLevel', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Ensino medio</option><option>Superior</option></select>
+                  </div>
+                </div>
+              )}
+
+              {mainTab === 'FICHA CADASTRO' && (
+                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
+                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                    <label className="text-right">Estado civil</label>
+                    <select value={editing.civilStatus} onChange={(event) => updateEditing('civilStatus', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Solteiro</option><option>Casado</option></select>
+                    <label className="text-right">Nome do conjuge</label>
+                    <input value={editing.spouseName} onChange={(event) => updateEditing('spouseName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Codigo/CNPJ</label>
+                    <input value={editing.employerDocument} onChange={(event) => updateEditing('employerDocument', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Empregador</label>
+                    <input value={editing.employer} onChange={(event) => updateEditing('employer', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Cargo</label>
+                    <input value={editing.jobTitle} onChange={(event) => updateEditing('jobTitle', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Naturalidade</label>
+                    <input value={editing.birthplace} onChange={(event) => updateEditing('birthplace', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Nacionalidade</label>
+                    <input value={editing.nationality} onChange={(event) => updateEditing('nationality', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                  </div>
+                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                    <label className="text-right">Nome da mae</label>
+                    <input value={editing.motherName} onChange={(event) => updateEditing('motherName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <label className="text-right">Nome do pai</label>
+                    <input value={editing.fatherName} onChange={(event) => updateEditing('fatherName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                  </div>
+                </div>
+              )}
+
+              {mainTab === 'CONSELHO' && <div className="border border-t-0 border-zinc-300 p-8 text-sm text-zinc-500">Dados de conselho quando aplicavel.</div>}
+
+              <div className="mt-3 flex border-b border-zinc-400 text-xs">
+                {['ENDERECO', 'COMUNICACOES (TELEFONES/EMAIL)', 'CONTATOS'].map((tab) => (
+                  <button key={tab} onClick={() => setSubTab(tab)} className={`border border-b-0 px-3 py-1 ${subTab === tab ? 'bg-zinc-300' : 'border-transparent bg-zinc-100'}`}>{tab}</button>
+                ))}
+              </div>
+
+              {subTab === 'ENDERECO' && (
+                <div className="border border-t-0 border-zinc-300 p-2">
+                  <div className="flex justify-between bg-zinc-300 px-2 py-1 text-xs"><span>Endereco</span><span>1 registro</span></div>
+                  <table className="w-full text-xs"><tbody>
+                    <tr className="bg-white">{['Logradouro', 'Numero', 'Complemento', 'Bairro', 'Cidade', 'Estado', 'Sg. pais', 'CEP', 'Inscricao estadual', 'Inscricao municipal'].map((h) => <td key={h} className="border border-zinc-200 px-2 py-1 text-zinc-600">{h}</td>)}</tr>
+                    <tr>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.street} onChange={(e) => updateEditing('street', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.number} onChange={(e) => updateEditing('number', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.complement} onChange={(e) => updateEditing('complement', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.district} onChange={(e) => updateEditing('district', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.city} onChange={(e) => updateEditing('city', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.state} onChange={(e) => updateEditing('state', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" maxLength={2} /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.country} onChange={(e) => updateEditing('country', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.zipCode} onChange={(e) => updateEditing('zipCode', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.stateRegistration} onChange={(e) => updateEditing('stateRegistration', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.municipalRegistration} onChange={(e) => updateEditing('municipalRegistration', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                    </tr>
+                  </tbody></table>
+                </div>
+              )}
+
+              {subTab === 'COMUNICACOES (TELEFONES/EMAIL)' && (
+                <div className="border border-t-0 border-zinc-300 p-2">
+                  <div className="flex justify-between bg-zinc-300 px-2 py-1 text-xs"><span>Comunicacoes</span><span>1 registro</span></div>
+                  <table className="w-full text-xs"><tbody>
+                    <tr className="bg-white">{['Principal?', 'Tipo de comunicacao', 'DDD', 'Telefone', 'Ramal', 'Tem whats?', 'E-mail/Conta', 'Excluido?', 'Registrado por', 'Observacao'].map((h) => <td key={h} className="border border-zinc-200 px-2 py-1 text-zinc-600">{h}</td>)}</tr>
+                    <tr>
+                      <td className="border border-zinc-200 px-2 py-1">S</td>
+                      <td className="border border-zinc-200 px-2 py-1">E-mail/Telefone</td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phoneDdd} onChange={(e) => updateEditing('phoneDdd', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phone} onChange={(e) => updateEditing('phone', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phoneExtension} onChange={(e) => updateEditing('phoneExtension', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.hasWhatsapp} onChange={(e) => updateEditing('hasWhatsapp', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.contactEmail} onChange={(e) => updateEditing('contactEmail', e.target.value)} className="w-full border-0 bg-transparent" /></td>
+                      <td className="border border-zinc-200 px-2 py-1">N</td>
+                      <td className="border border-zinc-200 px-2 py-1">Sistema</td>
+                      <td className="border border-zinc-200 px-2 py-1" />
+                    </tr>
+                  </tbody></table>
+                </div>
+              )}
+
+              {subTab === 'CONTATOS' && <div className="border border-t-0 border-zinc-300 p-8 text-sm text-zinc-500">Contatos adicionais do cliente.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,8 +3,37 @@ export type Customer = {
   document: string
   name: string
   tradeName?: string
+  participantType?: string
+  market?: string
+  category?: string
+  shortName?: string
+  birthDate?: string
+  anniversary?: string
+  gender?: string
+  rg?: string
+  rgIssuer?: string
+  rgState?: string
+  notes?: string
+  website?: string
+  economicGroup?: string
+  groupedCode?: string
+  occupation?: string
+  educationLevel?: string
+  civilStatus?: string
+  spouseName?: string
+  employerDocument?: string
+  employer?: string
+  jobTitle?: string
+  birthplace?: string
+  nationality?: string
+  motherName?: string
+  fatherName?: string
   emailFiscal: string
   phone?: string
+  phoneDdd?: string
+  phoneExtension?: string
+  hasWhatsapp?: string
+  contactEmail?: string
   municipalRegistration?: string
   stateRegistration?: string
   zipCode?: string
@@ -12,6 +41,7 @@ export type Customer = {
   number?: string
   complement?: string
   district?: string
+  reference?: string
   city: string
   cityCode?: string
   state: string
@@ -22,6 +52,7 @@ export type Customer = {
   issRate?: string
   issWithheld?: string
   paymentTerm: string
+  registrationDate?: string
   status: string
 }
 
@@ -361,7 +392,36 @@ function normalizeData(data: Partial<AppData>): AppData {
     customers: (data.customers ?? seedData.customers).map((customer) => ({
       ...customer,
       tradeName: customer.tradeName ?? '',
+      participantType: customer.participantType ?? (customer.document?.length > 14 ? 'Juridica' : 'Fisica'),
+      market: customer.market ?? '',
+      category: customer.category ?? '',
+      shortName: customer.shortName ?? customer.tradeName ?? customer.name,
+      birthDate: customer.birthDate ?? '',
+      anniversary: customer.anniversary ?? '',
+      gender: customer.gender ?? '',
+      rg: customer.rg ?? '',
+      rgIssuer: customer.rgIssuer ?? '',
+      rgState: customer.rgState ?? '',
+      notes: customer.notes ?? '',
+      website: customer.website ?? '',
+      economicGroup: customer.economicGroup ?? '',
+      groupedCode: customer.groupedCode ?? '',
+      occupation: customer.occupation ?? '',
+      educationLevel: customer.educationLevel ?? '',
+      civilStatus: customer.civilStatus ?? '',
+      spouseName: customer.spouseName ?? '',
+      employerDocument: customer.employerDocument ?? '',
+      employer: customer.employer ?? '',
+      jobTitle: customer.jobTitle ?? '',
+      birthplace: customer.birthplace ?? '',
+      nationality: customer.nationality ?? 'Brasil',
+      motherName: customer.motherName ?? '',
+      fatherName: customer.fatherName ?? '',
       phone: customer.phone ?? '',
+      phoneDdd: customer.phoneDdd ?? '',
+      phoneExtension: customer.phoneExtension ?? '',
+      hasWhatsapp: customer.hasWhatsapp ?? 'S',
+      contactEmail: customer.contactEmail ?? customer.emailFiscal ?? '',
       municipalRegistration: customer.municipalRegistration ?? '123456',
       stateRegistration: customer.stateRegistration ?? '',
       zipCode: customer.zipCode ?? '69000-000',
@@ -369,6 +429,7 @@ function normalizeData(data: Partial<AppData>): AppData {
       number: customer.number ?? '1000',
       complement: customer.complement ?? '',
       district: customer.district ?? 'Distrito Industrial',
+      reference: customer.reference ?? '',
       cityCode: customer.cityCode ?? '1302603',
       country: customer.country ?? 'Brasil',
       taxRegime: customer.taxRegime ?? 'Simples Nacional',
@@ -376,6 +437,7 @@ function normalizeData(data: Partial<AppData>): AppData {
       serviceDescription: customer.serviceDescription ?? 'Servico de transporte municipal de cargas e apoio logistico operacional.',
       issRate: customer.issRate ?? '5',
       issWithheld: customer.issWithheld ?? 'Nao',
+      registrationDate: customer.registrationDate ?? '',
     })),
     drivers: (data.drivers ?? seedData.drivers).map((driver) => ({
       ...driver,
