@@ -202,7 +202,7 @@ export function DriversPage() {
         <table className="w-full min-w-[1260px] text-xs">
           <thead className="bg-zinc-100">
             <tr>
-              {['CNPJ/CPF/Codigo', 'Empresa ou Pessoa', 'Dt. vencimento GR', 'Tipo de p.', 'Nome fantasia', 'Nome reduzido', 'Comunicacao princ', 'Cidade', 'Estado', 'Dt. cadastro', 'Acoes'].map((heading) => (
+              {['CNPJ/CPF/Codigo', 'Empresa ou Pessoa', 'Dt. vencimento GR', 'Tipo de p.', 'Comunicacao princ', 'Cidade', 'Estado', 'Dt. cadastro', 'Acoes'].map((heading) => (
                 <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                   {heading}
                 </th>
@@ -216,8 +216,6 @@ export function DriversPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.name}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(driver.grExpiration || driver.cnhExpiration)}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.personType || 'Fisica'}</td>
-                <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.tradeName || driver.name}</td>
-                <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.shortName || driver.name.split(' ')[0]}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.mainCommunication || driver.phone}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.city || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.state || '-'}</td>
@@ -231,7 +229,7 @@ export function DriversPage() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
+                <td colSpan={9} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
                   Nenhum condutor encontrado.
                 </td>
               </tr>
