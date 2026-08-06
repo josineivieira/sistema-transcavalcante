@@ -91,7 +91,7 @@ alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 ```env
 APP_ENV=production
-APP_NAME=Container Freight Manager
+APP_NAME=Transcavalcante
 APP_URL=https://transcavalcante-web.onrender.com
 API_URL=https://transcavalcante-api.onrender.com
 API_V1_PREFIX=/api/v1
@@ -134,7 +134,7 @@ dist
 7. Variaveis:
 
 ```env
-VITE_APP_NAME=Container Freight Manager
+VITE_APP_NAME=Transcavalcante
 VITE_API_URL=https://transcavalcante-api.onrender.com/api/v1
 ```
 

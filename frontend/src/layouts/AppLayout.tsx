@@ -112,7 +112,7 @@ export function AppLayout() {
             {!collapsed && (
               <div>
                 <div className="text-sm font-bold leading-tight text-white">TRANSCAVALCANTE</div>
-                <div className="mt-1 text-[11px] font-semibold uppercase leading-tight text-[#9db7dc]">Container Freight Manager</div>
+                <div className="mt-1 text-[11px] font-semibold uppercase leading-tight text-[#9db7dc]">Centro Operacional</div>
               </div>
             )}
             <button

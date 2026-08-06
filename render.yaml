@@ -18,7 +18,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_NAME
-        value: Container Freight Manager
+        value: Transcavalcante
       - key: APP_URL
         value: https://transcavalcante-web.onrender.com
       - key: API_URL
@@ -68,7 +68,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_APP_NAME
-        value: Container Freight Manager
+        value: Transcavalcante
       - key: VITE_API_URL
         value: https://transcavalcante-api.onrender.com/api/v1
     routes:

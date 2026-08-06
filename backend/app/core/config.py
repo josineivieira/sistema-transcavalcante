@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "development"
-    app_name: str = "Container Freight Manager"
+    app_name: str = "Transcavalcante"
     app_url: str = "http://localhost:3000"
     api_url: str = "http://localhost:8000"
     api_v1_prefix: str = "/api/v1"
