@@ -32,6 +32,7 @@ const emptyUser: SystemUser = {
   id: '',
   name: '',
   email: '',
+  password: '',
   role: 'Operador',
   department: 'Operacao',
   status: 'Ativo',
@@ -98,6 +99,10 @@ export function UsersPage() {
     if (!editing) return
     if (!editing.name || !editing.email) {
       window.alert('Informe nome e e-mail do usuario.')
+      return
+    }
+    if (!editing.password) {
+      window.alert('Informe uma senha para o usuario acessar o sistema.')
       return
     }
 
@@ -179,6 +184,8 @@ export function UsersPage() {
                 <input value={editing.name} onChange={(event) => updateEditing('name', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
                 <label className="text-right text-red-600">E-mail</label>
                 <input value={editing.email} onChange={(event) => updateEditing('email', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+                <label className="text-right text-red-600">Senha</label>
+                <input value={editing.password} onChange={(event) => updateEditing('password', event.target.value)} className="h-7 border border-zinc-300 px-2" type="password" />
                 <label className="text-right">Setor</label>
                 <input value={editing.department} onChange={(event) => updateEditing('department', event.target.value)} className="h-7 border border-zinc-300 px-2" />
               </div>

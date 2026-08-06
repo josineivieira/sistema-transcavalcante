@@ -228,6 +228,7 @@ export type SystemUser = {
   id: string
   name: string
   email: string
+  password: string
   role: string
   department: string
   status: string
@@ -339,6 +340,7 @@ const seedData: AppData = {
       id: 'usr-1',
       name: 'Administrador SF',
       email: 'admin@transcavalcante.local',
+      password: 'admin123',
       role: 'Administrador',
       department: 'Administracao',
       status: 'Ativo',
@@ -540,7 +542,28 @@ function normalizeData(data: Partial<AppData>): AppData {
     closings: data.closings ?? [],
     fiscalDocuments: data.fiscalDocuments ?? [],
     receivables: data.receivables ?? [],
-    users: data.users ?? seedData.users,
+    users: (data.users ?? seedData.users).map((user) => ({
+      ...user,
+      password: user.password ?? (user.email === 'admin@transcavalcante.local' ? 'admin123' : ''),
+      permissions: { ...emptyUserPermissions(), ...(user.permissions ?? {}) },
+    })),
+  }
+}
+
+function emptyUserPermissions(): Record<string, UserPermission> {
+  return {
+    dashboard: 'none',
+    freights: 'none',
+    customers: 'none',
+    drivers: 'none',
+    vehicles: 'none',
+    containers: 'none',
+    closings: 'none',
+    fiscalDocuments: 'none',
+    finance: 'none',
+    reports: 'none',
+    users: 'none',
+    settings: 'none',
   }
 }
 

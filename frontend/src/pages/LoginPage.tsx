@@ -2,6 +2,7 @@ import { ArrowRight, BarChart3, Clock3, Eye, EyeOff, Lock, ShieldCheck, UserRoun
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { loadData } from '../services/localStore'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -23,8 +24,11 @@ export function LoginPage() {
       return
     }
 
-    if (normalizedEmail !== 'admin@transcavalcante.local' || normalizedPassword !== 'admin123') {
-      setMessage('Usuario ou senha invalido. Use admin@transcavalcante.local / admin123.')
+    const data = loadData()
+    const user = data.users.find((item) => item.email.toLowerCase() === normalizedEmail.toLowerCase())
+
+    if (!user || user.status !== 'Ativo' || user.password !== normalizedPassword) {
+      setMessage('Usuario ou senha invalido.')
       return
     }
 
@@ -37,6 +41,9 @@ export function LoginPage() {
         'transcavalcante.user',
         JSON.stringify({
           email: normalizedEmail,
+          name: user.name,
+          role: user.role,
+          permissions: user.permissions,
           company: 'Transcavalcante - Matriz Manaus/AM',
           remember,
         }),
