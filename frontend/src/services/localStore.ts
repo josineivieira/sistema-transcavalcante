@@ -34,6 +34,53 @@ export type Driver = {
   category: string
   cnhExpiration: string
   carrier: string
+  personType?: string
+  tradeName?: string
+  shortName?: string
+  mainCommunication?: string
+  city?: string
+  state?: string
+  registrationDate?: string
+  grExpiration?: string
+  email?: string
+  birthDate?: string
+  anniversary?: string
+  gender?: string
+  rg?: string
+  rgIssuer?: string
+  rgState?: string
+  notes?: string
+  nickname?: string
+  website?: string
+  economicGroup?: string
+  groupedCode?: string
+  inss?: string
+  occupation?: string
+  educationLevel?: string
+  civilStatus?: string
+  spouseName?: string
+  employerDocument?: string
+  employer?: string
+  jobTitle?: string
+  birthplace?: string
+  nationality?: string
+  motherName?: string
+  fatherName?: string
+  addressType?: string
+  addressIdentification?: string
+  street?: string
+  number?: string
+  complement?: string
+  reference?: string
+  district?: string
+  zipCode?: string
+  municipalRegistration?: string
+  stateRegistration?: string
+  communicationType?: string
+  phoneDdd?: string
+  phoneExtension?: string
+  hasWhatsapp?: string
+  contactEmail?: string
   status: string
 }
 
@@ -330,7 +377,56 @@ function normalizeData(data: Partial<AppData>): AppData {
       issRate: customer.issRate ?? '5',
       issWithheld: customer.issWithheld ?? 'Nao',
     })),
-    drivers: data.drivers ?? seedData.drivers,
+    drivers: (data.drivers ?? seedData.drivers).map((driver) => ({
+      ...driver,
+      personType: driver.personType ?? 'Fisica',
+      tradeName: driver.tradeName ?? driver.name,
+      shortName: driver.shortName ?? driver.name.split(' ')[0],
+      mainCommunication: driver.mainCommunication ?? driver.phone,
+      city: driver.city ?? 'Manaus',
+      state: driver.state ?? 'AM',
+      registrationDate: driver.registrationDate ?? '',
+      grExpiration: driver.grExpiration ?? driver.cnhExpiration,
+      email: driver.email ?? '',
+      birthDate: driver.birthDate ?? '',
+      anniversary: driver.anniversary ?? '',
+      gender: driver.gender ?? 'Masculino',
+      rg: driver.rg ?? '',
+      rgIssuer: driver.rgIssuer ?? '',
+      rgState: driver.rgState ?? 'AM',
+      notes: driver.notes ?? '',
+      nickname: driver.nickname ?? driver.name.split(' ')[0],
+      website: driver.website ?? '',
+      economicGroup: driver.economicGroup ?? '',
+      groupedCode: driver.groupedCode ?? '',
+      inss: driver.inss ?? '',
+      occupation: driver.occupation ?? 'Motorista',
+      educationLevel: driver.educationLevel ?? '',
+      civilStatus: driver.civilStatus ?? '',
+      spouseName: driver.spouseName ?? '',
+      employerDocument: driver.employerDocument ?? '',
+      employer: driver.employer ?? driver.carrier,
+      jobTitle: driver.jobTitle ?? 'Motorista',
+      birthplace: driver.birthplace ?? 'Manaus',
+      nationality: driver.nationality ?? 'Brasil',
+      motherName: driver.motherName ?? '',
+      fatherName: driver.fatherName ?? '',
+      addressType: driver.addressType ?? 'RESIDENCIAL',
+      addressIdentification: driver.addressIdentification ?? '',
+      street: driver.street ?? '',
+      number: driver.number ?? '',
+      complement: driver.complement ?? '',
+      reference: driver.reference ?? '',
+      district: driver.district ?? '',
+      zipCode: driver.zipCode ?? '',
+      municipalRegistration: driver.municipalRegistration ?? '',
+      stateRegistration: driver.stateRegistration ?? '',
+      communicationType: driver.communicationType ?? 'Celular',
+      phoneDdd: driver.phoneDdd ?? '',
+      phoneExtension: driver.phoneExtension ?? '',
+      hasWhatsapp: driver.hasWhatsapp ?? 'S',
+      contactEmail: driver.contactEmail ?? driver.email ?? '',
+    })),
     vehicles: normalizedVehicles,
     containers: data.containers ?? seedData.containers,
     freights: (data.freights ?? seedData.freights).map((freight) => {
