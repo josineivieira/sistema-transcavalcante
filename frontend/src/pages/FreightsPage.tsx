@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Info, MoreVertical, Paperclip, Save, Settings, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
@@ -190,6 +190,49 @@ function EmptyGridMessage({ text }: { text: string }) {
   )
 }
 
+const freightGridColumns = [
+  { key: 'select', label: '', width: 30, locked: true },
+  { key: 'code', label: 'Codigo', width: 118, minWidth: 82, locked: true },
+  { key: 'dateStart', label: 'Dt. inicio', width: 132, minWidth: 96 },
+  { key: 'status', label: 'Situacao', width: 190, minWidth: 128 },
+  { key: 'customer', label: 'Cliente', width: 210, minWidth: 130 },
+  { key: 'sender', label: 'Remetente', width: 210, minWidth: 130 },
+  { key: 'recipient', label: 'Destinatario', width: 210, minWidth: 130 },
+  { key: 'contractor', label: 'Contratado', width: 190, minWidth: 120 },
+  { key: 'type', label: 'Tipo', width: 74, minWidth: 56 },
+  { key: 'driver', label: 'Motorista', width: 190, minWidth: 120 },
+  { key: 'tractor', label: 'Tracao', width: 96, minWidth: 76 },
+  { key: 'trailer', label: 'Reboque', width: 96, minWidth: 76 },
+  { key: 'origin', label: 'Origem', width: 160, minWidth: 100 },
+  { key: 'originUf', label: 'UF coleta', width: 82, minWidth: 66 },
+  { key: 'destination', label: 'Destino', width: 160, minWidth: 100 },
+  { key: 'destinationUf', label: 'UF entrega', width: 86, minWidth: 70 },
+  { key: 'payment', label: 'Pagamento', width: 100, minWidth: 80 },
+  { key: 'value', label: 'Vl. frete lista', width: 122, minWidth: 100 },
+  { key: 'fuelValue', label: 'Vl. abastecimento', width: 128, minWidth: 110 },
+  { key: 'scheduleUnload', label: 'Dt. agendamento descarga', width: 170, minWidth: 138 },
+  { key: 'arrivalDate', label: 'Dt. chegada', width: 112, minWidth: 92 },
+  { key: 'unloadStartDate', label: 'Dt.Inicio Descarg.', width: 132, minWidth: 110 },
+  { key: 'unloadStartHour', label: 'Hr.Inicio Descarg', width: 126, minWidth: 108 },
+  { key: 'cntrDescent', label: 'Dt. descida CNTR', width: 132, minWidth: 108 },
+  { key: 'pdWithdrawal', label: 'Dt. retirada P.D.', width: 128, minWidth: 108 },
+  { key: 'unloadEnd', label: 'Dt. fim descarga', width: 128, minWidth: 106 },
+  { key: 'cntrReturn', label: 'Dt. devolucao CNTR', width: 142, minWidth: 116 },
+  { key: 'fiscalEstab', label: 'Estab. CT-e/NFS-e', width: 132, minWidth: 112 },
+  { key: 'fiscalNumber', label: 'No CT-e/NFS-e', width: 116, minWidth: 96 },
+  { key: 'cteAverbacao', label: 'No averbacao CTE', width: 152, minWidth: 122 },
+  { key: 'ciot', label: 'No CIOT', width: 128, minWidth: 100 },
+  { key: 'ciotStatus', label: 'Situacao CIOT', width: 122, minWidth: 100 },
+  { key: 'actions', label: 'Acoes', width: 58, minWidth: 54, locked: true },
+] as const
+
+type FreightGridColumnKey = typeof freightGridColumns[number]['key']
+
+const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, number>>((widths, column) => {
+  widths[column.key] = column.width
+  return widths
+}, {})
+
 export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
@@ -211,6 +254,10 @@ export function FreightsPage() {
     originDateEnd: '',
   })
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false)
+  const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>({})
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(defaultFreightColumnWidths)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -266,6 +313,43 @@ export function FreightsPage() {
       && (!filters.dateEnd || freight.date <= filters.dateEnd),
     )
   }, [filters, freights, search])
+
+  const visibleFreightColumns = useMemo(
+    () => freightGridColumns.filter((column) => !hiddenColumns[column.key]),
+    [hiddenColumns],
+  )
+
+  const freightGridMinWidth = visibleFreightColumns.reduce((total, column) => total + (columnWidths[column.key] ?? column.width), 0)
+
+  function startColumnResize(event: ReactMouseEvent<HTMLSpanElement>, column: typeof freightGridColumns[number]) {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = columnWidths[column.key] ?? column.width
+    const minWidth = 'minWidth' in column ? column.minWidth : 58
+
+    const resize = (moveEvent: MouseEvent) => {
+      const nextWidth = Math.max(minWidth, startWidth + moveEvent.clientX - startX)
+      setColumnWidths((current) => ({ ...current, [column.key]: nextWidth }))
+    }
+
+    const stopResize = () => {
+      document.removeEventListener('mousemove', resize)
+      document.removeEventListener('mouseup', stopResize)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', resize)
+    document.addEventListener('mouseup', stopResize)
+  }
+
+  function toggleColumn(columnKey: FreightGridColumnKey) {
+    const column = freightGridColumns.find((item) => item.key === columnKey)
+    if (column && 'locked' in column && column.locked) return
+    setHiddenColumns((current) => ({ ...current, [columnKey]: !current[columnKey] }))
+  }
 
   function updateForm(field: keyof FreightForm, value: string | boolean) {
     setForm((current) => {
@@ -407,6 +491,76 @@ export function FreightsPage() {
     }
     setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
     setOpenActionId(null)
+  }
+
+  function renderFreightCell(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
+    const date = freight.date || ''
+
+    if (columnKey === 'select') {
+      return <input type="checkbox" onClick={(event) => event.stopPropagation()} />
+    }
+
+    if (columnKey === 'code') {
+      return (
+        <button onClick={() => openFreightDetail(freight)} className="flex w-full items-center justify-between gap-2 text-left font-medium text-blue-950">
+          <span className="truncate">{freight.process || freight.number}</span>
+          <span className="text-red-600">▶</span>
+        </button>
+      )
+    }
+
+    if (columnKey === 'actions') {
+      return (
+        <div className="relative">
+          <button onClick={(event) => { event.stopPropagation(); setOpenActionId(openActionId === freight.id ? null : freight.id) }} className="grid h-5 w-7 place-items-center border border-zinc-300 bg-white">
+            <MoreVertical size={14} />
+          </button>
+          {openActionId === freight.id && (
+            <div className="absolute right-0 top-6 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
+              <button onClick={() => openFreightDetail(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
+              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Aprovar</button>
+              <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Duplicar</button>
+              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    const values: Record<Exclude<FreightGridColumnKey, 'select' | 'code' | 'actions'>, string> = {
+      dateStart: `${date} 07:50`,
+      status: freight.operationalStatus || 'OPERACAO ENCERRADA',
+      customer: freight.customer,
+      sender: freight.customer,
+      recipient: freight.destination || '-',
+      contractor: 'TRANS CAVALCANTE',
+      type: 'ETC',
+      driver: freight.driver || '-',
+      tractor: freight.tractorPlate || '-',
+      trailer: freight.trailerPlate || '-',
+      origin: freight.origin || '-',
+      originUf: 'AM',
+      destination: freight.destination || '-',
+      destinationUf: 'AM',
+      payment: '7 DIAS',
+      value: freight.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      fuelValue: '0,00',
+      scheduleUnload: `${date} 10:00`,
+      arrivalDate: date,
+      unloadStartDate: date,
+      unloadStartHour: '07:30',
+      cntrDescent: date,
+      pdWithdrawal: date,
+      unloadEnd: `${date} 15:30`,
+      cntrReturn: date,
+      fiscalEstab: 'LAM',
+      fiscalNumber: freight.fiscalStatus === 'Emitido' ? '1296' : '',
+      cteAverbacao: freight.fiscalStatus === 'Emitido' ? '0572007261938274900068' : '',
+      ciot: freight.closing ? '5200029452035879' : '',
+      ciotStatus: freight.closing ? 'REGISTRADO' : '',
+    }
+
+    return values[columnKey]
   }
 
   function renderActiveTab() {
@@ -643,33 +797,51 @@ export function FreightsPage() {
             <button onClick={openNewFreight} className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white" title="Novo transporte">+</button>
           </div>
 
-          <div className="grid min-h-[calc(100vh-150px)] grid-cols-[430px_minmax(0,1fr)]">
-            <aside className="border-r border-zinc-500 bg-zinc-100">
-              <div className="flex h-7 items-center justify-between border-b border-zinc-400 px-2 text-xs">
-                <span>Filtro</span>
-                <div className="flex gap-2 text-zinc-800"><Settings size={15} /><X size={15} /></div>
-              </div>
-              <div className="p-2 text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</div>
-              <div className="grid gap-1 px-2 text-xs">
-                <Field label="Nr. do processo"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
-                <Field label="Codigo do processo"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
-                <Field label="Data inicial"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
-                <Field label="Descricao do Processo"><input value={filters.processDescription} onChange={(event) => setFilters({ ...filters, processDescription: event.target.value })} className={textInputClass()} /></Field>
-                <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
-                <div className="mt-2 border border-zinc-400">
-                  <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Settings size={14} /><X size={14} /></div></div>
-                  <select value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} className="h-7 w-full border-t border-zinc-300 bg-white px-2 text-xs">
-                    <option value="">Selecione...</option>
-                    {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
-                  </select>
-                </div>
-                <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
-                <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
-                <Field label="Dt. origem"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.originDateStart} onChange={(event) => setFilters({ ...filters, originDateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.originDateEnd} onChange={(event) => setFilters({ ...filters, originDateEnd: event.target.value })} className={textInputClass()} /></div></Field>
-                <div className="mt-3 flex justify-end gap-2">
-                  <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} className="border border-zinc-400 bg-white px-3 py-1">Limpar</button>
-                </div>
-              </div>
+          <div
+            className="grid min-h-[calc(100vh-150px)] transition-[grid-template-columns]"
+            style={{ gridTemplateColumns: filtersCollapsed ? '30px minmax(0,1fr)' : '430px minmax(0,1fr)' }}
+          >
+            <aside className="overflow-hidden border-r border-zinc-500 bg-zinc-100">
+              {filtersCollapsed ? (
+                <button
+                  onClick={() => setFiltersCollapsed(false)}
+                  className="flex h-full w-full items-start justify-center bg-zinc-200 pt-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-300"
+                  title="Abrir filtro"
+                >
+                  &gt;
+                </button>
+              ) : (
+                <>
+                  <div className="flex h-7 items-center justify-between border-b border-zinc-400 px-2 text-xs">
+                    <span>Filtro</span>
+                    <div className="flex items-center gap-2 text-zinc-800">
+                      <Settings size={15} />
+                      <button onClick={() => setFiltersCollapsed(true)} title="Recolher filtro"><X size={15} /></button>
+                    </div>
+                  </div>
+                  <div className="p-2 text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</div>
+                  <div className="grid gap-1 px-2 text-xs">
+                    <Field label="Nr. do processo"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
+                    <Field label="Codigo do processo"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
+                    <Field label="Data inicial"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
+                    <Field label="Descricao do Processo"><input value={filters.processDescription} onChange={(event) => setFilters({ ...filters, processDescription: event.target.value })} className={textInputClass()} /></Field>
+                    <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
+                    <div className="mt-2 border border-zinc-400">
+                      <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Settings size={14} /><X size={14} /></div></div>
+                      <select value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} className="h-7 w-full border-t border-zinc-300 bg-white px-2 text-xs">
+                        <option value="">Selecione...</option>
+                        {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
+                      </select>
+                    </div>
+                    <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
+                    <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                    <Field label="Dt. origem"><div className="grid grid-cols-[1fr_28px_1fr] gap-1"><input type="date" value={filters.originDateStart} onChange={(event) => setFilters({ ...filters, originDateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.originDateEnd} onChange={(event) => setFilters({ ...filters, originDateEnd: event.target.value })} className={textInputClass()} /></div></Field>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} className="border border-zinc-400 bg-white px-3 py-1">Limpar</button>
+                    </div>
+                  </div>
+                </>
+              )}
             </aside>
 
             <section className="min-w-0 bg-white">
@@ -677,16 +849,45 @@ export function FreightsPage() {
                 <div className="px-2 font-semibold">Transportes de carga rodoviario</div>
                 <div className="ml-auto px-2">{visibleFreights.length} registros</div>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
-                <div className="flex items-center gap-2 pr-2"><Settings size={18} /><span>↔</span><span>☑</span><span>1:1</span><span>XLS</span><button onClick={openNewFreight} className="grid h-6 w-6 place-items-center bg-black text-white">+</button></div>
+                <div className="relative flex items-center gap-2 pr-2">
+                  <button onClick={() => setColumnMenuOpen(!columnMenuOpen)} className="inline-flex h-6 items-center gap-1 border border-zinc-500 bg-zinc-200 px-2 hover:bg-white">
+                    <Settings size={16} /> Colunas
+                  </button>
+                  {columnMenuOpen && (
+                    <div className="absolute right-10 top-7 z-30 max-h-80 w-64 overflow-auto border border-zinc-500 bg-white p-2 text-xs shadow-xl">
+                      <div className="mb-2 border-b border-zinc-300 pb-1 font-semibold">Exibir colunas</div>
+                      {freightGridColumns.filter((column) => column.label).map((column) => (
+                        <label key={column.key} className="flex items-center justify-between gap-2 py-1">
+                          <span>{column.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={!hiddenColumns[column.key]}
+                            disabled={'locked' in column && column.locked}
+                            onChange={() => toggleColumn(column.key)}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <span>&lt;-&gt;</span>
+                  <span>1:1</span>
+                  <span>XLS</span>
+                  <button onClick={openNewFreight} className="grid h-6 w-6 place-items-center bg-black text-white">+</button>
+                </div>
               </div>
               <div className="overflow-auto">
-                <table className="w-full min-w-[2550px] text-xs">
+                <table className="table-fixed text-xs" style={{ minWidth: freightGridMinWidth }}>
                   <thead className="bg-white">
                     <tr>
-                      {['', '', 'Codigo', '', '', '', 'Dt. inicio', 'Situacao', 'Cliente', 'Remetente', 'Destinatario', 'Contratado', 'Tipo', 'Motorista', 'Tracao', 'Reboque', 'Origem', 'UF coleta', 'Destino', 'UF entrega', 'Pagamento', 'Vl. frete lista', 'Vl. abastecimento', 'Dt. agendamento descarga', 'Dt. chegada', 'Dt.Inicio Descarg.', 'Hr.Inicio Descarg', 'Dt. descida CNTR', 'Dt. retirada P.D.', 'Dt. fim descarga', 'Dt. devolucao CNTR', 'Estab. CT-e/NFS-e', 'No CT-e/NFS-e', 'No averbacao CTE', 'No CIOT', 'Situacao CIOT'].map((heading, index) => (
-                        <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
-                          <span>{heading}</span>
-                          {heading && <span className="float-right text-zinc-400">▼</span>}
+                      {visibleFreightColumns.map((column) => (
+                        <th
+                          key={column.key}
+                          className="relative border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700"
+                          style={{ width: columnWidths[column.key] ?? column.width }}
+                        >
+                          <span className="block truncate pr-5">{column.label}</span>
+                          {column.label && <button onClick={() => toggleColumn(column.key)} disabled={'locked' in column && column.locked} className="absolute right-2 top-2 text-zinc-400 disabled:cursor-default disabled:opacity-40">▼</button>}
+                          {!('locked' in column && column.locked) && <span onMouseDown={(event) => startColumnResize(event, column)} className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-sky-500" />}
                         </th>
                       ))}
                     </tr>
@@ -694,55 +895,18 @@ export function FreightsPage() {
                   <tbody>
                     {visibleFreights.map((freight, index) => (
                       <tr key={freight.id} onDoubleClick={() => openFreightDetail(freight)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" /></td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-400">⋮</td>
-                        <td onClick={() => openFreightDetail(freight)} className="border-b border-r border-zinc-200 px-2 py-1 font-medium text-blue-950">{freight.process || freight.number}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-center">▪</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-red-600">▶</td>
-                        <td className="relative border-b border-r border-zinc-200 px-2 py-1">
-                          <button onClick={() => setOpenActionId(openActionId === freight.id ? null : freight.id)} className="grid h-5 w-6 place-items-center border border-zinc-300 bg-white"><MoreVertical size={14} /></button>
-                          {openActionId === freight.id && (
-                            <div className="absolute left-0 top-7 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
-                              <button onClick={() => openFreightDetail(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
-                              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Aprovar</button>
-                              <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Duplicar</button>
-                              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 07:50</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.operationalStatus || 'OPERACAO ENCERRADA'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.customer}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.customer}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.destination || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">TRANS CAVALCANTE</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">ETC</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.driver || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.tractorPlate || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.trailerPlate || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.origin || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">AM</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.destination || '-'}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">AM</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">7 DIAS</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-right">{freight.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1 text-right">0,00</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 10:00</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">07:30</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date} 15:30</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.date}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">LAM</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.fiscalStatus === 'Emitido' ? '1296' : ''}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.fiscalStatus === 'Emitido' ? '0572007261938274900068' : ''}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.closing ? '5200029452035879' : ''}</td>
-                        <td className="border-b border-r border-zinc-200 px-2 py-1">{freight.closing ? 'REGISTRADO' : ''}</td>
+                        {visibleFreightColumns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={`border-b border-r border-zinc-200 px-2 py-1 ${column.key === 'value' || column.key === 'fuelValue' ? 'text-right' : ''}`}
+                            style={{ width: columnWidths[column.key] ?? column.width }}
+                          >
+                            <div className="truncate">{renderFreightCell(column.key, freight)}</div>
+                          </td>
+                        ))}
                       </tr>
                     ))}
-                    {!visibleFreights.length && <tr><td colSpan={36} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
+                    {!visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
                   </tbody>
                 </table>
               </div>
