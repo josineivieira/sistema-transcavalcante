@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Check, Info, MoreVertical, Paperclip, Save, Settings, X } from 'lucide-react'
+import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -819,15 +819,23 @@ export function FreightsPage() {
                       <button onClick={() => setFiltersCollapsed(true)} title="Recolher filtro"><X size={15} /></button>
                     </div>
                   </div>
-                  <div className="p-2 pb-1 text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</div>
-                  <div className="mx-1 grid min-h-[calc(100vh-220px)] gap-1 border border-dotted border-zinc-500 p-1 text-xs">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <span className="text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</span>
+                    <div className="flex items-center gap-2">
+                      <Search size={22} strokeWidth={2.5} />
+                      <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} title="Limpar filtro">
+                        <Eraser size={20} strokeWidth={2.4} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mx-1 grid min-h-[calc(100vh-220px)] content-start gap-1 border border-dotted border-zinc-500 p-1 text-xs">
                     <Field label="Nr. do processo"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
                     <Field label="Codigo do processo"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="Data inicial"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
                     <Field label="Descricao do Processo"><input value={filters.processDescription} onChange={(event) => setFilters({ ...filters, processDescription: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
                     <div className="mt-2 border border-zinc-400">
-                      <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Settings size={14} /><X size={14} /></div></div>
+                      <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Filter size={18} fill="currentColor" /><X size={18} /></div></div>
                       <select value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} className="h-7 w-full border-t border-zinc-300 bg-white px-2 text-xs">
                         <option value="">Selecione...</option>
                         {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
@@ -836,9 +844,6 @@ export function FreightsPage() {
                     <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
                     <Field label="Dt. origem"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input type="date" value={filters.originDateStart} onChange={(event) => setFilters({ ...filters, originDateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.originDateEnd} onChange={(event) => setFilters({ ...filters, originDateEnd: event.target.value })} className={textInputClass()} /></div></Field>
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} className="border border-zinc-400 bg-white px-3 py-1">Limpar</button>
-                    </div>
                   </div>
                 </>
               )}
