@@ -91,14 +91,12 @@ function openVehicle(type: VehicleType, vehicle?: Vehicle): Vehicle {
 
 export function VehiclesPage() {
   const { vehicles, setVehicles } = useLocalData()
-  const [activeTab, setActiveTab] = useState<VehicleType>('Cavalo')
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [modalTab, setModalTab] = useState('GERAL')
   const [query, setQuery] = useState('')
 
   const rows = useMemo(() => {
     return vehicles
-      .filter((vehicle) => vehicle.vehicleType === activeTab)
       .filter((vehicle) => {
         const text = [
           vehicle.fleetNumber,
@@ -113,10 +111,7 @@ export function VehiclesPage() {
         ].join(' ').toLowerCase()
         return text.includes(query.toLowerCase())
       })
-  }, [activeTab, query, vehicles])
-
-  const tractorsCount = vehicles.filter((vehicle) => vehicle.vehicleType === 'Cavalo').length
-  const trailersCount = vehicles.filter((vehicle) => vehicle.vehicleType === 'Carreta').length
+  }, [query, vehicles])
 
   function updateEditing(field: keyof Vehicle, value: string | boolean) {
     if (!editing) return
@@ -171,25 +166,14 @@ export function VehiclesPage() {
             <h2 className="text-sm font-semibold">Frota de veiculos</h2>
             <p className="text-xs text-zinc-500">Cadastro de cavalos, carretas, proprietarios, documentos e licenciamento.</p>
           </div>
-          <button onClick={() => setEditing(openVehicle(activeTab))} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
+          <button onClick={() => setEditing(openVehicle('Cavalo'))} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
             Novo veiculo
           </button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
-          <div className="flex">
-            {[
-              { type: 'Cavalo' as const, label: 'Cavalos mecanicos', count: tractorsCount },
-              { type: 'Carreta' as const, label: 'Carretas', count: trailersCount },
-            ].map((tab) => (
-              <button
-                key={tab.type}
-                onClick={() => setActiveTab(tab.type)}
-                className={`border px-4 py-2 text-sm font-medium ${activeTab === tab.type ? 'border-zinc-300 bg-white text-zinc-950' : 'border-transparent text-zinc-500'}`}
-              >
-                {tab.label} <span className="text-xs text-zinc-500">{tab.count}</span>
-              </button>
-            ))}
+          <div className="text-xs text-zinc-600">
+            {rows.length} veiculo{rows.length === 1 ? '' : 's'} listado{rows.length === 1 ? '' : 's'}
           </div>
           <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
             <Search size={15} className="mr-2" />
@@ -223,7 +207,7 @@ export function VehiclesPage() {
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.yearModel || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.chassis || '-'}</td>
                   <td className="border-b border-zinc-200 px-2 py-1">
-                    <button onClick={() => setEditing(openVehicle(activeTab, vehicle))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                    <button onClick={() => setEditing(openVehicle(vehicle.vehicleType, vehicle))} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                       <Pencil size={14} />
                     </button>
                   </td>
