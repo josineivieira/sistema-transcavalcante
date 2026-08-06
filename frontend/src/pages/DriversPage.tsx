@@ -231,8 +231,8 @@ export function DriversPage() {
             </div>
 
             <div className="max-h-[calc(100vh-92px)] overflow-y-auto p-2">
-              <div className="grid gap-x-16 gap-y-2 border-b-4 border-zinc-400 pb-2 md:grid-cols-2">
-                <div className="grid grid-cols-[140px_1fr] items-center gap-1 text-xs">
+              <div className="grid items-start gap-x-12 gap-y-2 pb-1 md:grid-cols-2">
+                <div className="grid content-start grid-cols-[128px_1fr] items-center gap-1 text-xs">
                   <label className="text-right text-red-600">Tipo de pessoa</label>
                   <select value={editing.personType} onChange={(event) => updateEditing('personType', event.target.value)} className="h-7 border border-zinc-300 px-2">
                     <option>Fisica</option>
@@ -244,7 +244,7 @@ export function DriversPage() {
                   <input value={editing.email} onChange={(event) => updateEditing('email', event.target.value)} className="h-7 border border-zinc-300 px-2" />
                 </div>
 
-                <div className="grid grid-cols-[150px_1fr] items-center gap-1 text-xs">
+                <div className="grid content-start grid-cols-[138px_1fr] items-center gap-1 text-xs">
                   <label className="text-right">Categoria</label>
                   <select value={editing.category} onChange={(event) => updateEditing('category', event.target.value)} className="h-7 border border-zinc-300 px-2">
                     <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
@@ -264,7 +264,11 @@ export function DriversPage() {
                 </div>
               </div>
 
-              <div className="mt-3 flex border-b border-zinc-400 text-xs">
+              <div className="relative my-2 h-2 border-t-4 border-zinc-400">
+                <span className="absolute left-1/2 top-[-4px] h-2 w-12 -translate-x-1/2 border-x border-zinc-400 bg-zinc-100" />
+              </div>
+
+              <div className="flex border-b border-zinc-400 text-xs">
                 {['GERAIS', 'FICHA CADASTRO', 'CONSELHO'].map((tab) => (
                   <button key={tab} onClick={() => setMainTab(tab)} className={`border border-b-0 px-3 py-1 ${mainTab === tab ? 'bg-zinc-300' : 'border-transparent bg-zinc-100'}`}>
                     {tab}
@@ -273,8 +277,8 @@ export function DriversPage() {
               </div>
 
               {mainTab === 'GERAIS' && (
-                <div className="grid gap-x-16 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
-                  <div className="grid grid-cols-[140px_1fr_130px] items-center gap-1 text-xs">
+                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
+                  <div className="grid content-start grid-cols-[130px_1fr_130px] items-center gap-1 text-xs">
                     <label className="text-right">Dt. nascimento</label>
                     <input type="date" value={editing.birthDate} onChange={(event) => updateEditing('birthDate', event.target.value)} className="h-7 border border-zinc-300 px-2" />
                     <input value={editing.birthDate ? 'idade calculada' : ''} readOnly className="h-7 border border-zinc-300 bg-zinc-200 px-2" />
@@ -297,7 +301,7 @@ export function DriversPage() {
                     <textarea value={editing.notes} onChange={(event) => updateEditing('notes', event.target.value)} className="h-20 border border-zinc-300 px-2 py-1" />
                   </div>
 
-                  <div className="grid grid-cols-[150px_1fr] items-center gap-1 text-xs">
+                  <div className="grid content-start grid-cols-[138px_1fr] items-center gap-1 text-xs">
                     <label className="text-right">Nome abreviado</label>
                     <input value={editing.nickname} onChange={(event) => updateEditing('nickname', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
                     <label className="text-right">Sitio (site) sem http://</label>
@@ -319,8 +323,8 @@ export function DriversPage() {
               )}
 
               {mainTab === 'FICHA CADASTRO' && (
-                <div className="grid gap-x-16 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
-                  <div className="grid grid-cols-[140px_1fr] items-center gap-1 text-xs">
+                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
+                  <div className="grid content-start grid-cols-[130px_1fr] items-center gap-1 text-xs">
                     <label className="text-right">Estado civil</label>
                     <select value={editing.civilStatus} onChange={(event) => updateEditing('civilStatus', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Solteiro</option><option>Casado</option></select>
                     <label className="text-right">Nome do conjuge</label>
@@ -336,7 +340,7 @@ export function DriversPage() {
                     <label className="text-right">Nacionalidade</label>
                     <input value={editing.nationality} onChange={(event) => updateEditing('nationality', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
                   </div>
-                  <div className="grid grid-cols-[140px_1fr] content-start items-center gap-1 text-xs">
+                  <div className="grid content-start grid-cols-[130px_1fr] items-center gap-1 text-xs">
                     <label className="text-right">Nome da mae</label>
                     <input value={editing.motherName} onChange={(event) => updateEditing('motherName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
                     <label className="text-right">Nome do pai</label>
