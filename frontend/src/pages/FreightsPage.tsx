@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
@@ -234,8 +234,10 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 }, {})
 
 export function FreightsPage() {
-  const { customers, drivers, vehicles, containers, freights, setFreights } = useLocalData()
+  const { customers, drivers, vehicles, containers, freights, issuerSettings, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
+  const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
+  const issuerDocument = issuerSettings.document || ''
   const [showForm, setShowForm] = useState(false)
   const [editingFreightId, setEditingFreightId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
@@ -261,7 +263,8 @@ export function FreightsPage() {
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
-    serviceTaker: customers[0]?.name ?? '',
+    serviceTakerDocument: issuerDocument,
+    serviceTaker: issuerName,
     recipient: customers[0]?.name ?? '',
     driver: drivers[0]?.name ?? '',
     tractorId: vehicles.find((vehicle) => vehicle.vehicleType === 'Cavalo')?.id ?? '',
@@ -274,6 +277,14 @@ export function FreightsPage() {
   const selectedTractor = tractors.find((vehicle) => vehicle.id === form.tractorId)
   const selectedTrailer = trailers.find((vehicle) => vehicle.id === form.trailerId)
   const selectedContainer = containers.find((container) => container.number === form.container)
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      serviceTakerDocument: issuerDocument,
+      serviceTaker: issuerName,
+    }))
+  }, [issuerDocument, issuerName])
 
   const generalReady = Boolean(form.process && form.processType && form.customer && form.serviceTaker)
   const routeReady = Boolean(form.routeName && form.origin && form.destination)
@@ -358,7 +369,6 @@ export function FreightsPage() {
         next.routeName = `${field === 'origin' ? value : next.origin} X ${field === 'destination' ? value : next.destination}`.replace(/^ X | X $/g, '')
       }
       if (field === 'customer') {
-        next.serviceTaker = String(value)
         next.recipient = next.recipient || String(value)
       }
       return next
@@ -370,7 +380,8 @@ export function FreightsPage() {
     setForm({
       ...emptyForm,
       customer: customers[0]?.name ?? '',
-      serviceTaker: customers[0]?.name ?? '',
+      serviceTakerDocument: issuerDocument,
+      serviceTaker: issuerName,
       recipient: customers[0]?.name ?? '',
       driver: drivers[0]?.name ?? '',
       tractorId: tractors[0]?.id ?? '',
@@ -398,7 +409,8 @@ export function FreightsPage() {
       customer: freight.customer,
       process: freight.process,
       status: freight.operationalStatus,
-      serviceTaker: freight.customer,
+      serviceTakerDocument: issuerDocument,
+      serviceTaker: issuerName,
       recipient: freight.customer,
       routeName: `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
       origin: freight.origin,
@@ -912,8 +924,8 @@ export function FreightsPage() {
                 <div className="grid gap-1">
                   <Field label="Codigo do processo" required><input value={form.process} onChange={(event) => updateForm('process', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
                   <Field label="Situacao"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
-                  <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} onChange={(event) => updateForm('serviceTakerDocument', event.target.value)} className={textInputClass()} /></Field>
-                  <Field label="Tomador do servico"><input value={form.serviceTaker} onChange={(event) => updateForm('serviceTaker', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} className={textInputClass(true)} disabled /></Field>
+                  <Field label="Tomador do servico"><input value={form.serviceTaker} className={textInputClass(true)} disabled /></Field>
                   <Field label="CNPJ/CPF"><input value={form.senderDocument} onChange={(event) => updateForm('senderDocument', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="Remetente"><input value={form.sender} onChange={(event) => updateForm('sender', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
                 </div>
