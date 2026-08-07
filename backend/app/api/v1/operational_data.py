@@ -43,6 +43,7 @@ def _default_snapshot_data() -> dict:
         "closings": [],
         "fiscalDocuments": [],
         "receivables": [],
+        "priceLists": [],
         "issuerSettings": {},
         "settingsSavedAt": "-",
         "users": [
@@ -64,6 +65,7 @@ def _default_snapshot_data() -> dict:
                     "closings": "edit",
                     "fiscalDocuments": "edit",
                     "finance": "edit",
+                    "priceLists": "edit",
                     "reports": "view",
                     "users": "edit",
                     "settings": "edit",

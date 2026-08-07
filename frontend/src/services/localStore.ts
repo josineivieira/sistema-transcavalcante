@@ -224,6 +224,18 @@ export type Receivable = {
   status: string
 }
 
+export type PriceList = {
+  id: string
+  listName: string
+  originPort: string
+  destinationPort: string
+  product: string
+  listValue: number
+  taxPercent: number
+  total: number
+  status: string
+}
+
 export type UserPermission = 'none' | 'view' | 'edit'
 
 export type SystemUser = {
@@ -247,6 +259,7 @@ export type AppData = {
   closings: Closing[]
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
+  priceLists: PriceList[]
   users: SystemUser[]
   issuerSettings: IssuerSettings
   settingsSavedAt: string
@@ -338,6 +351,12 @@ export const seedData: AppData = {
   closings: [],
   fiscalDocuments: [],
   receivables: [],
+  priceLists: [
+    { id: 'pl-1', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'BLUMENAU/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2100, taxPercent: 0, total: 2100, status: 'Ativo' },
+    { id: 'pl-2', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'PALHOCA/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2782.55, taxPercent: 0, total: 2870.75, status: 'Ativo' },
+    { id: 'pl-3', listName: 'GEO LOG MANAUS - MULTIMODAL', originPort: 'MANAUS/AM', destinationPort: 'BOA VISTA/RR', product: 'CUSTO FRETE ROD, DESTINO', listValue: 8400, taxPercent: 0, total: 8400, status: 'Ativo' },
+    { id: 'pl-4', listName: 'LISTA LOGIN - MANAUS', originPort: 'MANAUS/AM', destinationPort: 'MANAUS - DISTRITO/AM', product: 'CUSTO FRETE ROD, DESTINO', listValue: 1400, taxPercent: 0, total: 1400, status: 'Ativo' },
+  ],
   users: [
     {
       id: 'usr-1',
@@ -358,6 +377,7 @@ export const seedData: AppData = {
         closings: 'edit',
         fiscalDocuments: 'edit',
         finance: 'edit',
+        priceLists: 'edit',
         reports: 'view',
         users: 'edit',
         settings: 'edit',
@@ -548,6 +568,17 @@ export function normalizeData(data: Partial<AppData>): AppData {
     closings: data.closings ?? [],
     fiscalDocuments: data.fiscalDocuments ?? [],
     receivables: data.receivables ?? [],
+    priceLists: (data.priceLists ?? seedData.priceLists).map((price) => ({
+      ...price,
+      listName: price.listName ?? '',
+      originPort: price.originPort ?? '',
+      destinationPort: price.destinationPort ?? '',
+      product: price.product ?? 'CUSTO FRETE ROD, DESTINO',
+      listValue: Number(price.listValue ?? 0),
+      taxPercent: Number(price.taxPercent ?? 0),
+      total: Number(price.total ?? price.listValue ?? 0),
+      status: price.status ?? 'Ativo',
+    })),
     users: (data.users ?? seedData.users).map((user) => ({
       ...user,
       password: user.password ?? '',
@@ -570,6 +601,7 @@ function emptyUserPermissions(): Record<string, UserPermission> {
     closings: 'none',
     fiscalDocuments: 'none',
     finance: 'none',
+    priceLists: 'none',
     reports: 'none',
     users: 'none',
     settings: 'none',

@@ -15,6 +15,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LoginPage } from './pages/LoginPage'
 import { UsersPage } from './pages/UsersPage'
+import { PriceListsPage } from './pages/PriceListsPage'
 import { canAccessPath, firstAllowedPath, isAuthenticated } from './services/authSession'
 
 function ProtectedPage({ path, children }: { path: string, children: ReactNode }) {
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="vehicles" element={<ProtectedPage path="/vehicles"><VehiclesPage /></ProtectedPage>} />
         <Route path="containers" element={<ProtectedPage path="/containers"><ContainersPage /></ProtectedPage>} />
         <Route path="finance" element={<ProtectedPage path="/finance"><FinancePage /></ProtectedPage>} />
+        <Route path="price-lists" element={<ProtectedPage path="/price-lists"><PriceListsPage /></ProtectedPage>} />
         <Route path="reports" element={<ProtectedPage path="/reports"><ReportsPage /></ProtectedPage>} />
         <Route path="users" element={<ProtectedPage path="/users"><UsersPage /></ProtectedPage>} />
         <Route path="settings" element={<ProtectedPage path="/settings"><SettingsPage /></ProtectedPage>} />
