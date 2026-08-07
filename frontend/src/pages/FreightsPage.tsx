@@ -90,6 +90,14 @@ type FreightForm = {
   value: string
 }
 
+type InvoiceImport = {
+  fileName: string
+  senderDocument: string
+  sender: string
+  recipientDocument: string
+  recipient: string
+}
+
 const emptyForm: FreightForm = {
   customer: '',
   process: '',
@@ -156,6 +164,14 @@ const emptyForm: FreightForm = {
   dfeNumber: '',
   protocolStatus: 'Aguardando',
   value: '0',
+}
+
+const emptyInvoiceImport: InvoiceImport = {
+  fileName: '',
+  senderDocument: '',
+  sender: '',
+  recipientDocument: '',
+  recipient: '',
 }
 
 function textInputClass(disabled = false) {
@@ -260,6 +276,9 @@ export function FreightsPage() {
   const [columnMenuOpen, setColumnMenuOpen] = useState(false)
   const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>({})
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(defaultFreightColumnWidths)
+  const [invoiceImportOpen, setInvoiceImportOpen] = useState(false)
+  const [invoiceImport, setInvoiceImport] = useState<InvoiceImport>(emptyInvoiceImport)
+  const [invoiceImportMessage, setInvoiceImportMessage] = useState('')
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -531,6 +550,102 @@ export function FreightsPage() {
     }
     setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
     setOpenActionId(null)
+  }
+
+  function getXmlText(parent: Element | null, tag: string) {
+    return parent?.getElementsByTagName(tag)[0]?.textContent?.trim() ?? ''
+  }
+
+  function extractInvoiceFromXml(text: string, fileName: string): InvoiceImport | null {
+    const xml = new DOMParser().parseFromString(text, 'application/xml')
+    if (xml.getElementsByTagName('parsererror').length) return null
+
+    const emit = xml.getElementsByTagName('emit')[0]
+    const dest = xml.getElementsByTagName('dest')[0]
+    if (!emit && !dest) return null
+
+    return {
+      fileName,
+      senderDocument: getXmlText(emit, 'CNPJ') || getXmlText(emit, 'CPF'),
+      sender: getXmlText(emit, 'xNome'),
+      recipientDocument: getXmlText(dest, 'CNPJ') || getXmlText(dest, 'CPF'),
+      recipient: getXmlText(dest, 'xNome'),
+    }
+  }
+
+  function extractAfterLabel(text: string, label: string) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = text.match(new RegExp(`${escaped}\\s+([^\\n\\r]+)`, 'i'))
+    return match?.[1]?.replace(/\s{2,}.*/, '').trim() ?? ''
+  }
+
+  function extractInvoiceFromDanfText(text: string, fileName: string): InvoiceImport | null {
+    const normalized = text.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ')
+    const lines = text
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const natureIndex = lines.findIndex((line) => /NATUREZA DA OPERA/i.test(line))
+    const issuerCandidates = (natureIndex > 0 ? lines.slice(0, natureIndex) : lines.slice(0, 25))
+      .filter((line) => /LTDA|EIRELI|S\/A| SA | ME\b| EPP\b/i.test(line))
+      .filter((line) => !/DANFE|NF-?E|DESTINAT/i.test(line))
+    const destBlock = normalized.match(/DESTINAT[ÁA]RIO\/REMETENTE([\s\S]*?)(?:C[ÁA]LCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|FATURA|$)/i)?.[1] ?? ''
+    const transportBlock = normalized.match(/TRANSPORTADOR\/VOLUMES TRANSPORTADOS([\s\S]*?)(?:DADOS DO PRODUTO|C[ÁA]LCULO DO ISSQN|$)/i)?.[1] ?? ''
+
+    const sender = issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
+    const senderDocument = extractAfterLabel(transportBlock, 'CNPJ / CPF') || extractAfterLabel(normalized, 'CNPJ')
+    const recipient = extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
+    const recipientDocument = extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
+
+    if (!sender && !recipient) return null
+    return {
+      fileName,
+      senderDocument,
+      sender,
+      recipientDocument,
+      recipient,
+    }
+  }
+
+  function openInvoiceImport() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    setInvoiceImport(emptyInvoiceImport)
+    setInvoiceImportMessage('')
+    setInvoiceImportOpen(true)
+  }
+
+  function readInvoiceFile(file: File) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = String(reader.result ?? '')
+      const extracted = extractInvoiceFromXml(text, file.name) ?? extractInvoiceFromDanfText(text, file.name)
+      if (!extracted) {
+        setInvoiceImport({ ...emptyInvoiceImport, fileName: file.name })
+        setInvoiceImportMessage('Nao consegui ler remetente/destinatario automaticamente. Se for PDF escaneado ou imagem, anexe o XML da NF-e ou preencha manualmente aqui.')
+        return
+      }
+      setInvoiceImport(extracted)
+      setInvoiceImportMessage('Dados extraidos. Confira antes de aplicar no frete.')
+    }
+    reader.onerror = () => {
+      setInvoiceImportMessage('Nao foi possivel ler o arquivo anexado.')
+    }
+    reader.readAsText(file)
+  }
+
+  function applyInvoiceImport() {
+    setForm((current) => ({
+      ...current,
+      senderDocument: invoiceImport.senderDocument || current.senderDocument,
+      sender: invoiceImport.sender || current.sender,
+      recipientDocument: invoiceImport.recipientDocument || current.recipientDocument,
+      recipient: invoiceImport.recipient || current.recipient,
+    }))
+    setInvoiceImportOpen(false)
   }
 
   function renderFreightCell(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
@@ -997,7 +1112,7 @@ export function FreightsPage() {
                 <button className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
                 <Info size={16} />
                 <Settings size={16} />
-                <button className="inline-flex items-center gap-1"><Paperclip size={15} /> ANEXAR</button>
+                <button onClick={openInvoiceImport} className="inline-flex items-center gap-1"><Paperclip size={15} /> ANEXAR</button>
                 <button onClick={() => setShowForm(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
               </div>
             </div>
@@ -1044,6 +1159,55 @@ export function FreightsPage() {
                 <span className="px-2.5 py-1 text-zinc-400">ORIENTACAO INTERNA</span>
               </div>
               <div className="min-h-[calc(100vh-420px)] bg-zinc-100">{renderActiveTab()}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {invoiceImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/30 px-4 py-8">
+          <div className="max-h-[calc(100vh-64px)] w-full max-w-5xl overflow-hidden border border-zinc-500 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Anexar NF-e</h3>
+              <div className="flex items-center gap-3 text-xs">
+                <button onClick={applyInvoiceImport} className="inline-flex items-center gap-1"><Save size={15} /> APLICAR NO FRETE</button>
+                <button onClick={() => setInvoiceImportOpen(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+              </div>
+            </div>
+
+            <div className="p-3">
+              <div className="grid gap-x-24 gap-y-2 border-b-4 border-zinc-400 pb-4 md:grid-cols-2">
+                <div className="grid gap-1">
+                  <Field label="Arquivo">
+                    <input
+                      type="file"
+                      accept=".xml,.txt,.pdf,application/xml,text/xml,application/pdf"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) readInvoiceFile(file)
+                      }}
+                      className="h-7 w-full border border-zinc-300 bg-white px-2 text-xs"
+                    />
+                  </Field>
+                  <Field label="Nome do arquivo"><input value={invoiceImport.fileName} className={textInputClass(true)} disabled /></Field>
+                </div>
+                <div className="text-xs text-zinc-700">
+                  {invoiceImportMessage || 'Anexe o XML da NF-e ou um DANFE PDF com texto pesquisavel.'}
+                </div>
+              </div>
+
+              <div className="grid gap-x-24 gap-y-1 pt-4 md:grid-cols-2">
+                <div className="grid gap-1">
+                  <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">REMETENTE / EMITENTE DA NF</div>
+                  <Field label="CNPJ/CPF"><input value={invoiceImport.senderDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderDocument: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Remetente"><input value={invoiceImport.sender} onChange={(event) => setInvoiceImport({ ...invoiceImport, sender: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                </div>
+                <div className="grid gap-1">
+                  <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / RECEBEDOR</div>
+                  <Field label="CNPJ/CPF"><input value={invoiceImport.recipientDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientDocument: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Destinatario"><input value={invoiceImport.recipient} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipient: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                </div>
+              </div>
             </div>
           </div>
         </div>
