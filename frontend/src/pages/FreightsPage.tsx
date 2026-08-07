@@ -566,35 +566,40 @@ export function FreightsPage() {
   function renderActiveTab() {
     if (activeTab === 'GERAIS') {
       return (
-        <div className="grid gap-x-20 gap-y-1 p-3 md:grid-cols-2">
-          <div className="grid gap-1">
-            <Field label="Codigo do processo" required><input value={form.process} onChange={(event) => updateForm('process', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            <Field label="Situacao"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
-            <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} onChange={(event) => updateForm('serviceTakerDocument', event.target.value)} className={textInputClass()} /></Field>
-            <Field label="Tomador do servico" required><input value={form.serviceTaker} onChange={(event) => updateForm('serviceTaker', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            <Field label="CNPJ/CPF"><input value={form.senderDocument} onChange={(event) => updateForm('senderDocument', event.target.value)} className={textInputClass()} /></Field>
-            <Field label="Remetente"><input value={form.sender} onChange={(event) => updateForm('sender', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            <label className="ml-[140px] flex items-center gap-2 text-xs"><input type="checkbox" checked={form.consolidateCargo} onChange={(event) => updateForm('consolidateCargo', event.target.checked)} /> Consolidar carga?</label>
+        <div className="p-3">
+          <div className="grid gap-x-24 gap-y-1 md:grid-cols-2">
+            <div className="grid gap-1">
+              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONTRATADO</div>
+              <Field label="CNPJ/CPF"><input value={form.contractorDocument} onChange={(event) => updateForm('contractorDocument', event.target.value)} className={textInputClass()} /></Field>
+              <Field label="Contratado"><input value={form.contractor} onChange={(event) => updateForm('contractor', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+            </div>
+            <div className="grid gap-1">
+              <Field label="Operador da origem"><input className={textInputClass()} /></Field>
+              <Field label="Condicao de negociacao"><select value={form.negotiationCondition} onChange={(event) => updateForm('negotiationCondition', event.target.value)} className={textInputClass()}><option>Selecione...</option><option>7 DIAS [A] (per D)</option><option>A vista</option><option>15 DIAS</option></select></Field>
+            </div>
           </div>
-          <div className="grid gap-1">
-            <Field label="Tipo processo" required>
-              <select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}>
-                <option>Multimodal [M]</option>
-                <option>Rodoviario [R]</option>
-                <option>Container [C]</option>
-              </select>
-            </Field>
-            <Field label="Identificacao do cliente"><input value={form.customerIdentification} onChange={(event) => updateForm('customerIdentification', event.target.value)} className={textInputClass()} /></Field>
-            <Field label="Cliente" required>
-              <select value={form.customer} onChange={(event) => updateForm('customer', event.target.value)} className={textInputClass()}>
-                <option value="">Selecione...</option>
-                {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Produto"><input value={form.product} onChange={(event) => updateForm('product', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            <Field label="CNPJ/CPF"><input value={form.recipientDocument} onChange={(event) => updateForm('recipientDocument', event.target.value)} className={textInputClass()} /></Field>
-            <Field label="Destinatario"><input value={form.recipient} onChange={(event) => updateForm('recipient', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            <label className="ml-[140px] flex items-center gap-2 text-xs"><input type="checkbox" checked={form.urgent} onChange={(event) => updateForm('urgent', event.target.checked)} /> Urgente?</label>
+          <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
+            <div className="grid gap-1">
+              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONDUTORES</div>
+              <Field label="Motorista" required><select value={form.driver} onChange={(event) => updateForm('driver', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{drivers.map((driver) => <option key={driver.id}>{driver.name}</option>)}</select></Field>
+              <Field label="Ajudante"><input value={form.helper} onChange={(event) => updateForm('helper', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+            </div>
+            <div className="grid gap-1">
+              <Field label="Motorista auxiliar"><input value={form.auxiliaryDriver} onChange={(event) => updateForm('auxiliaryDriver', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
+            <div className="grid gap-1">
+              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">FROTAS</div>
+              <Field label="Placa" required><select value={form.tractorId} onChange={(event) => updateForm('tractorId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{tractors.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.tractorPlate}</option>)}</select></Field>
+              <Field label="Veiculo trator"><input value={selectedTractor?.description || selectedTractor?.type || ''} className={textInputClass(true)} disabled /></Field>
+              <Field label="Tag de pedagio"><input value={form.tollTag} onChange={(event) => updateForm('tollTag', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+            </div>
+            <div className="grid gap-1">
+              <Field label="Placa"><select value={form.trailerId} onChange={(event) => updateForm('trailerId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{trailers.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.trailerPlate}</option>)}</select></Field>
+              <Field label="Veiculo reboque"><input value={selectedTrailer?.description || selectedTrailer?.type || ''} className={textInputClass(true)} disabled /></Field>
+              <Field label="Placa"><input value={form.auxiliaryPlate} onChange={(event) => updateForm('auxiliaryPlate', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+            </div>
           </div>
         </div>
       )
@@ -631,42 +636,7 @@ export function FreightsPage() {
 
     if (activeTab === 'SERVICOS') {
       return (
-        <div className="p-3">
-          <div className="grid gap-x-24 gap-y-1 md:grid-cols-2">
-            <div className="grid gap-1">
-              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONTRATADO</div>
-              <Field label="CNPJ/CPF"><input value={form.contractorDocument} onChange={(event) => updateForm('contractorDocument', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Contratado"><input value={form.contractor} onChange={(event) => updateForm('contractor', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            </div>
-            <div className="grid gap-1">
-              <Field label="Operador da origem"><input className={textInputClass()} /></Field>
-              <Field label="Condicao de negociacao"><select value={form.negotiationCondition} onChange={(event) => updateForm('negotiationCondition', event.target.value)} className={textInputClass()}><option>7 DIAS [A] (per D)</option><option>A vista</option><option>15 DIAS</option></select></Field>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
-            <div className="grid gap-1">
-              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONDUTORES</div>
-              <Field label="Motorista" required><select value={form.driver} onChange={(event) => updateForm('driver', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{drivers.map((driver) => <option key={driver.id}>{driver.name}</option>)}</select></Field>
-              <Field label="Ajudante"><input value={form.helper} onChange={(event) => updateForm('helper', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            </div>
-            <div className="grid gap-1">
-              <Field label="Motorista auxiliar"><input value={form.auxiliaryDriver} onChange={(event) => updateForm('auxiliaryDriver', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
-            <div className="grid gap-1">
-              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">FROTAS</div>
-              <Field label="Placa" required><select value={form.tractorId} onChange={(event) => updateForm('tractorId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{tractors.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.tractorPlate}</option>)}</select></Field>
-              <Field label="Veiculo trator"><input value={selectedTractor?.description || selectedTractor?.type || ''} className={textInputClass(true)} disabled /></Field>
-              <Field label="Tag de pedagio"><input value={form.tollTag} onChange={(event) => updateForm('tollTag', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            </div>
-            <div className="grid gap-1">
-              <Field label="Placa"><select value={form.trailerId} onChange={(event) => updateForm('trailerId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{trailers.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.trailerPlate}</option>)}</select></Field>
-              <Field label="Veiculo reboque"><input value={selectedTrailer?.description || selectedTrailer?.type || ''} className={textInputClass(true)} disabled /></Field>
-              <Field label="Placa"><input value={form.auxiliaryPlate} onChange={(event) => updateForm('auxiliaryPlate', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
-            </div>
-          </div>
-        </div>
+        <EmptyGridMessage text="Sem informacoes adicionais nesta etapa." />
       )
     }
 
@@ -957,8 +927,7 @@ export function FreightsPage() {
                 </div>
               </div>
 
-              <div className="px-3 pt-3 text-xs font-medium">ORIENTACAO INTERNA</div>
-              <div className="flex flex-wrap border-b border-zinc-300 px-2 pt-1 text-xs">
+              <div className="flex flex-wrap items-end border-b border-zinc-300 px-2 pt-3 text-xs">
                 {freightTabs.map((tab) => {
                   const enabled = tabAvailability[tab]
                   return (
@@ -971,6 +940,7 @@ export function FreightsPage() {
                     </button>
                   )
                 })}
+                <span className="px-2.5 py-1 text-zinc-400">ORIENTACAO INTERNA</span>
               </div>
               <div className="min-h-[calc(100vh-420px)] bg-zinc-100">{renderActiveTab()}</div>
             </div>
