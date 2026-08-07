@@ -265,6 +265,8 @@ export function FreightsPage() {
     customer: customers[0]?.name ?? '',
     serviceTakerDocument: issuerDocument,
     serviceTaker: issuerName,
+    contractorDocument: issuerDocument,
+    contractor: issuerName,
     recipient: customers[0]?.name ?? '',
     driver: drivers[0]?.name ?? '',
     tractorId: vehicles.find((vehicle) => vehicle.vehicleType === 'Cavalo')?.id ?? '',
@@ -283,6 +285,8 @@ export function FreightsPage() {
       ...current,
       serviceTakerDocument: issuerDocument,
       serviceTaker: issuerName,
+      contractorDocument: issuerDocument,
+      contractor: issuerName,
     }))
   }, [issuerDocument, issuerName])
 
@@ -382,6 +386,8 @@ export function FreightsPage() {
       customer: customers[0]?.name ?? '',
       serviceTakerDocument: issuerDocument,
       serviceTaker: issuerName,
+      contractorDocument: issuerDocument,
+      contractor: issuerName,
       recipient: customers[0]?.name ?? '',
       driver: drivers[0]?.name ?? '',
       tractorId: tractors[0]?.id ?? '',
@@ -411,6 +417,8 @@ export function FreightsPage() {
       status: freight.operationalStatus,
       serviceTakerDocument: issuerDocument,
       serviceTaker: issuerName,
+      contractorDocument: issuerDocument,
+      contractor: issuerName,
       recipient: freight.customer,
       routeName: `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
       origin: freight.origin,
@@ -582,8 +590,8 @@ export function FreightsPage() {
           <div className="grid gap-x-24 gap-y-1 md:grid-cols-2">
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONTRATADO</div>
-              <Field label="CNPJ/CPF"><input value={form.contractorDocument} onChange={(event) => updateForm('contractorDocument', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Contratado"><input value={form.contractor} onChange={(event) => updateForm('contractor', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+              <Field label="CNPJ/CPF"><input value={form.contractorDocument} className={textInputClass(true)} disabled /></Field>
+              <Field label="Contratado"><input value={form.contractor} className={textInputClass(true)} disabled /></Field>
             </div>
             <div className="grid gap-1">
               <Field label="Operador da origem"><input className={textInputClass()} /></Field>
