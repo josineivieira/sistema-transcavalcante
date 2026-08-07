@@ -234,7 +234,7 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 }, {})
 
 export function FreightsPage() {
-  const { customers, drivers, vehicles, containers, freights, issuerSettings, setFreights } = useLocalData()
+  const { customers, drivers, vehicles, containers, freights, priceLists, issuerSettings, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
   const issuerDocument = issuerSettings.document || ''
@@ -279,6 +279,12 @@ export function FreightsPage() {
   const selectedTractor = tractors.find((vehicle) => vehicle.id === form.tractorId)
   const selectedTrailer = trailers.find((vehicle) => vehicle.id === form.trailerId)
   const selectedContainer = containers.find((container) => container.number === form.container)
+  const productOptions = useMemo(() => {
+    const products = priceLists
+      .filter((price) => price.status !== 'Inativo' && price.product)
+      .map((price) => price.product)
+    return Array.from(new Set(products)).sort()
+  }, [priceLists])
 
   useEffect(() => {
     setForm((current) => ({
@@ -374,6 +380,20 @@ export function FreightsPage() {
       }
       if (field === 'customer') {
         next.recipient = next.recipient || String(value)
+      }
+      if (field === 'product' || field === 'origin' || field === 'destination') {
+        const selectedProduct = String(field === 'product' ? value : next.product).toUpperCase()
+        const origin = String(field === 'origin' ? value : next.origin).toUpperCase()
+        const destination = String(field === 'destination' ? value : next.destination).toUpperCase()
+        const price = priceLists.find((item) =>
+          item.product.toUpperCase() === selectedProduct
+          && (!origin || item.originPort.toUpperCase().includes(origin) || origin.includes(item.originPort.toUpperCase()))
+          && (!destination || item.destinationPort.toUpperCase().includes(destination) || destination.includes(item.destinationPort.toUpperCase())),
+        ) ?? priceLists.find((item) => item.product.toUpperCase() === selectedProduct)
+        if (price) {
+          next.value = String(price.total || price.listValue || 0)
+          next.plannedFreightCost = String(price.total || price.listValue || 0)
+        }
       }
       return next
     })
@@ -996,7 +1016,13 @@ export function FreightsPage() {
                   <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
                   <Field label="Identificacao do cliente"><input value={form.customerIdentification} onChange={(event) => updateForm('customerIdentification', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="Cliente" required><select value={form.customer} onChange={(event) => updateForm('customer', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}</select></Field>
-                  <Field label="Produto"><input value={form.product} onChange={(event) => updateForm('product', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="Produto">
+                    <select value={form.product} onChange={(event) => updateForm('product', event.target.value)} className={textInputClass()}>
+                      <option value="">Selecione...</option>
+                      {productOptions.map((product) => <option key={product} value={product}>{product}</option>)}
+                      {form.product && !productOptions.includes(form.product) && <option value={form.product}>{form.product}</option>}
+                    </select>
+                  </Field>
                   <Field label="CNPJ/CPF"><input value={form.recipientDocument} onChange={(event) => updateForm('recipientDocument', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="Destinatario"><input value={form.recipient} onChange={(event) => updateForm('recipient', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
                 </div>
