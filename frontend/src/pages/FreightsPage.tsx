@@ -750,9 +750,64 @@ export function FreightsPage() {
       )
     }
 
-    if (activeTab === 'SM' || activeTab === 'CIOT' || activeTab === 'DFE' || activeTab === 'PROTOCOLO' || activeTab === 'VALE PEDAGIO') {
-      const field = activeTab === 'SM' ? 'smNumber' : activeTab === 'CIOT' ? 'ciotNumber' : activeTab === 'DFE' ? 'dfeNumber' : 'protocolStatus'
-      const label = activeTab === 'SM' ? 'Nr. SM' : activeTab === 'CIOT' ? 'Nr. CIOT' : activeTab === 'DFE' ? 'Nr. averbacao' : 'Situacao'
+    if (activeTab === 'CIOT') {
+      const date = form.deliveryForecast || new Date().toISOString().slice(0, 10)
+      const endDate = form.cntrReturnDate || form.destinationScheduleDate || date
+      return (
+        <div className="p-3">
+          <Field label="Tipo de viagem"><input value="P-Padrao" className={`${textInputClass(true)} max-w-md`} disabled /></Field>
+          <div className="mt-2 overflow-x-auto border border-zinc-300 bg-white">
+            <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2 text-xs">
+              <div className="ml-auto">{form.ciotNumber ? '2' : '1'} de {form.ciotNumber ? '2' : '1'} registros</div>
+              <input className="ml-2 h-6 w-32 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
+              <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>&lt;-&gt;</span><span>☑</span><span>1:1</span></div>
+            </div>
+            <table className="w-full min-w-[980px] table-fixed text-xs">
+              <thead className="bg-white">
+                <tr>
+                  {['', '', 'No CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
+                    <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
+                      {heading}
+                      {heading && <span className="float-right text-zinc-400">▾</span>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-sky-300">
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" defaultChecked /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-500">⋮</td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber} onChange={(event) => updateForm('ciotNumber', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber ? 'REGISTRADO' : ''} className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={endDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} className={textInputClass()} readOnly /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" className={textInputClass()} /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" className={textInputClass()} /></td>
+                </tr>
+                {form.ciotNumber && (
+                  <tr>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" /></td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-500">⋮</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{form.ciotNumber}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">REGISTRADO</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{date}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{endDate}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{date}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1"></td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1"></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )
+    }
+
+    if (activeTab === 'SM' || activeTab === 'DFE' || activeTab === 'PROTOCOLO' || activeTab === 'VALE PEDAGIO') {
+      const field = activeTab === 'SM' ? 'smNumber' : activeTab === 'DFE' ? 'dfeNumber' : 'protocolStatus'
+      const label = activeTab === 'SM' ? 'Nr. SM' : activeTab === 'DFE' ? 'Nr. averbacao' : 'Situacao'
       return (
         <div className="p-3">
           <Field label={label}><input value={String(form[field as keyof FreightForm])} onChange={(event) => updateForm(field as keyof FreightForm, event.target.value)} className={`${textInputClass()} max-w-md`} /></Field>
