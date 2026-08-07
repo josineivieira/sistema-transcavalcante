@@ -579,6 +579,54 @@ export function FreightsPage() {
     return match?.[1]?.replace(/\s{2,}.*/, '').trim() ?? ''
   }
 
+  function plainText(value: string) {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  }
+
+  function formatCnpj(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length !== 14) return value
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+  }
+
+  function firstFormattedDocument(text: string) {
+    return text.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{3}\.\d{3}\.\d{3}-\d{2}/)?.[0] ?? ''
+  }
+
+  function documentFromAccessKey(text: string) {
+    const accessKey = text.match(/(?:\d[\s.-]*){44}/)?.[0]?.replace(/\D/g, '') ?? ''
+    return accessKey.length === 44 ? formatCnpj(accessKey.slice(6, 20)) : ''
+  }
+
+  function lineAfterPattern(lines: string[], pattern: RegExp) {
+    const index = lines.findIndex((line) => pattern.test(line) || pattern.test(plainText(line)))
+    if (index < 0) return ''
+    const ignored = /^(CNPJ|CPF|FONE|DATA|HORA|MUNIC[IÍ]PIO|BAIRRO|ENDERE[CÇ]O|UF|CEP|INSCRI[CÇ][AÃ]O|NOME\s*\/|NOME\/)/i
+    return lines.slice(index + 1).find((line) => line && !ignored.test(line)) ?? ''
+  }
+
+  async function extractTextFromPdf(file: File) {
+    const [pdfjsLib, pdfWorker] = await Promise.all([
+      import('pdfjs-dist'),
+      import('pdfjs-dist/build/pdf.worker.mjs?url'),
+    ])
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker.default
+    const data = new Uint8Array(await file.arrayBuffer())
+    const pdf = await pdfjsLib.getDocument({ data }).promise
+    const pages: string[] = []
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber)
+      const content = await page.getTextContent()
+      pages.push(content.items.map((item) => {
+        if (typeof item === 'object' && item !== null && 'str' in item) {
+          return String((item as { str: string }).str)
+        }
+        return ''
+      }).join('\n'))
+    }
+    return pages.join('\n')
+  }
+
   function extractInvoiceFromDanfText(text: string, fileName: string): InvoiceImport | null {
     const normalized = text.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ')
     const lines = text
@@ -586,17 +634,27 @@ export function FreightsPage() {
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
-    const natureIndex = lines.findIndex((line) => /NATUREZA DA OPERA/i.test(line))
+    const natureIndex = lines.findIndex((line) => /NATUREZA DA OPERA/i.test(plainText(line)))
     const issuerCandidates = (natureIndex > 0 ? lines.slice(0, natureIndex) : lines.slice(0, 25))
       .filter((line) => /LTDA|EIRELI|S\/A| SA | ME\b| EPP\b/i.test(line))
       .filter((line) => !/DANFE|NF-?E|DESTINAT/i.test(line))
-    const destBlock = normalized.match(/DESTINAT[ÁA]RIO\/REMETENTE([\s\S]*?)(?:C[ÁA]LCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|FATURA|$)/i)?.[1] ?? ''
+    const destinationStart = lines.findIndex((line) => plainText(line).includes('DESTINATARIO/REMETENTE'))
+    const relativeDestinationEnd = destinationStart >= 0
+      ? lines.slice(destinationStart + 1).findIndex((line) => /TRANSPORTADOR\/VOLUMES|CALCULO DO IMPOSTO/i.test(plainText(line)))
+      : -1
+    const destinationEnd = relativeDestinationEnd >= 0 ? destinationStart + 1 + relativeDestinationEnd : lines.length
+    const destinationLines = destinationStart >= 0 ? lines.slice(destinationStart, destinationEnd) : []
+    const recipientContextLines = destinationStart >= 0
+      ? lines.slice(Math.max(0, destinationStart - 20), destinationEnd)
+      : destinationLines
+    const destBlock = destinationLines.join('\n') || (normalized.match(/DESTINAT[ÁA]RIO\/REMETENTE([\s\S]*?)(?:C[ÁA]LCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|FATURA|$)/i)?.[1] ?? '')
     const transportBlock = normalized.match(/TRANSPORTADOR\/VOLUMES TRANSPORTADOS([\s\S]*?)(?:DADOS DO PRODUTO|C[ÁA]LCULO DO ISSQN|$)/i)?.[1] ?? ''
 
-    const sender = issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
-    const senderDocument = extractAfterLabel(transportBlock, 'CNPJ / CPF') || extractAfterLabel(normalized, 'CNPJ')
-    const recipient = extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
-    const recipientDocument = extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
+    const senderFromReceipt = normalized.match(/RECEBEMOS DE\s+(.+?)\s+OS PRODUTOS/i)?.[1]?.trim() ?? ''
+    const sender = senderFromReceipt || issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
+    const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
+    const recipient = lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i) || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
+    const recipientDocument = firstFormattedDocument(destBlock) || firstFormattedDocument(recipientContextLines.join('\n')) || extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
 
     if (!sender && !recipient) return null
     return {
@@ -618,10 +676,10 @@ export function FreightsPage() {
     setInvoiceImportOpen(true)
   }
 
-  function readInvoiceFile(file: File) {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = String(reader.result ?? '')
+  async function readInvoiceFile(file: File) {
+    try {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      const text = isPdf ? await extractTextFromPdf(file) : await file.text()
       const extracted = extractInvoiceFromXml(text, file.name) ?? extractInvoiceFromDanfText(text, file.name)
       if (!extracted) {
         setInvoiceImport({ ...emptyInvoiceImport, fileName: file.name })
@@ -630,11 +688,10 @@ export function FreightsPage() {
       }
       setInvoiceImport(extracted)
       setInvoiceImportMessage('Dados extraidos. Confira antes de aplicar no frete.')
-    }
-    reader.onerror = () => {
+    } catch {
+      setInvoiceImport({ ...emptyInvoiceImport, fileName: file.name })
       setInvoiceImportMessage('Nao foi possivel ler o arquivo anexado.')
     }
-    reader.readAsText(file)
   }
 
   function applyInvoiceImport() {
