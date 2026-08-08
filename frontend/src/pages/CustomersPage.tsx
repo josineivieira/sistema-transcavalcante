@@ -69,6 +69,10 @@ function formatDate(value?: string) {
   return `${day}/${month}/${year}`
 }
 
+function automaticShortName(name: string) {
+  return name.trim().toUpperCase()
+}
+
 function customerForEdit(customer?: Customer): Customer {
   if (!customer) {
     return { ...emptyCustomer, id: nextId('cli'), registrationDate: new Date().toISOString().slice(0, 10) }
@@ -113,8 +117,11 @@ export function CustomersPage() {
     if (!editing) return
     const next = { ...editing, [field]: value }
     if (field === 'name') {
+      const previousAutoShortName = automaticShortName(editing.name)
       next.tradeName = next.tradeName || value
-      next.shortName = next.shortName || value
+      if (!editing.shortName || editing.shortName === previousAutoShortName) {
+        next.shortName = automaticShortName(value)
+      }
     }
     if (field === 'emailFiscal') next.contactEmail = value
     setEditing(next)
@@ -133,7 +140,7 @@ export function CustomersPage() {
     const normalized = {
       ...editing,
       tradeName: editing.tradeName || editing.name,
-      shortName: editing.shortName || editing.tradeName || editing.name,
+      shortName: editing.shortName || automaticShortName(editing.name),
       contactEmail: editing.contactEmail || editing.emailFiscal,
       status: editing.status || 'Ativo',
     }
@@ -324,7 +331,7 @@ export function CustomersPage() {
                   </div>
                   <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
                     <label className="text-right">Nome reduzido</label>
-                    <input value={editing.shortName} onChange={(event) => updateEditing('shortName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+                    <input value={editing.shortName || automaticShortName(editing.name)} onChange={(event) => updateEditing('shortName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
                     <label className="text-right">Sitio (site) sem http://</label>
                     <input value={editing.website} onChange={(event) => updateEditing('website', event.target.value)} className="h-7 border border-zinc-300 px-2" />
                     <label className="text-right">Grupo economico</label>
