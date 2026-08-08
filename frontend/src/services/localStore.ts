@@ -175,6 +175,15 @@ export type Freight = {
   date: string
   customer: string
   process: string
+  processType?: string
+  customerIdentification?: string
+  serviceTakerDocument?: string
+  serviceTaker?: string
+  senderDocument?: string
+  sender?: string
+  product?: string
+  recipientDocument?: string
+  recipient?: string
   container: string
   driver: string
   tractorPlate: string
@@ -563,6 +572,15 @@ export function normalizeData(data: Partial<AppData>): AppData {
         driver: legacyFreight.driver ?? '',
         tractorPlate: legacyFreight.tractorPlate ?? '',
         trailerPlate: legacyFreight.trailerPlate ?? '',
+        processType: legacyFreight.processType ?? 'Multimodal [M]',
+        customerIdentification: legacyFreight.customerIdentification ?? '',
+        serviceTakerDocument: legacyFreight.serviceTakerDocument ?? '',
+        serviceTaker: legacyFreight.serviceTaker ?? '',
+        senderDocument: legacyFreight.senderDocument ?? '',
+        sender: legacyFreight.sender ?? '',
+        product: legacyFreight.product ?? '',
+        recipientDocument: legacyFreight.recipientDocument ?? '',
+        recipient: legacyFreight.recipient ?? legacyFreight.customer ?? '',
       } as Freight
     }),
     closings: data.closings ?? [],
