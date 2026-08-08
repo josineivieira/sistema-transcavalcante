@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
-import { formatMoney, nextId, type FreightTask } from '../services/localStore'
+import { formatMoney, nextId, type Freight, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 
@@ -214,6 +214,15 @@ function parseBrazilianNumber(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function cityState(value: string | undefined) {
+  const text = String(value || '')
+  const parts = text.split('/')
+  return {
+    city: parts[0]?.trim() || text || '-',
+    state: parts[1]?.trim() || '',
+  }
+}
+
 const freightGridColumns = [
   { key: 'select', label: '', width: 30, locked: true },
   { key: 'code', label: 'Codigo', width: 118, minWidth: 82, locked: true },
@@ -386,6 +395,23 @@ export function FreightsPage() {
 
   const freightGridMinWidth = visibleFreightColumns.reduce((total, column) => total + (columnWidths[column.key] ?? column.width), 0)
 
+  function findPriceForProcess(product: string, origin: string, destination: string) {
+    const selectedProduct = product.toUpperCase()
+    const selectedOrigin = origin.toUpperCase()
+    const selectedDestination = destination.toUpperCase()
+    return priceLists.find((item) =>
+      item.status !== 'Inativo'
+      && item.product.toUpperCase() === selectedProduct
+      && (!selectedOrigin || item.originPort.toUpperCase().includes(selectedOrigin) || selectedOrigin.includes(item.originPort.toUpperCase()))
+      && (!selectedDestination || item.destinationPort.toUpperCase().includes(selectedDestination) || selectedDestination.includes(item.destinationPort.toUpperCase())),
+    ) ?? priceLists.find((item) => item.status !== 'Inativo' && item.product.toUpperCase() === selectedProduct)
+  }
+
+  function priceValueForProcess(product: string, origin: string, destination: string) {
+    const price = findPriceForProcess(product, origin, destination)
+    return price ? String(price.total || price.listValue || 0) : ''
+  }
+
   function startColumnResize(event: ReactMouseEvent<HTMLSpanElement>, column: typeof freightGridColumns[number]) {
     event.preventDefault()
     const startX = event.clientX
@@ -426,17 +452,14 @@ export function FreightsPage() {
         next.recipient = next.recipient || String(value)
       }
       if (field === 'product' || field === 'origin' || field === 'destination') {
-        const selectedProduct = String(field === 'product' ? value : next.product).toUpperCase()
-        const origin = String(field === 'origin' ? value : next.origin).toUpperCase()
-        const destination = String(field === 'destination' ? value : next.destination).toUpperCase()
-        const price = priceLists.find((item) =>
-          item.product.toUpperCase() === selectedProduct
-          && (!origin || item.originPort.toUpperCase().includes(origin) || origin.includes(item.originPort.toUpperCase()))
-          && (!destination || item.destinationPort.toUpperCase().includes(destination) || destination.includes(item.destinationPort.toUpperCase())),
-        ) ?? priceLists.find((item) => item.product.toUpperCase() === selectedProduct)
+        const price = priceValueForProcess(
+          String(field === 'product' ? value : next.product),
+          String(field === 'origin' ? value : next.origin),
+          String(field === 'destination' ? value : next.destination),
+        )
         if (price) {
-          next.value = String(price.total || price.listValue || 0)
-          next.plannedFreightCost = String(price.total || price.listValue || 0)
+          next.value = price
+          next.plannedFreightCost = price
         }
       }
       return next
@@ -530,12 +553,54 @@ export function FreightsPage() {
       time: 'Hoje',
       user: authUser?.name || authUser?.email || 'Sistema',
     }
-    setForm((current) => ({
-      ...current,
-      status: taskName,
-      taskHistory: [task, ...(current.taskHistory ?? [])],
-    }))
+    setForm((current) => {
+      const next = {
+        ...current,
+        status: taskName,
+        taskHistory: [task, ...(current.taskHistory ?? [])],
+      }
+      if (editingFreightId) {
+        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+      }
+      return next
+    })
     setTaskPickerOpen(false)
+  }
+
+  function buildFreightRecord(formSnapshot: FreightForm, existing?: Freight): Freight {
+    const matchedPrice = priceValueForProcess(formSnapshot.product, formSnapshot.origin, formSnapshot.destination)
+    const rawValue = parseBrazilianNumber(formSnapshot.value || formSnapshot.plannedFreightCost)
+    const value = rawValue > 0 ? rawValue : parseBrazilianNumber(matchedPrice)
+    const tractor = tractors.find((item) => item.id === formSnapshot.tractorId)
+    const trailer = trailers.find((item) => item.id === formSnapshot.trailerId)
+    const createdNumber = `FRT-${String(freights.length + 1).padStart(6, '0')}`
+    return {
+      ...formSnapshot,
+      id: existing?.id ?? nextId('fr'),
+      number: existing?.number ?? createdNumber,
+      date: existing?.date ?? new Date().toISOString().slice(0, 10),
+      customer: formSnapshot.customer,
+      process: formSnapshot.process,
+      processType: formSnapshot.processType,
+      customerIdentification: formSnapshot.customerIdentification,
+      serviceTakerDocument: formSnapshot.serviceTakerDocument,
+      serviceTaker: formSnapshot.serviceTaker,
+      senderDocument: formSnapshot.senderDocument,
+      sender: formSnapshot.sender,
+      product: formSnapshot.product,
+      recipientDocument: formSnapshot.recipientDocument,
+      recipient: formSnapshot.recipient,
+      container: formSnapshot.container,
+      driver: formSnapshot.driver,
+      tractorPlate: tractor?.tractorPlate ?? existing?.tractorPlate ?? '',
+      trailerPlate: trailer?.trailerPlate ?? existing?.trailerPlate ?? '',
+      origin: formSnapshot.origin,
+      destination: formSnapshot.destination,
+      value,
+      operationalStatus: formSnapshot.status || existing?.operationalStatus || 'Em digitacao',
+      fiscalStatus: existing?.fiscalStatus ?? 'Pendente',
+      closing: existing?.closing,
+    }
   }
 
   function saveFreight(closeAfterSave = true) {
@@ -543,54 +608,16 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    const value = parseBrazilianNumber(form.value || form.plannedFreightCost)
-    const tractor = tractors.find((item) => item.id === form.tractorId)
-    const trailer = trailers.find((item) => item.id === form.trailerId)
     if (!form.process || !form.processType || !form.customer || !form.serviceTaker) {
       window.alert('Informe Codigo do processo, Tipo processo, Cliente e Tomador do servico.')
       return
     }
 
     const formSnapshot = { ...form }
-    const nextRecord = {
-        ...formSnapshot,
-        id: nextId('fr'),
-        number: `FRT-${String(freights.length + 1).padStart(6, '0')}`,
-        date: new Date().toISOString().slice(0, 10),
-        customer: form.customer,
-        process: form.process,
-        processType: form.processType,
-        customerIdentification: form.customerIdentification,
-        serviceTakerDocument: form.serviceTakerDocument,
-        serviceTaker: form.serviceTaker,
-        senderDocument: form.senderDocument,
-        sender: form.sender,
-        product: form.product,
-        recipientDocument: form.recipientDocument,
-        recipient: form.recipient,
-        container: form.container,
-        driver: form.driver,
-        tractorPlate: tractor?.tractorPlate ?? '',
-        trailerPlate: trailer?.trailerPlate ?? '',
-        origin: form.origin,
-        destination: form.destination,
-        value,
-        operationalStatus: form.status || 'Em digitacao',
-        fiscalStatus: 'Pendente',
-    }
 
     setFreights(editingFreightId
-      ? freights.map((freight) => freight.id === editingFreightId ? {
-        ...freight,
-        ...nextRecord,
-        id: freight.id,
-        number: freight.number,
-        date: freight.date,
-        fiscalStatus: freight.fiscalStatus,
-        closing: freight.closing,
-        operationalStatus: form.status || freight.operationalStatus,
-      } : freight)
-      : [...freights, nextRecord],
+      ? freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(formSnapshot, freight) : freight)
+      : [...freights, buildFreightRecord(formSnapshot)],
     )
 
     if (closeAfterSave) {
@@ -772,6 +799,17 @@ export function FreightsPage() {
 
   function renderFreightCell(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
     const date = freight.date || ''
+    const origin = cityState(freight.origin)
+    const destination = cityState(freight.destination)
+    const startDate = freight.deliveryForecast || freight.date || ''
+    const scheduledUnload = freight.destinationScheduleDate
+      ? `${freight.destinationScheduleDate}${freight.destinationScheduleTime ? ` ${freight.destinationScheduleTime}` : ''}`
+      : ''
+    const unloadStartDate = freight.destinationArrivalDate || freight.cntrUnloadingDate || freight.arrivalDate || ''
+    const unloadStartHour = freight.destinationArrivalTime || freight.destinationScheduleTime || ''
+    const unloadEnd = freight.destinationDepartureDate
+      ? `${freight.destinationDepartureDate}${freight.destinationDepartureTime ? ` ${freight.destinationDepartureTime}` : ''}`
+      : freight.cntrUnloadingDate || ''
 
     if (columnKey === 'select') {
       return <input type="checkbox" onClick={(event) => event.stopPropagation()} />
@@ -805,31 +843,31 @@ export function FreightsPage() {
     }
 
     const values: Record<Exclude<FreightGridColumnKey, 'select' | 'code' | 'actions'>, string> = {
-      dateStart: `${date} 07:50`,
+      dateStart: startDate,
       status: freight.operationalStatus || 'OPERACAO ENCERRADA',
       customer: freight.customer,
       sender: freight.sender || '-',
       recipient: freight.recipient || '-',
-      contractor: freight.serviceTaker || 'TRANS CAVALCANTE',
+      contractor: freight.contractor || freight.serviceTaker || 'TRANS CAVALCANTE',
       type: 'ETC',
       driver: freight.driver || '-',
       tractor: freight.tractorPlate || '-',
       trailer: freight.trailerPlate || '-',
-      origin: freight.origin || '-',
-      originUf: 'AM',
-      destination: freight.destination || '-',
-      destinationUf: 'AM',
-      payment: '7 DIAS',
+      origin: origin.city,
+      originUf: origin.state || '-',
+      destination: destination.city,
+      destinationUf: destination.state || '-',
+      payment: freight.negotiationCondition || '7 DIAS',
       value: freight.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-      fuelValue: '0,00',
-      scheduleUnload: `${date} 10:00`,
-      arrivalDate: date,
-      unloadStartDate: date,
-      unloadStartHour: '07:30',
-      cntrDescent: date,
-      pdWithdrawal: date,
-      unloadEnd: `${date} 15:30`,
-      cntrReturn: date,
+      fuelValue: parseBrazilianNumber(freight.plannedTollCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      scheduleUnload: scheduledUnload,
+      arrivalDate: freight.arrivalDate || '',
+      unloadStartDate,
+      unloadStartHour,
+      cntrDescent: freight.cntrUnloadingDate || '',
+      pdWithdrawal: freight.portWithdrawalDate || '',
+      unloadEnd,
+      cntrReturn: freight.cntrReturnDate || '',
       fiscalEstab: 'LAM',
       fiscalNumber: freight.fiscalStatus === 'Emitido' ? '1296' : '',
       cteAverbacao: freight.fiscalStatus === 'Emitido' ? '0572007261938274900068' : '',
@@ -964,7 +1002,9 @@ export function FreightsPage() {
     }
 
     if (activeTab === 'DESPESAS PREVISTAS') {
-      const total = parseBrazilianNumber(form.plannedFreightCost) + parseBrazilianNumber(form.plannedTollCost)
+      const listPrice = priceValueForProcess(form.product, form.origin, form.destination)
+      const freightCost = form.plannedFreightCost || listPrice || '0'
+      const total = parseBrazilianNumber(freightCost) + parseBrazilianNumber(form.plannedTollCost)
       return (
         <div className="p-3">
           <div className="overflow-x-auto border border-zinc-300 bg-white">
@@ -972,7 +1012,7 @@ export function FreightsPage() {
             <table className="w-full min-w-[900px] text-xs">
               <thead><tr>{['Referencia', 'Produto', 'Fornecedor', 'Quantidade total', 'U.M.', 'Vlr. despesa'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
               <tbody>
-                <tr><td className="border-b border-r px-2 py-2">TRA010</td><td className="border-b border-r px-2 py-2">CUSTO FRETE ROD. DESTINO</td><td className="border-b border-r px-2 py-2">{form.contractor || '-'}</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={form.plannedFreightCost} onChange={(event) => { updateForm('plannedFreightCost', event.target.value); updateForm('value', event.target.value) }} className={textInputClass()} /></td></tr>
+                <tr><td className="border-b border-r px-2 py-2">TRA010</td><td className="border-b border-r px-2 py-2">{form.product || 'CUSTO FRETE ROD. DESTINO'}</td><td className="border-b border-r px-2 py-2">{form.contractor || '-'}</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={freightCost} onChange={(event) => { updateForm('plannedFreightCost', event.target.value); updateForm('value', event.target.value) }} className={textInputClass()} /></td></tr>
                 <tr><td className="border-b border-r px-2 py-2">TRA014</td><td className="border-b border-r px-2 py-2">PEDAGIO</td><td className="border-b border-r px-2 py-2">-</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={form.plannedTollCost} onChange={(event) => updateForm('plannedTollCost', event.target.value)} className={textInputClass()} /></td></tr>
               </tbody>
             </table>
