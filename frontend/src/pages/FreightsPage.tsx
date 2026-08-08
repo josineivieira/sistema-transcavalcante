@@ -1027,6 +1027,16 @@ export function FreightsPage() {
     setExtraExpenseOpen(true)
   }
 
+  function openExtraExpenseEdit(expense: ExtraExpense) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    setEditingExtraExpense({ ...expense })
+    setExtraProductSearch('')
+    setExtraExpenseOpen(true)
+  }
+
   function updateExtraExpense(field: keyof ExtraExpense, value: string) {
     setEditingExtraExpense((current) => ({ ...current, [field]: value }))
   }
@@ -1299,7 +1309,12 @@ export function FreightsPage() {
                   </thead>
                   <tbody>
                     {form.extraExpenses.map((expense, index) => (
-                      <tr key={expense.id} className={index % 2 ? 'bg-zinc-100' : 'bg-white'}>
+                      <tr
+                        key={expense.id}
+                        onDoubleClick={() => openExtraExpenseEdit(expense)}
+                        title="Dois cliques para editar"
+                        className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}
+                      >
                         <td className="border-b border-r px-2 py-2">{expense.reference}</td>
                         <td className="border-b border-r px-2 py-2">{expense.product}</td>
                         <td className="border-b border-r px-2 py-2">{expense.supplier || '-'}</td>
@@ -1737,8 +1752,8 @@ export function FreightsPage() {
       )}
 
       {extraExpenseOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/25 px-4 py-6">
-          <div className="system-modal max-h-[calc(100vh-48px)] w-full max-w-6xl overflow-auto border border-zinc-500 bg-zinc-100 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/25 p-2">
+          <div className="system-modal h-[calc(100vh-16px)] w-full overflow-auto border border-zinc-500 bg-zinc-100 shadow-2xl">
             <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
               <h3 className="text-lg font-normal text-red-600">Manutencao despesa extra</h3>
               <div className="flex items-center gap-3 text-xs">
@@ -1806,7 +1821,7 @@ export function FreightsPage() {
               </div>
 
               {extraProductOpen && (
-                <div className="absolute left-6 right-6 top-24 z-[70] border-4 border-red-700 bg-white shadow-2xl">
+                <div className="absolute left-5 right-5 top-24 z-[70] border-4 border-red-700 bg-white shadow-2xl">
                   <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-3 py-2">
                     <h3 className="text-lg font-normal text-red-600">Produto</h3>
                     <button onClick={() => setExtraProductOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
@@ -1816,8 +1831,8 @@ export function FreightsPage() {
                     <input value={extraProductSearch} onChange={(event) => setExtraProductSearch(event.target.value)} className="ml-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
                     <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>1:1</span><Filter size={18} fill="currentColor" /><span>▤</span></div>
                   </div>
-                  <div className="max-h-[430px] overflow-auto">
-                    <table className="w-full min-w-[820px] text-xs">
+                  <div className="max-h-[calc(100vh-210px)] overflow-auto">
+                    <table className="w-full min-w-[980px] text-xs">
                       <thead><tr>{['Referencia', 'Produto', 'Codigo estruturado', 'Dt. cadastro'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
                       <tbody>
                         {filteredExtraProducts.map((product, index) => (
