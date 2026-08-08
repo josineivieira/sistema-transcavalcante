@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
-import { formatMoney, nextId } from '../services/localStore'
+import { formatMoney, nextId, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
 
@@ -83,6 +83,7 @@ type FreightForm = {
   ciotNumber: string
   dfeNumber: string
   protocolStatus: string
+  taskHistory: FreightTask[]
   value: string
 }
 
@@ -159,6 +160,7 @@ const emptyForm: FreightForm = {
   ciotNumber: '',
   dfeNumber: '',
   protocolStatus: 'Aguardando',
+  taskHistory: [],
   value: '0',
 }
 
@@ -255,6 +257,18 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
   return widths
 }, {})
 
+const freightTaskOptions = [
+  'AGENDAMENTO E CARREGAMENTO 15',
+  'ABASTECIDO 17',
+  'NOTA(S) FISCAL(IS) RECEBIDA(S) 20',
+  'ENTREGA CONCLUIDA 50',
+  'OPERACAO ENCERRADA 55',
+  'PROCESSO INTERROMPIDO 60',
+  'AUDITORIA INICIADA 65',
+  'PROCESSO AUDITADO 70',
+  'AUDITORIA ENCERRADA 75',
+]
+
 export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, priceLists, issuerSettings, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
@@ -285,6 +299,8 @@ export function FreightsPage() {
   const [invoiceImportOpen, setInvoiceImportOpen] = useState(false)
   const [invoiceImport, setInvoiceImport] = useState<InvoiceImport>(emptyInvoiceImport)
   const [invoiceImportMessage, setInvoiceImportMessage] = useState('')
+  const [taskHistoryOpen, setTaskHistoryOpen] = useState(false)
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -489,6 +505,30 @@ export function FreightsPage() {
       return
     }
     window.alert('Preencha as etapas anteriores para liberar esta aba.')
+  }
+
+  function addFlowTask(taskName: string) {
+    const now = new Date()
+    const startDate = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    const task: FreightTask = {
+      id: nextId('tarefa'),
+      name: taskName,
+      description: '',
+      status: 'ENCERRADO',
+      sendToCustomer: 'N',
+      startDate,
+      endDate: startDate,
+      completionPercent: 0,
+      internalUse: 'N',
+      time: 'Hoje',
+      user: 'Sistema',
+    }
+    setForm((current) => ({
+      ...current,
+      status: taskName,
+      taskHistory: [task, ...(current.taskHistory ?? [])],
+    }))
+    setTaskPickerOpen(false)
   }
 
   function saveFreight(closeAfterSave = true) {
@@ -1182,6 +1222,7 @@ export function FreightsPage() {
                 <Info size={16} />
                 <Settings size={16} />
                 <button onClick={openInvoiceImport} className="inline-flex items-center gap-1"><Paperclip size={15} /> ANEXAR</button>
+                <button onClick={() => setTaskHistoryOpen(true)} className="inline-flex items-center gap-1"><MoreVertical size={15} /> HISTORICO TAREFA</button>
                 <button onClick={() => setShowForm(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
               </div>
             </div>
@@ -1228,6 +1269,92 @@ export function FreightsPage() {
                 <span className="px-2.5 py-1 text-zinc-400">ORIENTACAO INTERNA</span>
               </div>
               <div className="min-h-[calc(100vh-420px)] bg-zinc-100">{renderActiveTab()}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {taskHistoryOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-end bg-zinc-950/30 px-4 py-8">
+          <div className="max-h-[calc(100vh-64px)] w-full max-w-5xl overflow-hidden border-4 border-red-700 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-sm font-semibold text-red-600">TAREFAS DO FLUXO</h3>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setTaskHistoryOpen(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+              </div>
+            </div>
+            <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2 text-xs">
+              <span>Historico Tarefa</span>
+              <span className="ml-auto mr-2">{form.taskHistory.length} de {form.taskHistory.length} registros</span>
+              <input className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 outline-none" placeholder="Busca rapida" />
+              <Settings size={17} />
+              <span className="px-2">1:1</span>
+              <X size={18} />
+            </div>
+            <div className="min-h-[430px] overflow-auto bg-white">
+              <table className="w-full min-w-[980px] text-xs">
+                <thead>
+                  <tr className="bg-white">
+                    {['Nome da tarefa', 'Situacao', 'Envia ao clier', 'Data de inicio', 'Tempo', 'Usuario'].map((heading) => (
+                      <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">{heading} <span className="float-right text-zinc-400">▼</span></th>
+                    ))}
+                  </tr>
+                  <tr className="bg-white">
+                    {['Descricao', 'Conclusao %', 'Uso Interno?', 'Data fim', '', ''].map((heading, index) => (
+                      <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">{heading} {heading && <span className="float-right text-zinc-400">▼</span>}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.taskHistory.map((task) => (
+                    <tr key={task.id} className="odd:bg-zinc-100 even:bg-white">
+                      <td className="border-b border-r border-zinc-200 px-2 py-2">
+                        <div>{task.name}</div>
+                        <div className="pt-3 text-zinc-700">{task.description}</div>
+                      </td>
+                      <td className="border-b border-r border-zinc-200 px-2 py-2">
+                        <div>{task.status}</div>
+                        <div className="pt-3 text-right">{task.completionPercent.toFixed(2).replace('.', ',')}</div>
+                      </td>
+                      <td className="border-b border-r border-zinc-200 px-2 py-2">
+                        <div>{task.sendToCustomer}</div>
+                        <div className="pt-3">{task.internalUse}</div>
+                      </td>
+                      <td className="border-b border-r border-zinc-200 px-2 py-2">
+                        <div>{task.startDate}</div>
+                        <div className="pt-3">{task.endDate}</div>
+                      </td>
+                      <td className="border-b border-r border-zinc-200 px-2 py-2">{task.time}</td>
+                      <td className="border-b border-zinc-200 px-2 py-2">Incluido e Alterado por {task.user}</td>
+                    </tr>
+                  ))}
+                  {!form.taskHistory.length && (
+                    <tr><td colSpan={6} className="px-3 py-16 text-center text-zinc-500">Nenhuma tarefa no fluxo.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex h-10 items-center justify-end border-t border-zinc-300 bg-white px-3">
+              <button onClick={() => setTaskPickerOpen(true)} className="inline-flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-black text-white">+</span> ADICIONAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {taskPickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-zinc-950/20 px-4 py-10">
+          <div className="w-full max-w-4xl border-4 border-red-700 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Tarefa</h3>
+              <button onClick={() => setTaskPickerOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
+            </div>
+            <div className="h-8 border-b border-zinc-300 bg-zinc-400" />
+            <div className="min-h-[360px] bg-white p-6 text-xs font-semibold">
+              {freightTaskOptions.map((task) => (
+                <button key={task} onClick={() => addFlowTask(task)} className="block px-2 py-1 text-left hover:bg-sky-100">
+                  {task}
+                </button>
+              ))}
             </div>
           </div>
         </div>

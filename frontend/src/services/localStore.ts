@@ -169,6 +169,20 @@ export type ContainerRecord = {
   condition: string
 }
 
+export type FreightTask = {
+  id: string
+  name: string
+  description: string
+  status: string
+  sendToCustomer: string
+  startDate: string
+  endDate: string
+  completionPercent: number
+  internalUse: string
+  time: string
+  user: string
+}
+
 export type Freight = {
   id: string
   number: string
@@ -232,6 +246,7 @@ export type Freight = {
   ciotNumber?: string
   dfeNumber?: string
   protocolStatus?: string
+  taskHistory?: FreightTask[]
   container: string
   driver: string
   tractorPlate: string
@@ -629,6 +644,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
         product: legacyFreight.product ?? '',
         recipientDocument: legacyFreight.recipientDocument ?? '',
         recipient: legacyFreight.recipient ?? legacyFreight.customer ?? '',
+        taskHistory: legacyFreight.taskHistory ?? [],
       } as Freight
     }),
     closings: data.closings ?? [],
