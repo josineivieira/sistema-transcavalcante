@@ -411,6 +411,7 @@ export function FreightsPage() {
   const issuerDocument = issuerSettings.document || ''
   const [showForm, setShowForm] = useState(false)
   const [editingFreightId, setEditingFreightId] = useState<string | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({
@@ -777,6 +778,30 @@ export function FreightsPage() {
     }
     setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
     setOpenActionId(null)
+  }
+
+  function requestDeleteFreight() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    if (!editingFreightId) {
+      setShowForm(false)
+      resetForm()
+      return
+    }
+    setDeleteConfirmOpen(true)
+  }
+
+  function confirmDeleteFreight() {
+    if (!editingFreightId) {
+      setDeleteConfirmOpen(false)
+      return
+    }
+    setFreights(freights.filter((freight) => freight.id !== editingFreightId))
+    setDeleteConfirmOpen(false)
+    setShowForm(false)
+    resetForm()
   }
 
   function getXmlText(parent: Element | null, tag: string) {
@@ -1539,7 +1564,7 @@ export function FreightsPage() {
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <button onClick={() => saveFreight(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
                 <button onClick={() => saveFreight(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
-                <button onClick={() => setShowForm(false)} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
+                <button onClick={requestDeleteFreight} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
                 <button className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
                 <Info size={16} />
                 <Settings size={16} />
@@ -1658,6 +1683,30 @@ export function FreightsPage() {
             </div>
             <div className="flex h-10 items-center justify-end border-t border-zinc-300 bg-white px-3">
               <button onClick={() => { setShowPreviousTasks(false); setTaskPickerOpen(true) }} className="inline-flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-black text-white">+</span> ADICIONAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center bg-zinc-950/30 px-4 py-24">
+          <div className="w-full max-w-lg border border-zinc-600 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Confirmar exclusao</h3>
+              <button onClick={() => setDeleteConfirmOpen(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+            </div>
+            <div className="border-b border-zinc-300 bg-white px-4 py-5 text-xs">
+              <div className="mb-3 font-semibold">Deseja excluir este processo?</div>
+              <div className="grid gap-1">
+                <div><span className="font-semibold">Codigo:</span> {form.process || '-'}</div>
+                <div><span className="font-semibold">Cliente:</span> {form.customer || '-'}</div>
+                <div><span className="font-semibold">Destinatario:</span> {form.recipient || '-'}</div>
+              </div>
+              <div className="mt-4 text-red-700">Esta acao remove o frete do banco de dados.</div>
+            </div>
+            <div className="flex justify-end gap-2 bg-zinc-100 px-3 py-3 text-xs">
+              <button onClick={() => setDeleteConfirmOpen(false)} className="h-8 border border-zinc-400 bg-white px-4 hover:bg-zinc-200">Cancelar</button>
+              <button onClick={confirmDeleteFreight} className="h-8 bg-black px-4 font-semibold text-white hover:bg-red-800">Excluir processo</button>
             </div>
           </div>
         </div>
