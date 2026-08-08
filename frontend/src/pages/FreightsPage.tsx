@@ -83,7 +83,11 @@ type FreightForm = {
   extraCost: string
   extraExpenses: ExtraExpense[]
   invoiceNumber: string
+  invoiceSeries: string
+  invoiceIssueDate: string
+  invoiceGoodsValue: string
   invoiceValue: string
+  invoiceAccessKey: string
   smNumber: string
   ciotNumber: string
   dfeNumber: string
@@ -122,6 +126,12 @@ type InvoiceImport = {
   sender: string
   recipientDocument: string
   recipient: string
+  invoiceNumber: string
+  invoiceSeries: string
+  invoiceIssueDate: string
+  invoiceGoodsValue: string
+  invoiceValue: string
+  invoiceAccessKey: string
 }
 
 const emptyForm: FreightForm = {
@@ -189,7 +199,11 @@ const emptyForm: FreightForm = {
   extraCost: '0',
   extraExpenses: [],
   invoiceNumber: '',
+  invoiceSeries: '',
+  invoiceIssueDate: '',
+  invoiceGoodsValue: '0',
   invoiceValue: '0',
+  invoiceAccessKey: '',
   smNumber: '',
   ciotNumber: '',
   dfeNumber: '',
@@ -204,6 +218,12 @@ const emptyInvoiceImport: InvoiceImport = {
   sender: '',
   recipientDocument: '',
   recipient: '',
+  invoiceNumber: '',
+  invoiceSeries: '',
+  invoiceIssueDate: '',
+  invoiceGoodsValue: '0',
+  invoiceValue: '0',
+  invoiceAccessKey: '',
 }
 
 const emptyExtraExpense: ExtraExpense = {
@@ -764,12 +784,31 @@ export function FreightsPage() {
     return parent?.getElementsByTagName(tag)[0]?.textContent?.trim() ?? ''
   }
 
+  function accessKeyFromText(text: string) {
+    return text.match(/(?:\d[\s.-]*){44}/)?.[0]?.replace(/\D/g, '') ?? ''
+  }
+
+  function formatIsoDate(value: string) {
+    if (!value) return ''
+    const isoDate = value.slice(0, 10)
+    return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? isoDate : value
+  }
+
+  function firstMoneyAfter(text: string, label: string) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = text.match(new RegExp(`${escaped}[\\s\\S]{0,80}?(\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+,\\d{2})`, 'i'))
+    return match?.[1] ?? ''
+  }
+
   function extractInvoiceFromXml(text: string, fileName: string): InvoiceImport | null {
     const xml = new DOMParser().parseFromString(text, 'application/xml')
     if (xml.getElementsByTagName('parsererror').length) return null
 
     const emit = xml.getElementsByTagName('emit')[0]
     const dest = xml.getElementsByTagName('dest')[0]
+    const ide = xml.getElementsByTagName('ide')[0]
+    const total = xml.getElementsByTagName('ICMSTot')[0]
+    const infNfe = xml.getElementsByTagName('infNFe')[0]
     if (!emit && !dest) return null
 
     return {
@@ -778,6 +817,12 @@ export function FreightsPage() {
       sender: getXmlText(emit, 'xNome'),
       recipientDocument: getXmlText(dest, 'CNPJ') || getXmlText(dest, 'CPF'),
       recipient: getXmlText(dest, 'xNome'),
+      invoiceNumber: getXmlText(ide, 'nNF'),
+      invoiceSeries: getXmlText(ide, 'serie'),
+      invoiceIssueDate: formatIsoDate(getXmlText(ide, 'dhEmi') || getXmlText(ide, 'dEmi')),
+      invoiceGoodsValue: getXmlText(total, 'vProd').replace('.', ','),
+      invoiceValue: getXmlText(total, 'vNF').replace('.', ','),
+      invoiceAccessKey: infNfe?.getAttribute('Id')?.replace(/^NFe/i, '') || accessKeyFromText(text),
     }
   }
 
@@ -802,7 +847,7 @@ export function FreightsPage() {
   }
 
   function documentFromAccessKey(text: string) {
-    const accessKey = text.match(/(?:\d[\s.-]*){44}/)?.[0]?.replace(/\D/g, '') ?? ''
+    const accessKey = accessKeyFromText(text)
     return accessKey.length === 44 ? formatCnpj(accessKey.slice(6, 20)) : ''
   }
 
@@ -863,6 +908,14 @@ export function FreightsPage() {
     const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
     const recipient = lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i) || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
     const recipientDocument = firstFormattedDocument(destBlock) || firstFormattedDocument(recipientContextLines.join('\n')) || extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
+    const invoiceNumber = normalized.match(/N[ºo]\s*(?:NF-?E|NF)?\s*(\d{3,})/i)?.[1]
+      || normalized.match(/(?:NF-?e|NF)\s*N[ºo]?\s*(\d{3,})/i)?.[1]
+      || ''
+    const invoiceSeries = normalized.match(/S[ÉE]RIE\s*:?\s*(\d+)/i)?.[1] || ''
+    const invoiceAccessKey = accessKeyFromText(normalized)
+    const invoiceGoodsValue = firstMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
+    const invoiceValue = firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA') || invoiceGoodsValue
+    const invoiceIssueDate = normalized.match(/DATA DA EMISS[ÃA]O\s+(\d{2}\/\d{2}\/\d{4})/i)?.[1] ?? ''
 
     if (!sender && !recipient) return null
     return {
@@ -871,6 +924,12 @@ export function FreightsPage() {
       sender,
       recipientDocument,
       recipient,
+      invoiceNumber,
+      invoiceSeries,
+      invoiceIssueDate,
+      invoiceGoodsValue,
+      invoiceValue,
+      invoiceAccessKey,
     }
   }
 
@@ -909,6 +968,12 @@ export function FreightsPage() {
       sender: invoiceImport.sender || current.sender,
       recipientDocument: invoiceImport.recipientDocument || current.recipientDocument,
       recipient: invoiceImport.recipient || current.recipient,
+      invoiceNumber: invoiceImport.invoiceNumber || current.invoiceNumber,
+      invoiceSeries: invoiceImport.invoiceSeries || current.invoiceSeries,
+      invoiceIssueDate: invoiceImport.invoiceIssueDate || current.invoiceIssueDate,
+      invoiceGoodsValue: invoiceImport.invoiceGoodsValue || current.invoiceGoodsValue,
+      invoiceValue: invoiceImport.invoiceValue || current.invoiceValue,
+      invoiceAccessKey: invoiceImport.invoiceAccessKey || current.invoiceAccessKey,
     }))
     setInvoiceImportOpen(false)
   }
@@ -1246,7 +1311,18 @@ export function FreightsPage() {
             <div className="flex h-8 items-center justify-between bg-zinc-400 px-3 text-xs"><span>Notas do embarcador importadas</span><Settings size={16} /></div>
             <table className="w-full min-w-[900px] text-xs">
               <thead><tr>{['Nr. nfe', 'Tipo de documento', 'Serie', 'Dt. emissao', 'Destinatario', 'Vlr. mercadoria', 'Vlr. nf-e', 'Chave'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody><tr><td className="border-b border-r px-2 py-2"><input value={form.invoiceNumber} onChange={(event) => updateForm('invoiceNumber', event.target.value)} className={textInputClass()} /></td><td className="border-b border-r px-2 py-2">NF-e</td><td className="border-b border-r px-2 py-2">1</td><td className="border-b border-r px-2 py-2">{new Date().toLocaleDateString('pt-BR')}</td><td className="border-b border-r px-2 py-2">{form.recipient || '-'}</td><td className="border-b border-r px-2 py-2"><input value={form.invoiceValue} onChange={(event) => updateForm('invoiceValue', event.target.value)} className={textInputClass()} /></td><td className="border-b border-r px-2 py-2">{form.invoiceValue}</td><td className="border-b px-2 py-2">-</td></tr></tbody>
+              <tbody>
+                <tr>
+                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceNumber} onChange={(event) => updateForm('invoiceNumber', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r px-2 py-2">NF-e</td>
+                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceSeries} onChange={(event) => updateForm('invoiceSeries', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceIssueDate} onChange={(event) => updateForm('invoiceIssueDate', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r px-2 py-2">{form.recipient || '-'}</td>
+                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceGoodsValue} onChange={(event) => updateForm('invoiceGoodsValue', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceValue} onChange={(event) => updateForm('invoiceValue', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b px-2 py-2">{form.invoiceAccessKey || '-'}</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </div>
@@ -1762,6 +1838,19 @@ export function FreightsPage() {
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / RECEBEDOR</div>
                   <Field label="CNPJ/CPF"><input value={invoiceImport.recipientDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientDocument: event.target.value })} className={textInputClass()} /></Field>
                   <Field label="Destinatario"><input value={invoiceImport.recipient} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipient: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-4 md:grid-cols-2">
+                <div className="grid gap-1">
+                  <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DADOS DA NF-E</div>
+                  <Field label="Nr. nfe"><input value={invoiceImport.invoiceNumber} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceNumber: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Serie"><input value={invoiceImport.invoiceSeries} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceSeries: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Dt. emissao"><input value={invoiceImport.invoiceIssueDate} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceIssueDate: event.target.value })} className={textInputClass()} /></Field>
+                </div>
+                <div className="grid gap-1">
+                  <Field label="Vlr. mercadoria"><input value={invoiceImport.invoiceGoodsValue} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceGoodsValue: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Vlr. nf-e"><input value={invoiceImport.invoiceValue} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceValue: event.target.value })} className={textInputClass()} /></Field>
+                  <Field label="Chave"><input value={invoiceImport.invoiceAccessKey} onChange={(event) => setInvoiceImport({ ...invoiceImport, invoiceAccessKey: event.target.value })} className={textInputClass()} /></Field>
                 </div>
               </div>
             </div>
