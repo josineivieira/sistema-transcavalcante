@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
 import { formatMoney, nextId, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
-import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 
 const freightTabs = [
   'GERAIS',
@@ -272,6 +272,7 @@ const freightTaskOptions = [
 export function FreightsPage() {
   const { customers, drivers, vehicles, containers, freights, priceLists, issuerSettings, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
+  const authUser = getAuthUser()
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
   const issuerDocument = issuerSettings.document || ''
   const [showForm, setShowForm] = useState(false)
@@ -301,6 +302,7 @@ export function FreightsPage() {
   const [invoiceImportMessage, setInvoiceImportMessage] = useState('')
   const [taskHistoryOpen, setTaskHistoryOpen] = useState(false)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
+  const [showPreviousTasks, setShowPreviousTasks] = useState(false)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -340,20 +342,25 @@ export function FreightsPage() {
   const generalReady = Boolean(form.process && form.processType && form.customer && form.serviceTaker)
   const routeReady = Boolean(form.routeName && form.origin && form.destination)
   const serviceReady = Boolean(generalReady && routeReady && form.driver && form.tractorId)
+  const hasAbastecido = form.taskHistory.some((task) => task.name === 'ABASTECIDO 17')
+  const hasNotasRecebidas = form.taskHistory.some((task) => task.name === 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20')
   const containerReady = Boolean(serviceReady && form.container)
   const datesReady = Boolean(containerReady && form.deliveryForecast && form.destinationScheduleDate)
   const fiscalReady = Boolean(containerReady && form.invoiceNumber)
+  const availableTaskOptions = freightTaskOptions.filter((task) => (
+    showPreviousTasks || !form.taskHistory.some((history) => history.name === task)
+  ))
 
   const tabAvailability: Record<FreightTab, boolean> = {
     GERAIS: true,
     ROTA: true,
     CONTAINERS: serviceReady,
     'CONTROLE DE DATAS': containerReady,
-    'DESPESAS PREVISTAS': datesReady,
-    'DESPESAS EXTRAS': datesReady,
-    'NOTAS FISCAIS': containerReady,
-    CIOT: serviceReady,
-    PROTOCOLO: fiscalReady || datesReady,
+    'DESPESAS PREVISTAS': hasAbastecido,
+    'DESPESAS EXTRAS': hasAbastecido,
+    'NOTAS FISCAIS': hasNotasRecebidas,
+    CIOT: hasNotasRecebidas,
+    PROTOCOLO: hasNotasRecebidas || fiscalReady || datesReady,
   }
 
   const visibleFreights = useMemo(() => {
@@ -521,7 +528,7 @@ export function FreightsPage() {
       completionPercent: 0,
       internalUse: 'N',
       time: 'Hoje',
-      user: 'Sistema',
+      user: authUser?.name || authUser?.email || 'Sistema',
     }
     setForm((current) => ({
       ...current,
@@ -1335,7 +1342,7 @@ export function FreightsPage() {
               </table>
             </div>
             <div className="flex h-10 items-center justify-end border-t border-zinc-300 bg-white px-3">
-              <button onClick={() => setTaskPickerOpen(true)} className="inline-flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-black text-white">+</span> ADICIONAR</button>
+              <button onClick={() => { setShowPreviousTasks(false); setTaskPickerOpen(true) }} className="inline-flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-black text-white">+</span> ADICIONAR</button>
             </div>
           </div>
         </div>
@@ -1349,12 +1356,19 @@ export function FreightsPage() {
               <button onClick={() => setTaskPickerOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
             </div>
             <div className="h-8 border-b border-zinc-300 bg-zinc-400" />
+            <label className="flex h-9 items-center gap-2 border-b border-zinc-300 px-6 text-xs">
+              <input type="checkbox" checked={showPreviousTasks} onChange={(event) => setShowPreviousTasks(event.target.checked)} />
+              Ver status anteriores
+            </label>
             <div className="min-h-[360px] bg-white p-6 text-xs font-semibold">
-              {freightTaskOptions.map((task) => (
+              {availableTaskOptions.map((task) => (
                 <button key={task} onClick={() => addFlowTask(task)} className="block px-2 py-1 text-left hover:bg-sky-100">
                   {task}
                 </button>
               ))}
+              {!availableTaskOptions.length && (
+                <div className="px-2 py-1 font-normal text-zinc-500">Todos os status disponiveis ja foram adicionados.</div>
+              )}
             </div>
           </div>
         </div>
