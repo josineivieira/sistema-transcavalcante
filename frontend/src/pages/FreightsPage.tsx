@@ -1018,6 +1018,39 @@ export function FreightsPage() {
     return lines.slice(index + 1).find((line) => line && !ignored.test(line)) ?? ''
   }
 
+  function looksLikeBusinessName(line: string) {
+    return /\b(LTDA|EIRELI|S\/A|S\.A\.| ME\b| EPP\b|INDUSTRIA|COMERCIO|COMERCIAL|TRANSPORTES|LOGISTICA|ABATEDOURO|FRIGORIFICO|MERCANTIL|DISTRIBUIDORA)\b/i.test(plainText(line))
+  }
+
+  function cleanDanfLine(line: string) {
+    return line
+      .replace(/^(NOME\s*\/?\s*RAZ[AÃ]O\s*SOCIAL|RAZ[AÃ]O\s*SOCIAL|DESTINAT[AÃ]RIO\/REMETENTE)\s*/i, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
+
+  function firstBusinessName(lines: string[], exclude?: string) {
+    const normalizedExclude = plainText(exclude || '').toUpperCase()
+    return lines
+      .map(cleanDanfLine)
+      .find((line) => {
+        const normalized = plainText(line).toUpperCase()
+        return line
+          && looksLikeBusinessName(line)
+          && !/^(DANFE|NF-?E|DOCUMENTO|CHAVE|PROTOCOLO|NATUREZA|INSCRICAO|CNPJ|CPF|ENDERECO|BAIRRO|CEP|MUNICIPIO|FONE|DATA|HORA|VALOR)/i.test(normalized)
+          && (!normalizedExclude || normalized !== normalizedExclude)
+      }) ?? ''
+  }
+
+  function recipientFromDanfSection(lines: string[], sender: string) {
+    const destinationStart = lines.findIndex((line) => plainText(line).includes('DESTINATARIO/REMETENTE'))
+    if (destinationStart < 0) return ''
+    const section = lines.slice(destinationStart + 1, destinationStart + 24)
+    const byLabel = lineAfterPattern(section, /NOME\s*\/?\s*RAZ/i)
+    if (byLabel && looksLikeBusinessName(byLabel)) return cleanDanfLine(byLabel)
+    return firstBusinessName(section, sender)
+  }
+
   async function extractTextFromPdf(file: File) {
     const [pdfjsLib, pdfWorker] = await Promise.all([
       import('pdfjs-dist'),
@@ -1066,7 +1099,10 @@ export function FreightsPage() {
     const senderFromReceipt = normalized.match(/RECEBEMOS DE\s+(.+?)\s+OS PRODUTOS/i)?.[1]?.trim() ?? ''
     const sender = senderFromReceipt || issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
     const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
-    const recipient = lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i) || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
+    const recipient = recipientFromDanfSection(lines, sender)
+      || lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i)
+      || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL')
+      || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
     const recipientDocument = firstFormattedDocument(destBlock) || firstFormattedDocument(recipientContextLines.join('\n')) || extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
     const invoiceAccessKey = accessKeyFromText(normalized)
     const invoiceNumberFromKey = invoiceNumberFromAccessKey(invoiceAccessKey)
@@ -2100,7 +2136,7 @@ export function FreightsPage() {
               <div className="grid gap-x-24 gap-y-1 pt-4 md:grid-cols-2">
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">REMETENTE / EMITENTE DA NF</div>
-                  {invoiceSenderOptions.length > 1 && (
+                  {invoiceImport.invoices.length > 1 && invoiceSenderOptions.length > 0 && (
                     <Field label="Escolher">
                       <select
                         value={`${invoiceImport.senderDocument}|${invoiceImport.sender}`}
@@ -2119,7 +2155,7 @@ export function FreightsPage() {
                 </div>
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / RECEBEDOR</div>
-                  {invoiceRecipientOptions.length > 1 && (
+                  {invoiceImport.invoices.length > 1 && invoiceRecipientOptions.length > 0 && (
                     <Field label="Escolher">
                       <select
                         value={`${invoiceImport.recipientDocument}|${invoiceImport.recipient}`}
