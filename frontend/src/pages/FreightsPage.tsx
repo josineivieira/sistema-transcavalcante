@@ -141,14 +141,14 @@ type InvoiceImport = {
 const emptyForm: FreightForm = {
   customer: '',
   process: '',
-  processType: 'Multimodal [M]',
-  status: 'Em digitacao',
+  processType: '',
+  status: 'AGENDAMENTO E CARREGAMENTO 15',
   customerIdentification: '',
   serviceTakerDocument: '',
   serviceTaker: '',
   senderDocument: '',
   sender: '',
-  product: 'FRETE-MANAUS-BOA VISTA',
+  product: '',
   recipientDocument: '',
   recipient: '',
   urgent: false,
@@ -453,15 +453,10 @@ export function FreightsPage() {
   const [editingCiotId, setEditingCiotId] = useState<string | null>(null)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
-    customer: customers[0]?.name ?? '',
     serviceTakerDocument: issuerDocument,
     serviceTaker: issuerName,
     contractorDocument: issuerDocument,
     contractor: issuerName,
-    recipient: customers[0]?.name ?? '',
-    driver: drivers[0]?.name ?? '',
-    tractorId: vehicles.find((vehicle) => vehicle.vehicleType === 'Cavalo')?.id ?? '',
-    trailerId: vehicles.find((vehicle) => vehicle.vehicleType === 'Carreta')?.id ?? '',
   })
 
   const tractors = useMemo(() => vehicles.filter((vehicle) => vehicle.vehicleType === 'Cavalo'), [vehicles])
@@ -520,8 +515,8 @@ export function FreightsPage() {
   const tabAvailability: Record<FreightTab, boolean> = {
     GERAIS: true,
     ROTA: true,
-    CONTAINERS: serviceReady,
-    'CONTROLE DE DATAS': containerReady,
+    CONTAINERS: true,
+    'CONTROLE DE DATAS': true,
     'DESPESAS PREVISTAS': hasAbastecido,
     'DESPESAS EXTRAS': hasAbastecido,
     'NOTAS FISCAIS': hasNotasRecebidas,
@@ -599,14 +594,19 @@ export function FreightsPage() {
     setHiddenColumns((current) => ({ ...current, [columnKey]: !current[columnKey] }))
   }
 
+  function nextProcessCode() {
+    const maxNumber = freights.reduce((max, freight) => {
+      const match = freight.process.match(/^TR(\d+)$/i)
+      return match ? Math.max(max, Number(match[1])) : max
+    }, 0)
+    return `TR${String(maxNumber + 1).padStart(2, '0')}`
+  }
+
   function updateForm(field: keyof FreightForm, value: string | boolean) {
     setForm((current) => {
       const next = { ...current, [field]: value }
       if (field === 'origin' || field === 'destination') {
         next.routeName = `${field === 'origin' ? value : next.origin} X ${field === 'destination' ? value : next.destination}`.replace(/^ X | X $/g, '')
-      }
-      if (field === 'customer') {
-        next.recipient = next.recipient || String(value)
       }
       if (field === 'product' || field === 'origin' || field === 'destination') {
         const price = priceValueForProcess(
@@ -709,15 +709,11 @@ export function FreightsPage() {
     setEditingCiotId(null)
     setForm({
       ...emptyForm,
-      customer: customers[0]?.name ?? '',
+      process: nextProcessCode(),
       serviceTakerDocument: issuerDocument,
       serviceTaker: issuerName,
       contractorDocument: issuerDocument,
       contractor: issuerName,
-      recipient: customers[0]?.name ?? '',
-      driver: drivers[0]?.name ?? '',
-      tractorId: tractors[0]?.id ?? '',
-      trailerId: trailers[0]?.id ?? '',
       container: '',
     })
     setActiveTab('GERAIS')
@@ -841,7 +837,7 @@ export function FreightsPage() {
       origin: formSnapshot.origin,
       destination: formSnapshot.destination,
       value,
-      operationalStatus: formSnapshot.status || existing?.operationalStatus || 'Em digitacao',
+      operationalStatus: formSnapshot.status || existing?.operationalStatus || 'AGENDAMENTO E CARREGAMENTO 15',
       fiscalStatus: existing?.fiscalStatus ?? 'Pendente',
       closing: existing?.closing,
     }
@@ -852,12 +848,18 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    if (!form.process || !form.processType || !form.customer || !form.serviceTaker) {
+    const process = form.process || nextProcessCode()
+    const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== editingFreightId)
+    if (duplicatedProcess) {
+      window.alert('Codigo do processo ja existe. Gere ou informe outro codigo.')
+      return
+    }
+    if (!process || !form.processType || !form.customer || !form.serviceTaker) {
       window.alert('Informe Codigo do processo, Tipo processo, Cliente e Tomador do servico.')
       return
     }
 
-    const formSnapshot = materializeCiotDraft({ ...form })
+    const formSnapshot = materializeCiotDraft({ ...form, process })
     setForm(formSnapshot)
     setEditingCiotId(null)
 
@@ -886,7 +888,7 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, closing: undefined }])
+    setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, process: nextProcessCode(), closing: undefined }])
     setOpenActionId(null)
   }
 
@@ -1928,7 +1930,7 @@ export function FreightsPage() {
             <div>
               <div className="grid gap-x-24 gap-y-1 border-b-4 border-zinc-400 p-3 md:grid-cols-2">
                 <div className="grid gap-1">
-                  <Field label="Codigo do processo" required><input value={form.process} onChange={(event) => updateForm('process', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="Codigo do processo" required><input value={form.process} className={textInputClass(true)} disabled /></Field>
                   <Field label="Situacao"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Tomador do servico"><input value={form.serviceTaker} className={textInputClass(true)} disabled /></Field>
@@ -1936,7 +1938,7 @@ export function FreightsPage() {
                   <Field label="Remetente"><input value={form.sender} className={textInputClass(true)} disabled /></Field>
                 </div>
                 <div className="grid gap-1">
-                  <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
+                  <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option value="">Selecione...</option><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
                   <Field label="Identificacao do cliente"><input value={form.customerIdentification} onChange={(event) => updateForm('customerIdentification', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="Cliente" required><select value={form.customer} onChange={(event) => updateForm('customer', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}</select></Field>
                   <Field label="Produto">
