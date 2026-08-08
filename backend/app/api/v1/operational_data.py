@@ -44,6 +44,7 @@ def _default_snapshot_data() -> dict:
         "fiscalDocuments": [],
         "receivables": [],
         "priceLists": [],
+        "payrollProfiles": [],
         "payrollClosings": [],
         "issuerSettings": {},
         "settingsSavedAt": "-",

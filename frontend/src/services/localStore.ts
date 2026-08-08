@@ -370,6 +370,22 @@ export type PayrollItem = {
   amount: number
 }
 
+export type PayrollProfile = {
+  id: string
+  employeeId: string
+  employeeName: string
+  category: string
+  admissionDate: string
+  salary: number
+  dailyRate: number
+  paymentType: string
+  bank: string
+  agency: string
+  account: string
+  pixKey: string
+  status: string
+}
+
 export type PayrollClosing = {
   id: string
   employeeId: string
@@ -426,6 +442,7 @@ export type AppData = {
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
   priceLists: PriceList[]
+  payrollProfiles: PayrollProfile[]
   payrollClosings: PayrollClosing[]
   users: SystemUser[]
   issuerSettings: IssuerSettings
@@ -518,6 +535,7 @@ export const seedData: AppData = {
   closings: [],
   fiscalDocuments: [],
   receivables: [],
+  payrollProfiles: [],
   payrollClosings: [],
   priceLists: [
     { id: 'pl-1', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'BLUMENAU/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2100, taxPercent: 0, total: 2100, status: 'Ativo' },
@@ -762,6 +780,17 @@ export function normalizeData(data: Partial<AppData>): AppData {
       total: Number(price.total ?? price.listValue ?? 0),
       status: price.status ?? 'Ativo',
     })),
+    payrollProfiles: (data.payrollProfiles ?? []).map((profile) => ({
+      ...profile,
+      salary: Number(profile.salary ?? 0),
+      dailyRate: Number(profile.dailyRate ?? 0),
+      paymentType: profile.paymentType ?? 'PIX',
+      bank: profile.bank ?? '',
+      agency: profile.agency ?? '',
+      account: profile.account ?? '',
+      pixKey: profile.pixKey ?? '',
+      status: profile.status ?? 'Ativo',
+    })),
     payrollClosings: (data.payrollClosings ?? []).map((closing) => ({
       ...closing,
       salary: Number(closing.salary ?? 0),
@@ -827,6 +856,7 @@ export function loadData(): AppData {
     fiscalDocuments: [],
     receivables: [],
     priceLists: [],
+    payrollProfiles: [],
     payrollClosings: [],
     users: [],
     issuerSettings: defaultIssuerSettings,
