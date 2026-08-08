@@ -941,10 +941,31 @@ export function FreightsPage() {
     return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? isoDate : value
   }
 
+  function formatDanfDate(value: string) {
+    const match = value.match(/(\d{2})\/(\d{2})\/(\d{2,4})/)
+    if (!match) return ''
+    const [, day, month, rawYear] = match
+    const year = rawYear.length === 2 ? `20${rawYear}` : rawYear
+    return `${day}/${month}/${year}`
+  }
+
   function firstMoneyAfter(text: string, label: string) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const match = text.match(new RegExp(`${escaped}[\\s\\S]{0,80}?(\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+,\\d{2})`, 'i'))
+    const match = text.match(new RegExp(`${escaped}[\\s\\S]{0,220}?(\\d{1,3}(?:\\.\\d{3})*,\\d{2}|\\d+,\\d{2})`, 'i'))
     return match?.[1] ?? ''
+  }
+
+  function lastMoneyAfter(text: string, label: string) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const window = text.match(new RegExp(`${escaped}([\\s\\S]{0,260})`, 'i'))?.[1] ?? ''
+    const values = [...window.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})/g)].map((match) => match[1])
+    return values.length ? values[values.length - 1] : ''
+  }
+
+  function firstDateAfter(text: string, label: string) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = text.match(new RegExp(`${escaped}[\\s\\S]{0,120}?(\\d{2}\\/\\d{2}\\/\\d{2,4})`, 'i'))
+    return formatDanfDate(match?.[1] ?? '')
   }
 
   function invoiceEntryFromImport(invoice: InvoiceImport): FreightInvoiceEntry {
@@ -1031,6 +1052,11 @@ export function FreightsPage() {
   function cleanDanfLine(line: string) {
     return line
       .replace(/^(NOME\s*\/?\s*RAZ[AÃ]O\s*SOCIAL|RAZ[AÃ]O\s*SOCIAL|DESTINAT[AÃ]RIO\/REMETENTE)\s*/i, '')
+      .replace(/\bC\.?N\.?P\.?J\.?\/?C\.?P\.?F\.?\b.*$/i, '')
+      .replace(/\bCNPJ\/CPF\b.*$/i, '')
+      .replace(/\bDATA\s+(?:DA\s+)?EMISS[AÁÃÂÀƒ]O\b.*$/i, '')
+      .replace(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}.*$/g, '')
+      .replace(/\d{3}\.\d{3}\.\d{3}-\d{2}.*$/g, '')
       .replace(/\s{2,}/g, ' ')
       .trim()
   }
@@ -1057,6 +1083,13 @@ export function FreightsPage() {
     return firstBusinessName(section, sender)
   }
 
+  function recipientFromDanfText(normalized: string, sender: string) {
+    const block = normalized.match(/DESTINAT[AÁÃÂÀƒ]RIO\/REMETENTE([\s\S]{0,1000}?)(?:C[AÁÃÂÀƒ]LCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|DADOS DO PRODUTO|FATURA|$)/i)?.[1] ?? ''
+    const direct = block.match(/NOME\s*\/?\s*RAZ[AÁÃÂÀƒ]O\s*SOCIAL\s+(.+?)(?:\s+C\.?N\.?P\.?J| CNPJ| DATA\s+(?:DA\s+)?EMISS[AÁÃÂÀƒ]O|\n|$)/i)?.[1] ?? ''
+    if (direct && looksLikeBusinessName(direct)) return cleanDanfLine(direct)
+    return firstBusinessName(block.split('\n'), sender)
+  }
+
   async function extractTextFromPdf(file: File) {
     const [pdfjsLib, pdfWorker] = await Promise.all([
       import('pdfjs-dist'),
@@ -1069,12 +1102,33 @@ export function FreightsPage() {
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber)
       const content = await page.getTextContent()
-      pages.push(content.items.map((item) => {
-        if (typeof item === 'object' && item !== null && 'str' in item) {
-          return String((item as { str: string }).str)
+      const positioned = content.items.map((item) => {
+        if (typeof item === 'object' && item !== null && 'str' in item && 'transform' in item) {
+          const typed = item as { str: string; transform: number[] }
+          return {
+            text: String(typed.str).trim(),
+            x: typed.transform[4] ?? 0,
+            y: typed.transform[5] ?? 0,
+          }
         }
-        return ''
-      }).join('\n'))
+        return null
+      }).filter((item): item is { text: string; x: number; y: number } => Boolean(item?.text))
+      const rows: Array<{ y: number; items: Array<{ text: string; x: number }> }> = []
+      positioned
+        .sort((a, b) => b.y - a.y || a.x - b.x)
+        .forEach((item) => {
+          const row = rows.find((candidate) => Math.abs(candidate.y - item.y) < 3)
+          if (row) {
+            row.items.push(item)
+          } else {
+            rows.push({ y: item.y, items: [item] })
+          }
+        })
+      const visualText = rows
+        .map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(' '))
+        .join('\n')
+      const rawText = positioned.map((item) => item.text).join('\n')
+      pages.push(`${visualText}\n${rawText}`)
     }
     return pages.join('\n')
   }
@@ -1105,7 +1159,8 @@ export function FreightsPage() {
     const senderFromReceipt = normalized.match(/RECEBEMOS DE\s+(.+?)\s+OS PRODUTOS/i)?.[1]?.trim() ?? ''
     const sender = senderFromReceipt || issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
     const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
-    const recipient = recipientFromDanfSection(lines, sender)
+    const recipient = recipientFromDanfText(normalized, sender)
+      || recipientFromDanfSection(lines, sender)
       || lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i)
       || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL')
       || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
@@ -1119,9 +1174,17 @@ export function FreightsPage() {
     const invoiceSeries = normalized.match(/S[ÉE]RIE\s*:?\s*(\d+)/i)?.[1] || ''
     const invoiceSeriesFromKey = invoiceSeriesFromAccessKey(invoiceAccessKey)
     const safeInvoiceSeries = normalizeInvoiceNumber((invoiceSeries.length <= 3 ? invoiceSeries : '') || invoiceSeriesFromKey)
-    const invoiceGoodsValue = firstMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
-    const invoiceValue = firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA') || invoiceGoodsValue
-    const invoiceIssueDate = normalized.match(/DATA DA EMISS[ÃA]O\s+(\d{2}\/\d{2}\/\d{4})/i)?.[1] ?? ''
+    const invoiceGoodsValue = lastMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
+      || lastMoneyAfter(normalized, 'TOTAL DOS PRODUTOS')
+      || firstMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
+    const invoiceValue = lastMoneyAfter(normalized, 'VALOR TOTAL DA NOTA')
+      || lastMoneyAfter(normalized, 'TOTAL DA NOTA')
+      || firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA')
+      || invoiceGoodsValue
+    const invoiceIssueDate = firstDateAfter(normalized, 'DATA DA EMISSAO')
+      || firstDateAfter(normalized, 'DATA EMISSAO')
+      || firstDateAfter(normalized, 'DATA DE EMISSAO')
+      || formatDanfDate(normalized.match(/DATA\s+(?:DA\s+)?EMISS[AÁÃÂÀ]O[\s\S]{0,120}?(\d{2}\/\d{2}\/\d{2,4})/i)?.[1] ?? '')
 
     if (!sender && !recipient) return null
     const invoice = {
