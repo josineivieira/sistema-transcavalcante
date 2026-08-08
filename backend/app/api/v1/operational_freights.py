@@ -255,6 +255,16 @@ def _migrate_legacy_freights(db: Session) -> None:
 def list_operational_freights(
     search: str = "",
     status_filter: str = Query("", alias="status"),
+    process_number: str = "",
+    process_code: str = "",
+    date_start: str = "",
+    date_end: str = "",
+    process_description: str = "",
+    supplier: str = "",
+    process_type: str = "",
+    container: str = "",
+    origin_date_start: str = "",
+    origin_date_end: str = "",
     limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     email: str = Depends(_require_operational_auth),
@@ -275,6 +285,43 @@ def list_operational_freights(
         ))
     if status_filter:
         query = query.filter(Freight.operational_status.ilike(f"%{status_filter}%"))
+    if process_number:
+        query = query.filter(Freight.internal_number.ilike(f"%{process_number}%"))
+    if process_code:
+        query = query.filter(Freight.process_number.ilike(f"%{process_code}%"))
+    if process_description:
+        like = f"%{process_description}%"
+        query = query.filter(or_(
+            Freight.customer_name.ilike(like),
+            Freight.sender_name.ilike(like),
+            Freight.recipient_name.ilike(like),
+            Freight.origin_city.ilike(like),
+            Freight.destination_city.ilike(like),
+        ))
+    if supplier:
+        like = f"%{supplier}%"
+        query = query.filter(or_(
+            Freight.customer_name.ilike(like),
+            Freight.sender_name.ilike(like),
+            Freight.recipient_name.ilike(like),
+        ))
+    if process_type:
+        query = query.filter(Freight.service_type.ilike(f"%{process_type}%"))
+    if container:
+        query = query.filter(Freight.container_number.ilike(f"%{container}%"))
+
+    parsed_date_start = _date_from_payload(date_start, None) if date_start else None
+    parsed_date_end = _date_from_payload(date_end, None) if date_end else None
+    parsed_origin_start = _date_from_payload(origin_date_start, None) if origin_date_start else None
+    parsed_origin_end = _date_from_payload(origin_date_end, None) if origin_date_end else None
+    if parsed_date_start:
+        query = query.filter(Freight.execution_date >= parsed_date_start)
+    if parsed_date_end:
+        query = query.filter(Freight.execution_date <= parsed_date_end)
+    if parsed_origin_start:
+        query = query.filter(Freight.execution_date >= parsed_origin_start)
+    if parsed_origin_end:
+        query = query.filter(Freight.execution_date <= parsed_origin_end)
 
     total = query.count()
     freights = query.order_by(Freight.execution_date.desc(), Freight.internal_number.desc()).offset(offset).limit(limit).all()

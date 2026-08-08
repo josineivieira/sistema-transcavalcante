@@ -413,7 +413,20 @@ const freightTaskOptions = [
 ]
 
 export function FreightsPage() {
-  const { customers, drivers, vehicles, freights, priceLists, issuerSettings, loading, setFreights } = useLocalData()
+  const {
+    customers,
+    drivers,
+    vehicles,
+    freights,
+    freightsLoading,
+    freightsTotal,
+    priceLists,
+    issuerSettings,
+    loading,
+    loadFreights,
+    saveFreightRecord,
+    deleteFreightRecord,
+  } = useLocalData()
   const canEditPage = canEdit('freights')
   const authUser = getAuthUser()
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
@@ -525,21 +538,44 @@ export function FreightsPage() {
     PROTOCOLO: hasNotasRecebidas || fiscalReady || datesReady,
   }
 
-  const visibleFreights = useMemo(() => {
-    const term = search.toLowerCase()
-    return freights.filter((freight) =>
-      [freight.customer, freight.process, freight.sender ?? '', freight.recipient ?? '', freight.container, freight.driver, freight.tractorPlate, freight.trailerPlate, freight.origin, freight.destination]
-        .some((value) => value.toLowerCase().includes(term))
-      && (!filters.processNumber || freight.number.toLowerCase().includes(filters.processNumber.toLowerCase()))
-      && (!filters.processCode || freight.process.toLowerCase().includes(filters.processCode.toLowerCase()))
-      && (!filters.processDescription || [freight.customer, freight.origin, freight.destination].join(' ').toLowerCase().includes(filters.processDescription.toLowerCase()))
-      && (!filters.status || freight.operationalStatus.toLowerCase().includes(filters.status.toLowerCase()))
-      && (!filters.supplier || freight.customer.toLowerCase().includes(filters.supplier.toLowerCase()))
-      && (!filters.container || freight.container.toLowerCase().includes(filters.container.toLowerCase()))
-      && (!filters.dateStart || freight.date >= filters.dateStart)
-      && (!filters.dateEnd || freight.date <= filters.dateEnd),
-    )
-  }, [filters, freights, search])
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      loadFreights({
+        search,
+        status: filters.status,
+        process_number: filters.processNumber,
+        process_code: filters.processCode,
+        date_start: filters.dateStart,
+        date_end: filters.dateEnd,
+        process_description: filters.processDescription,
+        supplier: filters.supplier,
+        process_type: filters.processType,
+        container: filters.container,
+        origin_date_start: filters.originDateStart,
+        origin_date_end: filters.originDateEnd,
+        limit: 500,
+      })
+    }, 250)
+
+    return () => window.clearTimeout(timeout)
+  }, [
+    filters.container,
+    filters.dateEnd,
+    filters.dateStart,
+    filters.originDateEnd,
+    filters.originDateStart,
+    filters.processCode,
+    filters.processDescription,
+    filters.processNumber,
+    filters.processType,
+    filters.status,
+    filters.supplier,
+    loadFreights,
+    search,
+  ])
+
+  const visibleFreights = freights
+  const freightListLoading = loading || freightsLoading
 
   const visibleFreightColumns = useMemo(
     () => freightGridColumns.filter((column) => !hiddenColumns[column.key]),
@@ -626,7 +662,10 @@ export function FreightsPage() {
 
   function persistFreightForm(snapshot: FreightForm) {
     if (!editingFreightId) return
-    setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(snapshot, freight) : freight))
+    const currentFreight = freights.find((freight) => freight.id === editingFreightId)
+    if (currentFreight) {
+      void saveFreightRecord(buildFreightRecord(snapshot, currentFreight))
+    }
   }
 
   function legacyCiotRows(snapshot: Partial<FreightForm>) {
@@ -801,7 +840,10 @@ export function FreightsPage() {
         taskHistory: [task, ...(current.taskHistory ?? [])],
       }
       if (editingFreightId) {
-        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+        const currentFreight = freights.find((freight) => freight.id === editingFreightId)
+        if (currentFreight) {
+          void saveFreightRecord(buildFreightRecord(next, currentFreight))
+        }
       }
       return next
     })
@@ -850,7 +892,9 @@ export function FreightsPage() {
       return
     }
     const process = form.process || nextProcessCode()
-    const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== editingFreightId)
+    const existingByProcess = freights.find((freight) => freight.process.toUpperCase() === process.toUpperCase())
+    const activeFreightId = editingFreightId || existingByProcess?.id || null
+    const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== activeFreightId)
     if (duplicatedProcess) {
       window.alert('Codigo do processo ja existe. Gere ou informe outro codigo.')
       return
@@ -864,11 +908,15 @@ export function FreightsPage() {
     setForm(formSnapshot)
     setEditingCiotId(null)
 
-    if (editingFreightId) {
-      setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(formSnapshot, freight) : freight))
+    if (activeFreightId) {
+      const currentFreight = freights.find((freight) => freight.id === activeFreightId)
+      if (currentFreight) {
+        void saveFreightRecord(buildFreightRecord(formSnapshot, currentFreight))
+        setEditingFreightId(activeFreightId)
+      }
     } else {
       const createdFreight = buildFreightRecord(formSnapshot)
-      setFreights([...freights, createdFreight])
+      void saveFreightRecord(createdFreight)
       if (!closeAfterSave) {
         setEditingFreightId(createdFreight.id)
       }
@@ -885,7 +933,10 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    setFreights(freights.map((freight) => (freight.id === id ? { ...freight, ...patch } : freight)))
+    const currentFreight = freights.find((freight) => freight.id === id)
+    if (currentFreight) {
+      void saveFreightRecord({ ...currentFreight, ...patch })
+    }
     setOpenActionId(null)
   }
 
@@ -894,7 +945,7 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    setFreights([...freights, { ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, process: nextProcessCode(), closing: undefined }])
+    void saveFreightRecord({ ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, process: nextProcessCode(), closing: undefined })
     setOpenActionId(null)
   }
 
@@ -916,7 +967,7 @@ export function FreightsPage() {
       setDeleteConfirmOpen(false)
       return
     }
-    setFreights(freights.filter((freight) => freight.id !== editingFreightId))
+    void deleteFreightRecord(editingFreightId)
     setDeleteConfirmOpen(false)
     setShowForm(false)
     resetForm()
@@ -1330,7 +1381,10 @@ export function FreightsPage() {
         invoiceEntries: mergedInvoices,
       }
       if (editingFreightId) {
-        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+        const currentFreight = freights.find((freight) => freight.id === editingFreightId)
+        if (currentFreight) {
+          void saveFreightRecord(buildFreightRecord(next, currentFreight))
+        }
       }
       return next
     })
@@ -1385,7 +1439,10 @@ export function FreightsPage() {
         .toLocaleString('pt-BR', { minimumFractionDigits: 2 })
       const next = { ...current, extraExpenses, extraCost }
       if (editingFreightId) {
-        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+        const currentFreight = freights.find((freight) => freight.id === editingFreightId)
+        if (currentFreight) {
+          void saveFreightRecord(buildFreightRecord(next, currentFreight))
+        }
       }
       return next
     })
@@ -1847,7 +1904,7 @@ export function FreightsPage() {
             <section className="min-w-0 bg-white">
               <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
                 <div className="px-2 font-semibold">Transportes de carga rodoviario</div>
-                <div className="ml-auto px-2">{loading ? 'Carregando...' : `${visibleFreights.length} registros`}</div>
+                <div className="ml-auto px-2">{freightListLoading ? '' : `${freightsTotal} registros`}</div>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
                 <div className="relative flex items-center gap-2 pr-2">
                   <button onClick={() => setColumnMenuOpen(!columnMenuOpen)} className="inline-flex h-6 items-center gap-1 border border-zinc-500 bg-zinc-200 px-2 hover:bg-white">
@@ -1906,10 +1963,10 @@ export function FreightsPage() {
                         ))}
                       </tr>
                     ))}
-                    {!loading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
+                    {!freightListLoading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
                   </tbody>
                 </table>
-                {loading && (
+                {freightListLoading && (
                   <div className="absolute inset-0 grid place-items-center bg-white">
                     <LoadingState label="Carregando fretes..." />
                   </div>

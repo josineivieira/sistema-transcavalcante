@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { loadData, normalizeData } from '../services/localStore'
 import { api } from '../services/api'
 import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, PriceList, Receivable, SystemUser, Vehicle } from '../services/localStore'
@@ -11,10 +11,49 @@ type OperationalFreightsResponse = {
   offset: number
 }
 
+type OperationalFreightRecordResponse = {
+  data: Freight
+}
+
+type FreightQuery = {
+  search?: string
+  status?: string
+  process_number?: string
+  process_code?: string
+  date_start?: string
+  date_end?: string
+  process_description?: string
+  supplier?: string
+  process_type?: string
+  container?: string
+  origin_date_start?: string
+  origin_date_end?: string
+  limit?: number
+  offset?: number
+}
+
 export function useLocalData() {
   const [data, setData] = useState(loadData)
   const [loading, setLoading] = useState(true)
+  const [freightsLoading, setFreightsLoading] = useState(true)
+  const [freightsTotal, setFreightsTotal] = useState(0)
   const [error, setError] = useState('')
+
+  const loadFreights = useCallback((params: FreightQuery = {}) => {
+    setFreightsLoading(true)
+    return api.get<OperationalFreightsResponse>('/operational-freights', {
+      params: { limit: 500, offset: 0, ...params },
+    }).then((response) => {
+      const items = response.data.items || []
+      setData((current) => normalizeData({ ...current, freights: items }))
+      setFreightsTotal(response.data.total ?? items.length)
+      setError('')
+    }).catch(() => {
+      setError('Nao foi possivel carregar fretes.')
+    }).finally(() => {
+      setFreightsLoading(false)
+    })
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -35,12 +74,13 @@ export function useLocalData() {
         }
 
         const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
-          params: { limit: 1000 },
+          params: { limit: 500 },
         })
         nextData = normalizeData({ ...nextData, freights: freightsResponse.data.items || [] })
 
         if (active) {
           setData(nextData)
+          setFreightsTotal(freightsResponse.data.total ?? nextData.freights.length)
           setError('')
         }
       })
@@ -50,10 +90,11 @@ export function useLocalData() {
         }
       })
       .finally(() => {
-        if (active) {
-          setLoading(false)
-        }
-      })
+      if (active) {
+        setLoading(false)
+        setFreightsLoading(false)
+      }
+    })
     return () => {
       active = false
     }
@@ -89,15 +130,61 @@ export function useLocalData() {
     })
   }
 
+  function saveFreightRecord(freight: Freight) {
+    setData((current) => {
+      const exists = current.freights.some((item) => item.id === freight.id)
+      const freights = exists
+        ? current.freights.map((item) => item.id === freight.id ? freight : item)
+        : [freight, ...current.freights]
+      return normalizeData({ ...current, freights })
+    })
+
+    return api.put<OperationalFreightRecordResponse>(`/operational-freights/${encodeURIComponent(freight.id)}`, { data: freight }).then((response) => {
+      const saved = response.data.data
+      setData((current) => {
+        const exists = current.freights.some((item) => item.id === saved.id)
+        const freights = exists
+          ? current.freights.map((item) => item.id === saved.id ? saved : item)
+          : [saved, ...current.freights]
+        return normalizeData({ ...current, freights })
+      })
+      setError('')
+      return saved
+    }).catch((reason) => {
+      setError('Nao foi possivel salvar frete no banco de dados.')
+      throw reason
+    })
+  }
+
+  function deleteFreightRecord(id: string) {
+    const previousFreights = data.freights
+    setData((current) => normalizeData({ ...current, freights: current.freights.filter((freight) => freight.id !== id) }))
+    setFreightsTotal((current) => Math.max(0, current - 1))
+
+    return api.delete(`/operational-freights/${encodeURIComponent(id)}`).then(() => {
+      setError('')
+    }).catch((reason) => {
+      setData((current) => normalizeData({ ...current, freights: previousFreights }))
+      setFreightsTotal(previousFreights.length)
+      setError('Nao foi possivel excluir frete no banco de dados.')
+      throw reason
+    })
+  }
+
   return {
     ...data,
     loading,
+    freightsLoading,
+    freightsTotal,
     error,
     setCustomers: (customers: Customer[]) => update({ ...data, customers }),
     setDrivers: (drivers: Driver[]) => update({ ...data, drivers }),
     setVehicles: (vehicles: Vehicle[]) => update({ ...data, vehicles }),
     setContainers: (containers: ContainerRecord[]) => update({ ...data, containers }),
     setFreights,
+    loadFreights,
+    saveFreightRecord,
+    deleteFreightRecord,
     setClosings: (closings: Closing[]) => update({ ...data, closings }),
     setFiscalDocuments: (fiscalDocuments: FiscalDocument[]) => update({ ...data, fiscalDocuments }),
     setReceivables: (receivables: Receivable[]) => update({ ...data, receivables }),
