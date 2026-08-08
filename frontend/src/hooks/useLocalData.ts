@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { loadData, normalizeData, seedData } from '../services/localStore'
+import { loadData, normalizeData } from '../services/localStore'
 import { api } from '../services/api'
 import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, PriceList, Receivable, SystemUser, Vehicle } from '../services/localStore'
 import type { IssuerSettings } from '../services/fiscalSettings'
@@ -24,7 +24,7 @@ export function useLocalData() {
           return
         }
 
-        const initialData = normalizeData(seedData)
+        const initialData = loadData()
         await api.put('/operational-data', { data: initialData })
         if (active) {
           setData(initialData)

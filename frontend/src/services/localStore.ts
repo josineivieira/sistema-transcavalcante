@@ -389,7 +389,7 @@ export const seedData: AppData = {
 }
 
 export function normalizeData(data: Partial<AppData>): AppData {
-  const normalizedVehicles = (data.vehicles ?? seedData.vehicles).flatMap((vehicle) => {
+  const normalizedVehicles = (data.vehicles ?? []).flatMap((vehicle) => {
     const legacyVehicle = vehicle as Partial<Vehicle>
     if (legacyVehicle.vehicleType) {
       return [{
@@ -454,7 +454,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
   })
 
   return {
-    customers: (data.customers ?? seedData.customers).map((customer) => ({
+    customers: (data.customers ?? []).map((customer) => ({
       ...customer,
       tradeName: customer.tradeName ?? '',
       participantType: customer.participantType ?? (customer.document?.length > 14 ? 'Juridica' : 'Fisica'),
@@ -504,7 +504,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
       issWithheld: customer.issWithheld ?? 'Nao',
       registrationDate: customer.registrationDate ?? '',
     })),
-    drivers: (data.drivers ?? seedData.drivers).map((driver) => ({
+    drivers: (data.drivers ?? []).map((driver) => ({
       ...driver,
       personType: driver.personType ?? 'Fisica',
       tradeName: driver.tradeName ?? driver.name,
@@ -555,8 +555,8 @@ export function normalizeData(data: Partial<AppData>): AppData {
       contactEmail: driver.contactEmail ?? driver.email ?? '',
     })),
     vehicles: normalizedVehicles,
-    containers: data.containers ?? seedData.containers,
-    freights: (data.freights ?? seedData.freights).map((freight) => {
+    containers: data.containers ?? [],
+    freights: (data.freights ?? []).map((freight) => {
       const legacyFreight = freight as Partial<Freight>
       return {
         ...legacyFreight,
@@ -568,7 +568,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
     closings: data.closings ?? [],
     fiscalDocuments: data.fiscalDocuments ?? [],
     receivables: data.receivables ?? [],
-    priceLists: (data.priceLists ?? seedData.priceLists).map((price) => ({
+    priceLists: (data.priceLists ?? []).map((price) => ({
       ...price,
       listName: price.listName ?? '',
       originPort: price.originPort ?? '',
@@ -609,7 +609,20 @@ function emptyUserPermissions(): Record<string, UserPermission> {
 }
 
 export function loadData(): AppData {
-  return normalizeData(seedData)
+  return normalizeData({
+    customers: [],
+    drivers: [],
+    vehicles: [],
+    containers: [],
+    freights: [],
+    closings: [],
+    fiscalDocuments: [],
+    receivables: [],
+    priceLists: [],
+    users: [],
+    issuerSettings: defaultIssuerSettings,
+    settingsSavedAt: '-',
+  })
 }
 
 export function saveData(data: AppData) {
