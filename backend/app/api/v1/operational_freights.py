@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.operational_data import _find_user, _get_or_create_snapshot, _require_operational_auth
 from app.database.session import get_db
-from app.models.closing import ClosingItem
 from app.models.company import Company
 from app.models.customer import Customer
 from app.models.freight import Freight, FreightTask
@@ -258,6 +257,13 @@ def _migrate_legacy_freights(db: Session) -> None:
     db.commit()
 
 
+def _remember_deleted_freight(db: Session, identifiers: list[str]) -> None:
+    snapshot = _get_or_create_snapshot(db)
+    deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
+    deleted_ids.update(identifier for identifier in identifiers if identifier)
+    snapshot.data = {**snapshot.data, "deletedFreightIds": sorted(deleted_ids)}
+
+
 @router.get("")
 def list_operational_freights(
     search: str = "",
@@ -279,7 +285,15 @@ def list_operational_freights(
 ):
     _require_permission(db, email, "view")
     _migrate_legacy_freights(db)
+    snapshot = _get_or_create_snapshot(db)
+    deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
     query = db.query(Freight).filter(Freight.external_id.isnot(None))
+    if deleted_ids:
+        query = query.filter(
+            ~Freight.external_id.in_(deleted_ids),
+            or_(Freight.process_number.is_(None), ~Freight.process_number.in_(deleted_ids)),
+            ~Freight.internal_number.in_(deleted_ids),
+        )
     if search:
         like = f"%{search}%"
         query = query.filter(or_(
@@ -376,15 +390,11 @@ def delete_operational_freight(
         Freight.internal_number == external_id,
     )).first()
     if freight is None:
+        _remember_deleted_freight(db, [external_id])
+        db.commit()
         return None
-    snapshot = _get_or_create_snapshot(db)
-    deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
-    deleted_ids.update(filter(None, [freight.external_id, freight.process_number, freight.internal_number]))
-    snapshot.data = {**snapshot.data, "deletedFreightIds": sorted(deleted_ids)}
-    for item in db.query(ClosingItem).filter(ClosingItem.freight_id == freight.id).all():
-        db.delete(item)
-    for task in db.query(FreightTask).filter(FreightTask.freight_id == freight.id).all():
-        db.delete(task)
-    db.delete(freight)
+
+    identifiers = [freight.external_id or "", freight.process_number or "", freight.internal_number or "", external_id]
+    _remember_deleted_freight(db, identifiers)
     db.commit()
     return None
