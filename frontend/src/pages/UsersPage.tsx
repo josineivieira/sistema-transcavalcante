@@ -184,7 +184,7 @@ export function UsersPage() {
                 </tr>
               )
             })}
-            {loading && <LoadingRow colSpan={8} />}
+            {loading && <LoadingRow colSpan={8} label="Carregando usuários..." />}
             {!loading && !rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhum usuario encontrado.</td></tr>}
           </tbody>
         </table>

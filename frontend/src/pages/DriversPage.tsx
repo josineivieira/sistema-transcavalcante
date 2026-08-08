@@ -238,7 +238,7 @@ export function DriversPage() {
                 </td>
               </tr>
             ))}
-            {loading && <LoadingRow colSpan={9} />}
+            {loading && <LoadingRow colSpan={9} label="Carregando condutores..." />}
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">

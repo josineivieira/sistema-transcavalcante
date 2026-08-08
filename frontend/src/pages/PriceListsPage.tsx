@@ -166,7 +166,7 @@ export function PriceListsPage() {
                   <td className="border-b border-zinc-200 px-2 py-2">{price.status}</td>
                 </tr>
               ))}
-              {loading && <LoadingRow colSpan={8} />}
+              {loading && <LoadingRow colSpan={8} label="Carregando lista de preços..." />}
               {!loading && !rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhuma rota encontrada.</td></tr>}
             </tbody>
           </table>

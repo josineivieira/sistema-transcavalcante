@@ -56,7 +56,7 @@ export function FinancePage() {
               <td className="border-b border-zinc-200 px-3 py-2"><button onClick={() => markAsPaid(item.id)} className="border border-zinc-300 px-2 py-1 text-xs">Baixar</button></td>
             </tr>
           ))}
-          {data.loading && <LoadingRow colSpan={9} />}
+          {data.loading && <LoadingRow colSpan={9} label="Carregando financeiro..." />}
           {!data.loading && !data.receivables.length && <tr><td colSpan={9} className="px-3 py-10 text-center text-zinc-500">Nenhuma conta gerada.</td></tr>}
         </tbody>
       </table>

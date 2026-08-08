@@ -56,7 +56,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-4">
       {error && <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
-      {loading && <div className="border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-600">Carregando dados do banco...</div>}
+      {loading && <div className="border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-600">Carregando configurações...</div>}
       <div className="flex items-end justify-between border-b border-zinc-300 pb-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-900">Configuracoes</h2>

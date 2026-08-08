@@ -224,7 +224,7 @@ export function VehiclesPage() {
                   </td>
                 </tr>
               ))}
-              {loading && <LoadingRow colSpan={12} />}
+              {loading && <LoadingRow colSpan={12} label="Carregando veículos..." />}
               {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={12} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">

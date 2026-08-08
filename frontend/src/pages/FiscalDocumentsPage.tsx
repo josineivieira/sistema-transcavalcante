@@ -315,7 +315,7 @@ export function FiscalDocumentsPage() {
                   </td>
                 </tr>
               ))}
-              {data.loading && <LoadingRow colSpan={11} />}
+              {data.loading && <LoadingRow colSpan={11} label="Carregando documentos fiscais..." />}
               {!data.loading && !fiscalDocuments.length && (
                 <tr>
                   <td colSpan={11} className="px-3 py-10 text-center text-zinc-500">Nenhum documento fiscal emitido.</td>

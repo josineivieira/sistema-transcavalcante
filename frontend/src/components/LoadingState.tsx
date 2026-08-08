@@ -3,7 +3,7 @@ type LoadingStateProps = {
   label?: string
 }
 
-export function LoadingState({ label = 'Carregando dados do banco...' }: LoadingStateProps) {
+export function LoadingState({ label = 'Carregando informações...' }: LoadingStateProps) {
   return (
     <div className="grid min-h-48 place-items-center bg-white text-xs text-zinc-600">
       <div className="flex flex-col items-center gap-3">
@@ -14,7 +14,7 @@ export function LoadingState({ label = 'Carregando dados do banco...' }: Loading
   )
 }
 
-export function LoadingRow({ colSpan = 1, label = 'Carregando dados do banco...' }: LoadingStateProps) {
+export function LoadingRow({ colSpan = 1, label = 'Carregando informações...' }: LoadingStateProps) {
   return (
     <tr>
       <td colSpan={colSpan} className="border-b border-zinc-200 p-0">

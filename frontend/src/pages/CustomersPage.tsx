@@ -245,7 +245,7 @@ export function CustomersPage() {
                 </td>
               </tr>
             ))}
-            {loading && <LoadingRow colSpan={16} />}
+            {loading && <LoadingRow colSpan={16} label="Carregando clientes..." />}
             {!loading && rows.length === 0 && (
               <tr><td colSpan={16} className="px-3 py-10 text-center text-zinc-500">Nenhum cliente encontrado.</td></tr>
             )}

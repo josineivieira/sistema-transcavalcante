@@ -1906,7 +1906,7 @@ export function FreightsPage() {
                         ))}
                       </tr>
                     ))}
-                    {loading && <LoadingRow colSpan={visibleFreightColumns.length} />}
+                    {loading && <LoadingRow colSpan={visibleFreightColumns.length} label="Carregando fretes..." />}
                     {!loading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
                   </tbody>
                 </table>

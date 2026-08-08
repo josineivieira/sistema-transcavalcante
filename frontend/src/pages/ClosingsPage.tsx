@@ -328,7 +328,7 @@ export function ClosingsPage() {
                 </td>
               </tr>
             ))}
-            {data.loading && <LoadingRow colSpan={9} />}
+            {data.loading && <LoadingRow colSpan={9} label="Carregando fechamentos..." />}
             {!data.loading && !closings.length && (
               <tr>
                 <td colSpan={9} className="px-3 py-10 text-center text-zinc-500">Nenhum fechamento criado.</td>
