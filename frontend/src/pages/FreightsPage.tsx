@@ -788,6 +788,15 @@ export function FreightsPage() {
     return text.match(/(?:\d[\s.-]*){44}/)?.[0]?.replace(/\D/g, '') ?? ''
   }
 
+  function invoiceNumberFromAccessKey(accessKey: string) {
+    return accessKey.length === 44 ? accessKey.slice(25, 34) : ''
+  }
+
+  function normalizeInvoiceNumber(value: string) {
+    const digits = value.replace(/\D/g, '')
+    return digits.replace(/^0+(?=\d)/, '') || digits
+  }
+
   function formatIsoDate(value: string) {
     if (!value) return ''
     const isoDate = value.slice(0, 10)
@@ -908,11 +917,13 @@ export function FreightsPage() {
     const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
     const recipient = lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i) || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL') || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
     const recipientDocument = firstFormattedDocument(destBlock) || firstFormattedDocument(recipientContextLines.join('\n')) || extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
-    const invoiceNumber = normalized.match(/N[ºo]\s*(?:NF-?E|NF)?\s*(\d{3,})/i)?.[1]
-      || normalized.match(/(?:NF-?e|NF)\s*N[ºo]?\s*(\d{3,})/i)?.[1]
-      || ''
-    const invoiceSeries = normalized.match(/S[ÉE]RIE\s*:?\s*(\d+)/i)?.[1] || ''
     const invoiceAccessKey = accessKeyFromText(normalized)
+    const invoiceNumberFromKey = invoiceNumberFromAccessKey(invoiceAccessKey)
+    const invoiceNumberFromLabel = normalized.match(/N[ºo]\s*(?:NF-?E|NF)?\s*((?:\d[\s.]*){6,12})/i)?.[1]
+      || normalized.match(/(?:NF-?e|NF)[\s\S]{0,30}?N[ºo]?\s*((?:\d[\s.]*){6,12})/i)?.[1]
+      || ''
+    const invoiceNumber = normalizeInvoiceNumber(invoiceNumberFromLabel || invoiceNumberFromKey)
+    const invoiceSeries = normalized.match(/S[ÉE]RIE\s*:?\s*(\d+)/i)?.[1] || ''
     const invoiceGoodsValue = firstMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
     const invoiceValue = firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA') || invoiceGoodsValue
     const invoiceIssueDate = normalized.match(/DATA DA EMISS[ÃA]O\s+(\d{2}\/\d{2}\/\d{4})/i)?.[1] ?? ''
