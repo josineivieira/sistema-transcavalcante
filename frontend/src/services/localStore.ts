@@ -242,11 +242,15 @@ export type Freight = {
   booking?: string
   terminalEmpty?: string
   terminalReturn?: string
+  recordDates?: boolean
   deliveryForecast?: string
   arrivalDate?: string
   cntrUnloadingDate?: string
   documentReleaseDate?: string
   portWithdrawalDate?: string
+  scheduleStartDate?: string
+  scheduleEndDate?: string
+  integrationType?: string
   destinationScheduleDate?: string
   destinationScheduleTime?: string
   destinationArrivalDate?: string

@@ -62,11 +62,15 @@ type FreightForm = {
   booking: string
   terminalEmpty: string
   terminalReturn: string
+  recordDates: boolean
   deliveryForecast: string
   arrivalDate: string
   cntrUnloadingDate: string
   documentReleaseDate: string
   portWithdrawalDate: string
+  scheduleStartDate: string
+  scheduleEndDate: string
+  integrationType: string
   destinationScheduleDate: string
   destinationScheduleTime: string
   destinationArrivalDate: string
@@ -164,11 +168,15 @@ const emptyForm: FreightForm = {
   booking: '',
   terminalEmpty: '',
   terminalReturn: '',
+  recordDates: false,
   deliveryForecast: '',
   arrivalDate: '',
   cntrUnloadingDate: '',
   documentReleaseDate: '',
   portWithdrawalDate: '',
+  scheduleStartDate: '',
+  scheduleEndDate: '',
+  integrationType: '',
   destinationScheduleDate: '',
   destinationScheduleTime: '',
   destinationArrivalDate: '',
@@ -1133,23 +1141,40 @@ export function FreightsPage() {
     }
 
     if (activeTab === 'CONTROLE DE DATAS') {
+      const dateLocked = !form.recordDates
       return (
         <div className="p-3">
-          <label className="mb-3 flex items-center gap-2 text-xs font-semibold"><input type="checkbox" defaultChecked /> GRAVAR DATAS</label>
+          <label className="mb-3 flex items-center gap-2 text-xs font-semibold">
+            <input type="checkbox" checked={form.recordDates} onChange={(event) => updateForm('recordDates', event.target.checked)} /> GRAVAR DATAS
+          </label>
+          <div className="inline-flex border border-b-0 border-zinc-300 bg-zinc-300 px-2 py-1 text-xs">DESTINO</div>
           <div className="grid gap-x-24 gap-y-1 border border-zinc-300 bg-white p-3 md:grid-cols-2">
             <div className="grid gap-1">
-              <Field label="Dt. previsao de chegada"><input type="date" value={form.deliveryForecast} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt. chegada"><input type="date" value={form.arrivalDate} onChange={(event) => updateForm('arrivalDate', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt. descarga CNTR/Carga"><input type="date" value={form.cntrUnloadingDate} onChange={(event) => updateForm('cntrUnloadingDate', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt. liberacao documento"><input type="date" value={form.documentReleaseDate} onChange={(event) => updateForm('documentReleaseDate', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt. retirada porto destino"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass()} /></Field>
+              <Field label="Dt. previsao de chegada"><input type="date" value={form.deliveryForecast} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. chegada"><input type="date" value={form.arrivalDate} onChange={(event) => updateForm('arrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. descarga CNTR/Carga"><input type="date" value={form.cntrUnloadingDate} onChange={(event) => updateForm('cntrUnloadingDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. liberacao documento"><input type="date" value={form.documentReleaseDate} onChange={(event) => updateForm('documentReleaseDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. retirada porto destino"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. ini. agendamento"><input type="date" value={form.scheduleStartDate} onChange={(event) => updateForm('scheduleStartDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. fim agendamento"><input type="date" value={form.scheduleEndDate} onChange={(event) => updateForm('scheduleEndDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Tipo de integracao">
+                <select value={form.integrationType} onChange={(event) => updateForm('integrationType', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked}>
+                  <option value="">Selecione...</option>
+                  <option>Porto destino</option>
+                  <option>Terminal retro</option>
+                  <option>Cliente final</option>
+                  <option>Retirada/devolucao</option>
+                </select>
+              </Field>
             </div>
             <div className="grid gap-1">
-              <Field label="Dt. agendamento entrega" required><input type="date" value={form.destinationScheduleDate} onChange={(event) => updateForm('destinationScheduleDate', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Hr. agendamento entrega"><input value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt.chegada destinatario"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Hr. chegada destinatario"><input value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass()} /></Field>
-              <Field label="Dt. devolucao CNTR"><input type="date" value={form.cntrReturnDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass()} /></Field>
+              <Field label="Dt. agendamento entrega" required><input type="date" value={form.destinationScheduleDate} onChange={(event) => updateForm('destinationScheduleDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. agendamento entrega"><input value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt.chegada destinatario"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. chegada destinatario"><input value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. saida destinatario"><input type="date" value={form.destinationDepartureDate} onChange={(event) => updateForm('destinationDepartureDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. saida destinatario"><input value={form.destinationDepartureTime} onChange={(event) => updateForm('destinationDepartureTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. devolucao CNTR"><input type="date" value={form.cntrReturnDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
             </div>
           </div>
         </div>
