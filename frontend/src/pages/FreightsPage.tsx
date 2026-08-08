@@ -971,19 +971,25 @@ export function FreightsPage() {
   }
 
   function applyInvoiceImport() {
-    setForm((current) => ({
-      ...current,
-      senderDocument: invoiceImport.senderDocument || current.senderDocument,
-      sender: invoiceImport.sender || current.sender,
-      recipientDocument: invoiceImport.recipientDocument || current.recipientDocument,
-      recipient: invoiceImport.recipient || current.recipient,
-      invoiceNumber: invoiceImport.invoiceNumber || current.invoiceNumber,
-      invoiceSeries: invoiceImport.invoiceSeries || current.invoiceSeries,
-      invoiceIssueDate: invoiceImport.invoiceIssueDate || current.invoiceIssueDate,
-      invoiceGoodsValue: invoiceImport.invoiceGoodsValue || current.invoiceGoodsValue,
-      invoiceValue: invoiceImport.invoiceValue || current.invoiceValue,
-      invoiceAccessKey: invoiceImport.invoiceAccessKey || current.invoiceAccessKey,
-    }))
+    setForm((current) => {
+      const next = {
+        ...current,
+        senderDocument: invoiceImport.senderDocument || current.senderDocument,
+        sender: invoiceImport.sender || current.sender,
+        recipientDocument: invoiceImport.recipientDocument || current.recipientDocument,
+        recipient: invoiceImport.recipient || current.recipient,
+        invoiceNumber: invoiceImport.invoiceNumber || current.invoiceNumber,
+        invoiceSeries: invoiceImport.invoiceSeries || current.invoiceSeries,
+        invoiceIssueDate: invoiceImport.invoiceIssueDate || current.invoiceIssueDate,
+        invoiceGoodsValue: invoiceImport.invoiceGoodsValue || current.invoiceGoodsValue,
+        invoiceValue: invoiceImport.invoiceValue || current.invoiceValue,
+        invoiceAccessKey: invoiceImport.invoiceAccessKey || current.invoiceAccessKey,
+      }
+      if (editingFreightId) {
+        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+      }
+      return next
+    })
     setInvoiceImportOpen(false)
   }
 
