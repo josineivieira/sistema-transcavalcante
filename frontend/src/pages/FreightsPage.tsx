@@ -7,15 +7,11 @@ import { canEdit, denyNoPrivilege } from '../services/authSession'
 const freightTabs = [
   'GERAIS',
   'ROTA',
-  'SERVICOS',
-  'VALE PEDAGIO',
   'CONTAINERS',
   'CONTROLE DE DATAS',
   'DESPESAS PREVISTAS',
   'DESPESAS EXTRAS',
   'NOTAS FISCAIS',
-  'SM',
-  'DFE',
   'CIOT',
   'PROTOCOLO',
 ] as const
@@ -330,20 +326,16 @@ export function FreightsPage() {
   const serviceReady = Boolean(generalReady && routeReady && form.driver && form.tractorId)
   const containerReady = Boolean(serviceReady && form.container)
   const datesReady = Boolean(containerReady && form.deliveryForecast && form.destinationScheduleDate)
-  const fiscalReady = Boolean(containerReady && (form.invoiceNumber || form.dfeNumber))
+  const fiscalReady = Boolean(containerReady && form.invoiceNumber)
 
   const tabAvailability: Record<FreightTab, boolean> = {
     GERAIS: true,
     ROTA: true,
-    SERVICOS: generalReady && routeReady,
-    'VALE PEDAGIO': serviceReady,
     CONTAINERS: serviceReady,
     'CONTROLE DE DATAS': containerReady,
     'DESPESAS PREVISTAS': datesReady,
     'DESPESAS EXTRAS': datesReady,
     'NOTAS FISCAIS': containerReady,
-    SM: serviceReady,
-    DFE: fiscalReady,
     CIOT: serviceReady,
     PROTOCOLO: fiscalReady || datesReady,
   }
@@ -872,12 +864,6 @@ export function FreightsPage() {
       )
     }
 
-    if (activeTab === 'SERVICOS') {
-      return (
-        <EmptyGridMessage text="Sem informacoes adicionais nesta etapa." />
-      )
-    }
-
     if (activeTab === 'CONTAINERS') {
       return (
         <div className="p-3">
@@ -1031,9 +1017,9 @@ export function FreightsPage() {
       )
     }
 
-    if (activeTab === 'SM' || activeTab === 'DFE' || activeTab === 'PROTOCOLO' || activeTab === 'VALE PEDAGIO') {
-      const field = activeTab === 'SM' ? 'smNumber' : activeTab === 'DFE' ? 'dfeNumber' : 'protocolStatus'
-      const label = activeTab === 'SM' ? 'Nr. SM' : activeTab === 'DFE' ? 'Nr. averbacao' : 'Situacao'
+    if (activeTab === 'PROTOCOLO') {
+      const field = 'protocolStatus'
+      const label = 'Situacao'
       return (
         <div className="p-3">
           <Field label={label}><input value={String(form[field as keyof FreightForm])} onChange={(event) => updateForm(field as keyof FreightForm, event.target.value)} className={`${textInputClass()} max-w-md`} /></Field>
