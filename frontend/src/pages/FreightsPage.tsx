@@ -1075,7 +1075,7 @@ export function FreightsPage() {
   }
 
   function recipientFromDanfSection(lines: string[], sender: string) {
-    const destinationStart = lines.findIndex((line) => plainText(line).includes('DESTINATARIO/REMETENTE'))
+    const destinationStart = lines.findIndex((line) => plainText(line).replace(/\s+/g, '').includes('DESTINATARIO/REMETENTE'))
     if (destinationStart < 0) return ''
     const section = lines.slice(destinationStart + 1, destinationStart + 24)
     const byLabel = lineAfterPattern(section, /NOME\s*\/?\s*RAZ/i)
@@ -1084,8 +1084,11 @@ export function FreightsPage() {
   }
 
   function recipientFromDanfText(normalized: string, sender: string) {
-    const block = normalized.match(/DESTINAT[AÁÃÂÀƒ]RIO\/REMETENTE([\s\S]{0,1000}?)(?:C[AÁÃÂÀƒ]LCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|DADOS DO PRODUTO|FATURA|$)/i)?.[1] ?? ''
-    const direct = block.match(/NOME\s*\/?\s*RAZ[AÁÃÂÀƒ]O\s*SOCIAL\s+(.+?)(?:\s+C\.?N\.?P\.?J| CNPJ| DATA\s+(?:DA\s+)?EMISS[AÁÃÂÀƒ]O|\n|$)/i)?.[1] ?? ''
+    const receiptRecipient = normalized.match(/DEST\/REME:\s*(.+?)\s+VALOR TOTAL/i)?.[1] ?? ''
+    if (receiptRecipient && looksLikeBusinessName(receiptRecipient)) return cleanDanfLine(receiptRecipient)
+    const searchable = plainText(normalized)
+    const block = searchable.match(/DESTINATARIO\s*\/\s*REMETENTE([\s\S]{0,1000}?)(?:CALCULO DO IMPOSTO|TRANSPORTADOR\/VOLUMES|DADOS DO PRODUTO|FATURA|$)/i)?.[1] ?? ''
+    const direct = block.match(/NOME\s*\/?\s*RAZAO\s*SOCIAL\s+(.+?)(?:\s+C\.?N\.?P\.?J| CNPJ| DATA\s+(?:DA\s+)?EMISSAO|\n|$)/i)?.[1] ?? ''
     if (direct && looksLikeBusinessName(direct)) return cleanDanfLine(direct)
     return firstBusinessName(block.split('\n'), sender)
   }
@@ -1135,6 +1138,7 @@ export function FreightsPage() {
 
   function extractInvoiceFromDanfText(text: string, fileName: string): InvoiceImport | null {
     const normalized = text.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ')
+    const searchableText = plainText(normalized)
     const lines = text
       .replace(/\r/g, '\n')
       .split('\n')
@@ -1144,7 +1148,7 @@ export function FreightsPage() {
     const issuerCandidates = (natureIndex > 0 ? lines.slice(0, natureIndex) : lines.slice(0, 25))
       .filter((line) => /LTDA|EIRELI|S\/A| SA | ME\b| EPP\b/i.test(line))
       .filter((line) => !/DANFE|NF-?E|DESTINAT/i.test(line))
-    const destinationStart = lines.findIndex((line) => plainText(line).includes('DESTINATARIO/REMETENTE'))
+    const destinationStart = lines.findIndex((line) => plainText(line).replace(/\s+/g, '').includes('DESTINATARIO/REMETENTE'))
     const relativeDestinationEnd = destinationStart >= 0
       ? lines.slice(destinationStart + 1).findIndex((line) => /TRANSPORTADOR\/VOLUMES|CALCULO DO IMPOSTO/i.test(plainText(line)))
       : -1
@@ -1181,9 +1185,9 @@ export function FreightsPage() {
       || lastMoneyAfter(normalized, 'TOTAL DA NOTA')
       || firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA')
       || invoiceGoodsValue
-    const invoiceIssueDate = firstDateAfter(normalized, 'DATA DA EMISSAO')
-      || firstDateAfter(normalized, 'DATA EMISSAO')
-      || firstDateAfter(normalized, 'DATA DE EMISSAO')
+    const invoiceIssueDate = firstDateAfter(searchableText, 'DATA DA EMISSAO')
+      || firstDateAfter(searchableText, 'DATA EMISSAO')
+      || firstDateAfter(searchableText, 'DATA DE EMISSAO')
       || formatDanfDate(normalized.match(/DATA\s+(?:DA\s+)?EMISS[AÁÃÂÀ]O[\s\S]{0,120}?(\d{2}\/\d{2}\/\d{2,4})/i)?.[1] ?? '')
 
     if (!sender && !recipient) return null
