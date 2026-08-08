@@ -863,10 +863,15 @@ export function FreightsPage() {
     setForm(formSnapshot)
     setEditingCiotId(null)
 
-    setFreights(editingFreightId
-      ? freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(formSnapshot, freight) : freight)
-      : [...freights, buildFreightRecord(formSnapshot)],
-    )
+    if (editingFreightId) {
+      setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(formSnapshot, freight) : freight))
+    } else {
+      const createdFreight = buildFreightRecord(formSnapshot)
+      setFreights([...freights, createdFreight])
+      if (!closeAfterSave) {
+        setEditingFreightId(createdFreight.id)
+      }
+    }
 
     if (closeAfterSave) {
       setShowForm(false)
