@@ -6,7 +6,6 @@ import {
   ChevronRight,
   CircleHelp,
   ClipboardList,
-  Container,
   FileText,
   Gauge,
   LogOut,
@@ -34,7 +33,6 @@ const groups = [
       ['customers', 'Clientes', '/customers', Building2],
       ['drivers', 'Motoristas', '/drivers', UserRound],
       ['vehicles', 'Veículos', '/vehicles', Boxes],
-      ['containers', 'Contêineres', '/containers', Container],
     ],
   },
   {
@@ -64,7 +62,6 @@ const pageTitles: Record<string, string> = {
   '/customers': 'Clientes',
   '/drivers': 'Motoristas',
   '/vehicles': 'Veículos',
-  '/containers': 'Contêineres',
   '/finance': 'Financeiro',
   '/price-lists': 'Lista de precos',
   '/reports': 'Relatórios',

@@ -10,7 +10,6 @@ const modules = [
   ['customers', 'Clientes'],
   ['drivers', 'Condutores'],
   ['vehicles', 'Veiculos'],
-  ['containers', 'Conteineres'],
   ['closings', 'Fechamentos'],
   ['fiscalDocuments', 'Documentos fiscais'],
   ['finance', 'Financeiro'],

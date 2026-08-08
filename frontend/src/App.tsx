@@ -9,7 +9,6 @@ import { FiscalDocumentsPage } from './pages/FiscalDocumentsPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { DriversPage } from './pages/DriversPage'
 import { VehiclesPage } from './pages/VehiclesPage'
-import { ContainersPage } from './pages/ContainersPage'
 import { FinancePage } from './pages/FinancePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -56,7 +55,6 @@ export default function App() {
         <Route path="customers" element={<ProtectedPage path="/customers"><CustomersPage /></ProtectedPage>} />
         <Route path="drivers" element={<ProtectedPage path="/drivers"><DriversPage /></ProtectedPage>} />
         <Route path="vehicles" element={<ProtectedPage path="/vehicles"><VehiclesPage /></ProtectedPage>} />
-        <Route path="containers" element={<ProtectedPage path="/containers"><ContainersPage /></ProtectedPage>} />
         <Route path="finance" element={<ProtectedPage path="/finance"><FinancePage /></ProtectedPage>} />
         <Route path="price-lists" element={<ProtectedPage path="/price-lists"><PriceListsPage /></ProtectedPage>} />
         <Route path="reports" element={<ProtectedPage path="/reports"><ReportsPage /></ProtectedPage>} />

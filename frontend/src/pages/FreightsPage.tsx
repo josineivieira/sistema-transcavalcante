@@ -404,7 +404,7 @@ const freightTaskOptions = [
 ]
 
 export function FreightsPage() {
-  const { customers, drivers, vehicles, containers, freights, priceLists, issuerSettings, setFreights } = useLocalData()
+  const { customers, drivers, vehicles, freights, priceLists, issuerSettings, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
   const authUser = getAuthUser()
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
@@ -453,14 +453,12 @@ export function FreightsPage() {
     driver: drivers[0]?.name ?? '',
     tractorId: vehicles.find((vehicle) => vehicle.vehicleType === 'Cavalo')?.id ?? '',
     trailerId: vehicles.find((vehicle) => vehicle.vehicleType === 'Carreta')?.id ?? '',
-    container: containers[0]?.number ?? '',
   })
 
   const tractors = useMemo(() => vehicles.filter((vehicle) => vehicle.vehicleType === 'Cavalo'), [vehicles])
   const trailers = useMemo(() => vehicles.filter((vehicle) => vehicle.vehicleType === 'Carreta'), [vehicles])
   const selectedTractor = tractors.find((vehicle) => vehicle.id === form.tractorId)
   const selectedTrailer = trailers.find((vehicle) => vehicle.id === form.trailerId)
-  const selectedContainer = containers.find((container) => container.number === form.container)
   const productOptions = useMemo(() => {
     const products = priceLists
       .filter((price) => price.status !== 'Inativo' && price.product)
@@ -615,7 +613,7 @@ export function FreightsPage() {
       driver: drivers[0]?.name ?? '',
       tractorId: tractors[0]?.id ?? '',
       trailerId: trailers[0]?.id ?? '',
-      container: containers[0]?.number ?? '',
+      container: '',
     })
     setActiveTab('GERAIS')
   }
@@ -1230,7 +1228,7 @@ export function FreightsPage() {
             <div className="flex h-8 items-center justify-between bg-zinc-400 px-3 text-xs text-zinc-950"><span>1 registro</span><Settings size={16} /></div>
             <table className="w-full min-w-[900px] text-xs">
               <thead><tr>{['Codigo', 'Tipo de Container', 'No Container', 'Tara', 'Peso maximo', 'MGW', 'No Lacre Cia', 'No Lacre export.'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody><tr><td className="border-b border-r px-2 py-2">{selectedContainer?.size || '40HC'}</td><td className="border-b border-r px-2 py-2">{selectedContainer?.type || 'CONTAINER'}</td><td className="border-b border-r px-2 py-2"><select value={form.container} onChange={(event) => updateForm('container', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{containers.map((container) => <option key={container.id}>{container.number}</option>)}</select></td><td className="border-b border-r px-2 py-2">{selectedContainer?.tare || '-'}</td><td className="border-b border-r px-2 py-2">{selectedContainer?.grossWeight || '-'}</td><td className="border-b border-r px-2 py-2">32.500,0000</td><td className="border-b border-r px-2 py-2">{selectedContainer?.seal || '-'}</td><td className="border-b px-2 py-2">-</td></tr></tbody>
+              <tbody><tr><td className="border-b border-r px-2 py-2">40 HC</td><td className="border-b border-r px-2 py-2">Dry</td><td className="border-b border-r px-2 py-2"><input value={form.container} onChange={(event) => updateForm('container', event.target.value.toUpperCase())} className={textInputClass()} placeholder="MSCU1234567" /></td><td className="border-b border-r px-2 py-2">3800</td><td className="border-b border-r px-2 py-2">25000</td><td className="border-b border-r px-2 py-2">32.500,0000</td><td className="border-b border-r px-2 py-2">LCR-1001</td><td className="border-b px-2 py-2">-</td></tr></tbody>
             </table>
           </div>
         </div>
