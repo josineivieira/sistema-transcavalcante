@@ -3,7 +3,7 @@ import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Set
 import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightInvoiceEntry, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
-import { LoadingRow } from '../components/LoadingState'
+import { LoadingState } from '../components/LoadingState'
 
 const freightTabs = [
   'GERAIS',
@@ -1875,7 +1875,7 @@ export function FreightsPage() {
                   <button onClick={openNewFreight} className="grid h-6 w-6 place-items-center bg-black text-white">+</button>
                 </div>
               </div>
-              <div className="overflow-auto">
+              <div className="relative min-h-[420px] overflow-auto">
                 <table className="table-fixed text-xs" style={{ minWidth: freightGridMinWidth }}>
                   <thead className="bg-white">
                     <tr>
@@ -1906,10 +1906,14 @@ export function FreightsPage() {
                         ))}
                       </tr>
                     ))}
-                    {loading && <LoadingRow colSpan={visibleFreightColumns.length} label="Carregando fretes..." />}
                     {!loading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
                   </tbody>
                 </table>
+                {loading && (
+                  <div className="absolute inset-0 grid place-items-center bg-white">
+                    <LoadingState label="Carregando fretes..." />
+                  </div>
+                )}
               </div>
             </section>
           </div>
