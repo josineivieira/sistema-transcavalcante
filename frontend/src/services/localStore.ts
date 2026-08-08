@@ -405,6 +405,12 @@ export type PayrollClosing = {
   average: number
   basket: number
   inss: number
+  irrf: number
+  fgts: number
+  dependents: number
+  transportDiscount: number
+  absenceDiscount: number
+  advancePayment: number
   otherDiscounts: number
   otherEarnings: number
   tripQuantity: number
@@ -804,6 +810,12 @@ export function normalizeData(data: Partial<AppData>): AppData {
       average: Number(closing.average ?? 0),
       basket: Number(closing.basket ?? 0),
       inss: Number(closing.inss ?? 0),
+      irrf: Number(closing.irrf ?? 0),
+      fgts: Number(closing.fgts ?? 0),
+      dependents: Number(closing.dependents ?? 0),
+      transportDiscount: Number(closing.transportDiscount ?? 0),
+      absenceDiscount: Number(closing.absenceDiscount ?? 0),
+      advancePayment: Number(closing.advancePayment ?? 0),
       otherDiscounts: Number(closing.otherDiscounts ?? 0),
       otherEarnings: Number(closing.otherEarnings ?? 0),
       tripQuantity: Number(closing.tripQuantity ?? 0),

@@ -11,6 +11,24 @@ type PayrollTab = 'COLABORADORES' | 'FECHAMENTOS' | 'CONTRACHEQUES'
 type PayrollForm = Omit<PayrollClosing, 'grossTotal' | 'discountTotal' | 'netTotal'>
 type PayrollTotals = { grossTotal: number, discountTotal: number, netTotal: number }
 
+const inssBrackets = [
+  { limit: 1621.00, rate: 0.075 },
+  { limit: 2902.84, rate: 0.09 },
+  { limit: 4354.27, rate: 0.12 },
+  { limit: 8475.55, rate: 0.14 },
+]
+
+const irrfBrackets = [
+  { limit: 2428.80, rate: 0, deduction: 0 },
+  { limit: 2826.65, rate: 0.075, deduction: 182.16 },
+  { limit: 3751.05, rate: 0.15, deduction: 394.16 },
+  { limit: 4664.68, rate: 0.225, deduction: 675.49 },
+  { limit: Infinity, rate: 0.275, deduction: 908.73 },
+]
+
+const dependentDeduction = 189.59
+const simplifiedIrrfDeduction = 607.20
+
 const emptyProfile: PayrollProfile = {
   id: '',
   employeeId: '',
@@ -46,6 +64,12 @@ const emptyForm: PayrollForm = {
   average: 0,
   basket: 0,
   inss: 0,
+  irrf: 0,
+  fgts: 0,
+  dependents: 0,
+  transportDiscount: 0,
+  absenceDiscount: 0,
+  advancePayment: 0,
   otherDiscounts: 0,
   otherEarnings: 0,
   tripQuantity: 0,
@@ -74,8 +98,58 @@ function totals(form: PayrollForm) {
     + form.vacationBonus
     + form.otherEarnings
     + itemEarnings
-  const discountTotal = form.firstFortnightDiscount + form.inss + form.otherDiscounts + itemDiscounts
+  const discountTotal = form.firstFortnightDiscount
+    + form.inss
+    + form.irrf
+    + form.transportDiscount
+    + form.absenceDiscount
+    + form.advancePayment
+    + form.otherDiscounts
+    + itemDiscounts
   return { grossTotal, discountTotal, netTotal: grossTotal - discountTotal }
+}
+
+function roundMoney(value: number) {
+  return Number((Math.max(0, value) || 0).toFixed(2))
+}
+
+function payrollTaxBase(form: PayrollForm) {
+  const itemEarnings = form.items.filter((item) => item.type === 'earning').reduce((total, item) => total + item.amount, 0)
+  return roundMoney(
+    form.firstFortnightSalary
+    + form.firstFortnightOvertime
+    + form.secondFortnightSalary
+    + form.secondFortnightOvertime
+    + form.average
+    + form.vacationBonus
+    + form.otherEarnings
+    + itemEarnings
+  )
+}
+
+function calculateInss(base: number) {
+  let previousLimit = 0
+  let total = 0
+  for (const bracket of inssBrackets) {
+    const taxed = Math.min(base, bracket.limit) - previousLimit
+    if (taxed > 0) total += taxed * bracket.rate
+    previousLimit = bracket.limit
+    if (base <= bracket.limit) break
+  }
+  return roundMoney(total)
+}
+
+function calculateIrrf(base: number, inss: number, dependents: number) {
+  const legalDeduction = inss + (dependents * dependentDeduction)
+  const taxableBase = roundMoney(base - Math.max(legalDeduction, simplifiedIrrfDeduction))
+  const bracket = irrfBrackets.find((item) => taxableBase <= item.limit) ?? irrfBrackets[irrfBrackets.length - 1]
+  const baseTax = roundMoney((taxableBase * bracket.rate) - bracket.deduction)
+  const monthlyReduction = base <= 5000
+    ? Math.min(baseTax, 312.89)
+    : base <= 7350
+      ? Math.max(0, 978.62 - (0.133145 * base))
+      : 0
+  return roundMoney(baseTax - monthlyReduction)
 }
 
 function inputClass(disabled = false) {
@@ -206,6 +280,18 @@ export function PayrollPage() {
 
   function updateClosingNumber(field: keyof PayrollForm, value: string) {
     setClosing((current) => ({ ...current, [field]: parseNumber(value) }))
+  }
+
+  function calculateLegalDeductions() {
+    const base = payrollTaxBase(closing)
+    const inss = calculateInss(base)
+    const irrf = calculateIrrf(base, inss, closing.dependents)
+    setClosing((current) => ({
+      ...current,
+      inss,
+      irrf,
+      fgts: roundMoney(base * 0.08),
+    }))
   }
 
   function saveClosing(closeAfter = false) {
@@ -406,11 +492,11 @@ export function PayrollPage() {
                 <tr className="bg-cyan-700 text-white">
                   <th className="border-r px-2 py-2" rowSpan={2}>Mes</th>
                   <th className="border-r px-2 py-2" colSpan={4}>1a quinzena</th>
-                  <th className="border-r px-2 py-2" colSpan={8}>2a quinzena</th>
+                  <th className="border-r px-2 py-2" colSpan={9}>2a quinzena</th>
                   <th className="border-r px-2 py-2" colSpan={4}>Totais</th>
                 </tr>
                 <tr className="bg-cyan-600 text-white">
-                  {['Salario', 'HE', 'Desconto', 'Total', 'Salario', 'HE', 'Transp', 'Media', 'Cesta', 'INSS', 'Out (+)', 'Out (-)', 'Qtde viagem', 'Despesa (+)', 'Ferias/decimo', 'Total recebido'].map((heading) => <th key={heading} className="border-r px-2 py-2">{heading}</th>)}
+                  {['Salario', 'HE', 'Desconto', 'Total', 'Salario', 'HE', 'Transp', 'Media', 'Cesta', 'INSS', 'IRRF', 'Out (+)', 'Out (-)', 'Qtde viagem', 'Despesa (+)', 'Ferias/decimo', 'Total recebido'].map((heading) => <th key={heading} className="border-r px-2 py-2">{heading}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -426,6 +512,7 @@ export function PayrollPage() {
                   <td className="border-b border-r p-1"><input value={closing.average || ''} onChange={(event) => updateClosingNumber('average', event.target.value)} className={moneyClass()} /></td>
                   <td className="border-b border-r p-1"><input value={closing.basket || ''} onChange={(event) => updateClosingNumber('basket', event.target.value)} className={moneyClass()} /></td>
                   <td className="border-b border-r p-1"><input value={closing.inss || ''} onChange={(event) => updateClosingNumber('inss', event.target.value)} className={moneyClass()} /></td>
+                  <td className="border-b border-r p-1"><input value={closing.irrf || ''} onChange={(event) => updateClosingNumber('irrf', event.target.value)} className={moneyClass()} /></td>
                   <td className="border-b border-r p-1"><input value={closing.otherEarnings || ''} onChange={(event) => updateClosingNumber('otherEarnings', event.target.value)} className={moneyClass()} /></td>
                   <td className="border-b border-r p-1"><input value={closing.otherDiscounts || ''} onChange={(event) => updateClosingNumber('otherDiscounts', event.target.value)} className={moneyClass()} /></td>
                   <td className="border-b border-r p-1"><input value={closing.tripQuantity || ''} onChange={(event) => updateClosingNumber('tripQuantity', event.target.value)} className={moneyClass()} /></td>
@@ -437,7 +524,7 @@ export function PayrollPage() {
             </table>
           </div>
 
-          <div className="grid gap-4 bg-white p-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid gap-4 bg-white p-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="border border-zinc-400">
               <div className="flex h-8 items-center bg-zinc-400 px-2 font-semibold">
                 Lancamentos avulsos
@@ -460,11 +547,28 @@ export function PayrollPage() {
                 </tbody>
               </table>
             </div>
-            <div className="border border-zinc-400 bg-zinc-50 p-3">
-              <div className="grid gap-2">
-                <div className="flex justify-between"><span>Total bruto</span><strong>{formatMoney(closingTotals.grossTotal)}</strong></div>
-                <div className="flex justify-between"><span>Descontos</span><strong>{formatMoney(closingTotals.discountTotal)}</strong></div>
-                <div className="border-t border-zinc-400 pt-2 text-base"><div className="flex justify-between"><span>Total liquido</span><strong>{formatMoney(closingTotals.netTotal)}</strong></div></div>
+            <div className="grid gap-3">
+              <div className="border border-zinc-400 bg-zinc-50">
+                <div className="flex h-8 items-center bg-zinc-400 px-2 font-semibold">Descontos legais e operacionais</div>
+                <div className="grid gap-2 p-3">
+                  <Field label="Dependentes"><input value={closing.dependents || ''} onChange={(event) => updateClosingNumber('dependents', event.target.value)} className={moneyClass()} /></Field>
+                  <button onClick={calculateLegalDeductions} className="h-7 border border-zinc-600 bg-white px-2 text-xs font-semibold hover:bg-zinc-100">CALCULAR DESCONTOS LEGAIS</button>
+                  <Field label="INSS"><input value={closing.inss || ''} onChange={(event) => updateClosingNumber('inss', event.target.value)} className={moneyClass()} /></Field>
+                  <Field label="IRRF"><input value={closing.irrf || ''} onChange={(event) => updateClosingNumber('irrf', event.target.value)} className={moneyClass()} /></Field>
+                  <Field label="Vale transporte"><input value={closing.transportDiscount || ''} onChange={(event) => updateClosingNumber('transportDiscount', event.target.value)} className={moneyClass()} /></Field>
+                  <Field label="Faltas/atrasos"><input value={closing.absenceDiscount || ''} onChange={(event) => updateClosingNumber('absenceDiscount', event.target.value)} className={moneyClass()} /></Field>
+                  <Field label="Adiantamento"><input value={closing.advancePayment || ''} onChange={(event) => updateClosingNumber('advancePayment', event.target.value)} className={moneyClass()} /></Field>
+                  <Field label="FGTS info."><input value={closing.fgts || ''} onChange={(event) => updateClosingNumber('fgts', event.target.value)} className={moneyClass()} /></Field>
+                </div>
+              </div>
+              <div className="border border-zinc-400 bg-zinc-50 p-3">
+                <div className="grid gap-2">
+                  <div className="flex justify-between"><span>Base legal estimada</span><strong>{formatMoney(payrollTaxBase(closing))}</strong></div>
+                  <div className="flex justify-between"><span>Total bruto</span><strong>{formatMoney(closingTotals.grossTotal)}</strong></div>
+                  <div className="flex justify-between"><span>Descontos</span><strong>{formatMoney(closingTotals.discountTotal)}</strong></div>
+                  <div className="flex justify-between text-zinc-600"><span>FGTS informativo</span><strong>{formatMoney(closing.fgts)}</strong></div>
+                  <div className="border-t border-zinc-400 pt-2 text-base"><div className="flex justify-between"><span>Total liquido</span><strong>{formatMoney(closingTotals.netTotal)}</strong></div></div>
+                </div>
               </div>
             </div>
           </div>
@@ -581,6 +685,31 @@ function PayrollGrid({
 }
 
 function Payslip({ closing, payrollTotals }: { closing: PayrollForm, payrollTotals: PayrollTotals }) {
+  const rows: Array<{ description: string, earning?: number, discount?: number }> = [
+    { description: 'Salario - 1a quinzena', earning: closing.firstFortnightSalary },
+    { description: 'Hora extra - 1a quinzena', earning: closing.firstFortnightOvertime },
+    { description: 'Desconto - 1a quinzena', discount: closing.firstFortnightDiscount },
+    { description: 'Salario - 2a quinzena', earning: closing.secondFortnightSalary },
+    { description: 'Hora extra - 2a quinzena', earning: closing.secondFortnightOvertime },
+    { description: 'Transporte / ajuda de custo', earning: closing.transport },
+    { description: 'Media salarial', earning: closing.average },
+    { description: 'Cesta / beneficio', earning: closing.basket },
+    { description: 'Despesa de viagem', earning: closing.tripExpenses },
+    { description: 'Ferias / decimo terceiro', earning: closing.vacationBonus },
+    { description: 'Outros proventos', earning: closing.otherEarnings },
+    { description: 'INSS - desconto previdenciario legal', discount: closing.inss },
+    { description: 'IRRF - imposto de renda retido na fonte', discount: closing.irrf },
+    { description: 'Vale transporte descontado', discount: closing.transportDiscount },
+    { description: 'Faltas / atrasos', discount: closing.absenceDiscount },
+    { description: 'Adiantamento salarial', discount: closing.advancePayment },
+    { description: 'Outros descontos', discount: closing.otherDiscounts },
+    ...closing.items.map((item) => ({
+      description: `${item.description || 'Lancamento avulso'}${item.reference ? ` - ${item.reference}` : ''}`,
+      earning: item.type === 'earning' ? item.amount : 0,
+      discount: item.type === 'discount' ? item.amount : 0,
+    })),
+  ].filter((item) => (item.earning ?? 0) > 0 || (item.discount ?? 0) > 0)
+
   return (
     <div className="p-6 text-xs">
       <div className="border border-zinc-700">
@@ -594,15 +723,24 @@ function Payslip({ closing, payrollTotals }: { closing: PayrollForm, payrollTota
         <table className="w-full text-xs">
           <thead><tr className="bg-zinc-200"><th className="border px-2 py-2 text-left">Descricao</th><th className="border px-2 py-2 text-right">Proventos</th><th className="border px-2 py-2 text-right">Descontos</th></tr></thead>
           <tbody>
-            <tr><td className="border px-2 py-2">1a quinzena</td><td className="border px-2 py-2 text-right">{formatMoney(closing.firstFortnightSalary + closing.firstFortnightOvertime)}</td><td className="border px-2 py-2 text-right">{closing.firstFortnightDiscount ? formatMoney(closing.firstFortnightDiscount) : '-'}</td></tr>
-            <tr><td className="border px-2 py-2">2a quinzena e adicionais</td><td className="border px-2 py-2 text-right">{formatMoney(closing.secondFortnightSalary + closing.secondFortnightOvertime + closing.transport + closing.average + closing.basket + closing.tripExpenses + closing.vacationBonus + closing.otherEarnings)}</td><td className="border px-2 py-2 text-right">{formatMoney(closing.inss + closing.otherDiscounts)}</td></tr>
-            {closing.items.map((item) => <tr key={item.id}><td className="border px-2 py-2">{item.description || 'Lancamento avulso'} {item.reference && `- ${item.reference}`}</td><td className="border px-2 py-2 text-right">{item.type === 'earning' ? formatMoney(item.amount) : '-'}</td><td className="border px-2 py-2 text-right">{item.type === 'discount' ? formatMoney(item.amount) : '-'}</td></tr>)}
+            {rows.map((item) => (
+              <tr key={item.description}>
+                <td className="border px-2 py-2">{item.description}</td>
+                <td className="border px-2 py-2 text-right">{item.earning ? formatMoney(item.earning) : '-'}</td>
+                <td className="border px-2 py-2 text-right">{item.discount ? formatMoney(item.discount) : '-'}</td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td className="border px-2 py-8 text-center text-zinc-500" colSpan={3}>Nenhum lancamento no contracheque.</td></tr>}
           </tbody>
           <tfoot>
             <tr className="bg-zinc-100"><td className="border px-2 py-2 font-bold">Totais</td><td className="border px-2 py-2 text-right font-bold">{formatMoney(payrollTotals.grossTotal)}</td><td className="border px-2 py-2 text-right font-bold">{formatMoney(payrollTotals.discountTotal)}</td></tr>
             <tr className="bg-zinc-100 font-bold"><td className="border px-2 py-2">Liquido a receber</td><td className="border px-2 py-2 text-right" colSpan={2}>{formatMoney(payrollTotals.netTotal)}</td></tr>
           </tfoot>
         </table>
+        <div className="grid grid-cols-2 gap-px bg-zinc-700 text-xs">
+          <div className="bg-white p-3"><strong>Base legal estimada:</strong> {formatMoney(payrollTaxBase(closing))}</div>
+          <div className="bg-white p-3"><strong>FGTS informativo:</strong> {formatMoney(closing.fgts)} - valor da empresa, nao descontado do funcionario.</div>
+        </div>
         <div className="grid grid-cols-2 gap-12 p-8">
           <div className="border-t border-zinc-700 pt-2 text-center">Assinatura do colaborador</div>
           <div className="border-t border-zinc-700 pt-2 text-center">Responsavel financeiro</div>
