@@ -362,6 +362,46 @@ export type PriceList = {
   status: string
 }
 
+export type PayrollItem = {
+  id: string
+  type: 'earning' | 'discount'
+  description: string
+  reference: string
+  amount: number
+}
+
+export type PayrollClosing = {
+  id: string
+  employeeId: string
+  employeeName: string
+  category: string
+  admissionDate: string
+  month: string
+  year: string
+  salary: number
+  dailyRate: number
+  firstFortnightSalary: number
+  firstFortnightOvertime: number
+  firstFortnightDiscount: number
+  secondFortnightSalary: number
+  secondFortnightOvertime: number
+  transport: number
+  average: number
+  basket: number
+  inss: number
+  otherDiscounts: number
+  otherEarnings: number
+  tripQuantity: number
+  tripExpenses: number
+  vacationBonus: number
+  items: PayrollItem[]
+  grossTotal: number
+  discountTotal: number
+  netTotal: number
+  status: string
+  createdAt: string
+}
+
 export type UserPermission = 'none' | 'view' | 'edit'
 
 export type SystemUser = {
@@ -386,6 +426,7 @@ export type AppData = {
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
   priceLists: PriceList[]
+  payrollClosings: PayrollClosing[]
   users: SystemUser[]
   issuerSettings: IssuerSettings
   settingsSavedAt: string
@@ -477,6 +518,7 @@ export const seedData: AppData = {
   closings: [],
   fiscalDocuments: [],
   receivables: [],
+  payrollClosings: [],
   priceLists: [
     { id: 'pl-1', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'BLUMENAU/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2100, taxPercent: 0, total: 2100, status: 'Ativo' },
     { id: 'pl-2', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'PALHOCA/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2782.55, taxPercent: 0, total: 2870.75, status: 'Ativo' },
@@ -503,6 +545,7 @@ export const seedData: AppData = {
         fiscalDocuments: 'edit',
         finance: 'edit',
         priceLists: 'edit',
+        payroll: 'edit',
         reports: 'view',
         users: 'edit',
         settings: 'edit',
@@ -719,6 +762,31 @@ export function normalizeData(data: Partial<AppData>): AppData {
       total: Number(price.total ?? price.listValue ?? 0),
       status: price.status ?? 'Ativo',
     })),
+    payrollClosings: (data.payrollClosings ?? []).map((closing) => ({
+      ...closing,
+      salary: Number(closing.salary ?? 0),
+      dailyRate: Number(closing.dailyRate ?? 0),
+      firstFortnightSalary: Number(closing.firstFortnightSalary ?? 0),
+      firstFortnightOvertime: Number(closing.firstFortnightOvertime ?? 0),
+      firstFortnightDiscount: Number(closing.firstFortnightDiscount ?? 0),
+      secondFortnightSalary: Number(closing.secondFortnightSalary ?? 0),
+      secondFortnightOvertime: Number(closing.secondFortnightOvertime ?? 0),
+      transport: Number(closing.transport ?? 0),
+      average: Number(closing.average ?? 0),
+      basket: Number(closing.basket ?? 0),
+      inss: Number(closing.inss ?? 0),
+      otherDiscounts: Number(closing.otherDiscounts ?? 0),
+      otherEarnings: Number(closing.otherEarnings ?? 0),
+      tripQuantity: Number(closing.tripQuantity ?? 0),
+      tripExpenses: Number(closing.tripExpenses ?? 0),
+      vacationBonus: Number(closing.vacationBonus ?? 0),
+      items: closing.items ?? [],
+      grossTotal: Number(closing.grossTotal ?? 0),
+      discountTotal: Number(closing.discountTotal ?? 0),
+      netTotal: Number(closing.netTotal ?? 0),
+      status: closing.status ?? 'Em conferencia',
+      createdAt: closing.createdAt ?? '',
+    })),
     users: (data.users ?? seedData.users).map((user) => ({
       ...user,
       password: user.password ?? '',
@@ -741,6 +809,7 @@ function emptyUserPermissions(): Record<string, UserPermission> {
     fiscalDocuments: 'none',
     finance: 'none',
     priceLists: 'none',
+    payroll: 'none',
     reports: 'none',
     users: 'none',
     settings: 'none',
@@ -758,6 +827,7 @@ export function loadData(): AppData {
     fiscalDocuments: [],
     receivables: [],
     priceLists: [],
+    payrollClosings: [],
     users: [],
     issuerSettings: defaultIssuerSettings,
     settingsSavedAt: '-',
