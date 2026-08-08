@@ -369,13 +369,14 @@ const freightGridColumns = [
   { key: 'payment', label: 'Pagamento', width: 100, minWidth: 80 },
   { key: 'value', label: 'Vl. frete lista', width: 122, minWidth: 100 },
   { key: 'fuelValue', label: 'Vl. abastecimento', width: 128, minWidth: 110 },
-  { key: 'scheduleUnload', label: 'Dt. agendamento descarga', width: 170, minWidth: 138 },
-  { key: 'arrivalDate', label: 'Dt. chegada', width: 112, minWidth: 92 },
-  { key: 'unloadStartDate', label: 'Dt.Inicio Descarg.', width: 132, minWidth: 110 },
-  { key: 'unloadStartHour', label: 'Hr.Inicio Descarg', width: 126, minWidth: 108 },
-  { key: 'cntrDescent', label: 'Dt. descida CNTR', width: 132, minWidth: 108 },
+  { key: 'documentRelease', label: 'Dt. liberacao doc.', width: 132, minWidth: 110 },
   { key: 'pdWithdrawal', label: 'Dt. retirada P.D.', width: 128, minWidth: 108 },
-  { key: 'unloadEnd', label: 'Dt. fim descarga', width: 128, minWidth: 106 },
+  { key: 'scheduleDelivery', label: 'Dt. agendamento entrega', width: 170, minWidth: 138 },
+  { key: 'scheduleDeliveryHour', label: 'Hr. agendamento entrega', width: 160, minWidth: 128 },
+  { key: 'destinationArrival', label: 'Dt.chegada destinatario', width: 160, minWidth: 128 },
+  { key: 'destinationArrivalHour', label: 'Hr. chegada destinatario', width: 156, minWidth: 126 },
+  { key: 'destinationDeparture', label: 'Dt. saida destinatario', width: 150, minWidth: 120 },
+  { key: 'destinationDepartureHour', label: 'Hr. saida destinatario', width: 146, minWidth: 118 },
   { key: 'cntrReturn', label: 'Dt. devolucao CNTR', width: 142, minWidth: 116 },
   { key: 'fiscalNumber', label: 'NFS-e', width: 116, minWidth: 96 },
   { key: 'ciot', label: 'No CIOT', width: 128, minWidth: 100 },
@@ -1045,14 +1046,6 @@ export function FreightsPage() {
     const origin = cityState(freight.origin)
     const destination = cityState(freight.destination)
     const startDate = freight.deliveryForecast || freight.date || ''
-    const scheduledUnload = freight.destinationScheduleDate
-      ? `${freight.destinationScheduleDate}${freight.destinationScheduleTime ? ` ${freight.destinationScheduleTime}` : ''}`
-      : ''
-    const unloadStartDate = freight.destinationArrivalDate || freight.cntrUnloadingDate || freight.arrivalDate || ''
-    const unloadStartHour = freight.destinationArrivalTime || freight.destinationScheduleTime || ''
-    const unloadEnd = freight.destinationDepartureDate
-      ? `${freight.destinationDepartureDate}${freight.destinationDepartureTime ? ` ${freight.destinationDepartureTime}` : ''}`
-      : freight.cntrUnloadingDate || ''
 
     if (columnKey === 'select') {
       return <input type="checkbox" onClick={(event) => event.stopPropagation()} />
@@ -1103,13 +1096,14 @@ export function FreightsPage() {
       payment: freight.negotiationCondition || '7 DIAS',
       value: freight.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
       fuelValue: parseBrazilianNumber(freight.plannedTollCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-      scheduleUnload: scheduledUnload,
-      arrivalDate: freight.arrivalDate || '',
-      unloadStartDate,
-      unloadStartHour,
-      cntrDescent: freight.cntrUnloadingDate || '',
+      documentRelease: freight.documentReleaseDate || '',
       pdWithdrawal: freight.portWithdrawalDate || '',
-      unloadEnd,
+      scheduleDelivery: freight.destinationScheduleDate || '',
+      scheduleDeliveryHour: freight.destinationScheduleTime || '',
+      destinationArrival: freight.destinationArrivalDate || '',
+      destinationArrivalHour: freight.destinationArrivalTime || '',
+      destinationDeparture: freight.destinationDepartureDate || '',
+      destinationDepartureHour: freight.destinationDepartureTime || '',
       cntrReturn: freight.cntrReturnDate || '',
       fiscalNumber: freight.invoiceNumber || '',
       ciot: freight.closing ? '5200029452035879' : '',
@@ -1226,14 +1220,16 @@ export function FreightsPage() {
             <input type="checkbox" checked={form.recordDates} onChange={(event) => updateForm('recordDates', event.target.checked)} /> GRAVAR DATAS
           </label>
           <div className="inline-flex border border-b-0 border-zinc-300 bg-zinc-300 px-2 py-1 text-xs">DESTINO</div>
-          <div className="grid gap-x-24 gap-y-1 border border-zinc-300 bg-white p-3 md:grid-cols-2">
+          <div className="grid gap-x-14 gap-y-3 border border-zinc-300 bg-white p-3 md:grid-cols-2">
             <div className="grid gap-1">
+              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DOCUMENTO / PORTO</div>
               <Field label="Dt. liberacao documento"><input type="date" value={form.documentReleaseDate} onChange={(event) => updateForm('documentReleaseDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. retirada porto destino"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-            </div>
-            <div className="grid gap-1">
               <Field label="Dt. agendamento entrega" required><input type="date" value={form.destinationScheduleDate} onChange={(event) => updateForm('destinationScheduleDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Hr. agendamento entrega"><input value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+            </div>
+            <div className="grid gap-1">
+              <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / DEVOLUCAO</div>
               <Field label="Dt.chegada destinatario"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Hr. chegada destinatario"><input value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. saida destinatario"><input type="date" value={form.destinationDepartureDate} onChange={(event) => updateForm('destinationDepartureDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
