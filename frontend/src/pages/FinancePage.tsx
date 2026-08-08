@@ -1,5 +1,6 @@
 import { formatMoney } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
+import { LoadingRow } from '../components/LoadingState'
 
 export function FinancePage() {
   const data = useLocalData()
@@ -42,7 +43,7 @@ export function FinancePage() {
       <table className="system-grid w-full text-xs">
         <thead className="bg-zinc-50"><tr>{['Cliente', 'Fechamento', 'Documento', 'Vencimento', 'Valor líquido', 'Pago', 'Saldo', 'Situação', 'Ações'].map((h) => <th key={h} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">{h}</th>)}</tr></thead>
         <tbody>
-          {data.receivables.map((item) => (
+          {!data.loading && data.receivables.map((item) => (
             <tr key={item.id}>
               <td className="border-b border-zinc-200 px-3 py-2">{item.customer}</td>
               <td className="border-b border-zinc-200 px-3 py-2">{item.closing}</td>
@@ -55,7 +56,8 @@ export function FinancePage() {
               <td className="border-b border-zinc-200 px-3 py-2"><button onClick={() => markAsPaid(item.id)} className="border border-zinc-300 px-2 py-1 text-xs">Baixar</button></td>
             </tr>
           ))}
-          {!data.receivables.length && <tr><td colSpan={9} className="px-3 py-10 text-center text-zinc-500">Nenhuma conta gerada.</td></tr>}
+          {data.loading && <LoadingRow colSpan={9} />}
+          {!data.loading && !data.receivables.length && <tr><td colSpan={9} className="px-3 py-10 text-center text-zinc-500">Nenhuma conta gerada.</td></tr>}
         </tbody>
       </table>
     </div>

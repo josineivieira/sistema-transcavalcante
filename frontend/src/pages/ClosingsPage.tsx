@@ -3,6 +3,7 @@ import { MoreVertical } from 'lucide-react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const steps = [
   ['1', 'Selecao', 'Cliente e periodo'],
@@ -292,7 +293,7 @@ export function ClosingsPage() {
             </tr>
           </thead>
           <tbody>
-            {closings.map((closing) => (
+            {!data.loading && closings.map((closing) => (
               <tr key={closing.id}>
                 <td className="border-b border-zinc-200 px-3 py-2">{closing.number}</td>
                 <td className="border-b border-zinc-200 px-3 py-2">{closing.customer}</td>
@@ -327,7 +328,8 @@ export function ClosingsPage() {
                 </td>
               </tr>
             ))}
-            {!closings.length && (
+            {data.loading && <LoadingRow colSpan={9} />}
+            {!data.loading && !closings.length && (
               <tr>
                 <td colSpan={9} className="px-3 py-10 text-center text-zinc-500">Nenhum fechamento criado.</td>
               </tr>

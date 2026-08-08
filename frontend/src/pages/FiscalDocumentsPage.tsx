@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { formatMoney, nextId } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 export function FiscalDocumentsPage() {
   const data = useLocalData()
@@ -297,7 +298,7 @@ export function FiscalDocumentsPage() {
               </tr>
             </thead>
             <tbody>
-              {fiscalDocuments.map((document) => (
+              {!data.loading && fiscalDocuments.map((document) => (
                 <tr key={document.id}>
                   <td className="border-b border-zinc-200 px-3 py-2">{document.type}</td>
                   <td className="border-b border-zinc-200 px-3 py-2">{document.number}</td>
@@ -314,7 +315,8 @@ export function FiscalDocumentsPage() {
                   </td>
                 </tr>
               ))}
-              {!fiscalDocuments.length && (
+              {data.loading && <LoadingRow colSpan={11} />}
+              {!data.loading && !fiscalDocuments.length && (
                 <tr>
                   <td colSpan={11} className="px-3 py-10 text-center text-zinc-500">Nenhum documento fiscal emitido.</td>
                 </tr>

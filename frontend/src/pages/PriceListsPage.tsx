@@ -3,6 +3,7 @@ import { FileSpreadsheet, Save, Search, Settings, Trash2, X } from 'lucide-react
 import { useLocalData } from '../hooks/useLocalData'
 import { formatMoney, nextId, type PriceList } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const emptyPrice: PriceList = {
   id: '',
@@ -35,7 +36,7 @@ function parseMoney(value: string) {
 }
 
 export function PriceListsPage() {
-  const { priceLists, setPriceLists } = useLocalData()
+  const { priceLists, loading, setPriceLists } = useLocalData()
   const canEditPage = canEdit('priceLists')
   const [filters, setFilters] = useState({ originPort: '', destinationPort: '' })
   const [query, setQuery] = useState('')
@@ -137,7 +138,7 @@ export function PriceListsPage() {
       <div className="bg-white">
         <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
           <div className="px-2 font-semibold">CONSULTA ROTAS</div>
-          <div className="ml-auto px-2">{rows.length} de {priceLists.length} registros</div>
+          <div className="ml-auto px-2">{loading ? 'Carregando...' : `${rows.length} de ${priceLists.length} registros`}</div>
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
           <div className="flex items-center gap-2 pr-2"><Settings size={18} /><span>1:1</span><span>XLS</span></div>
         </div>
@@ -153,7 +154,7 @@ export function PriceListsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((price, index) => (
+              {!loading && rows.map((price, index) => (
                 <tr key={price.id} onDoubleClick={() => openEdit(price)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{price.listName}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{price.originPort}</td>
@@ -165,7 +166,8 @@ export function PriceListsPage() {
                   <td className="border-b border-zinc-200 px-2 py-2">{price.status}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhuma rota encontrada.</td></tr>}
+              {loading && <LoadingRow colSpan={8} />}
+              {!loading && !rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhuma rota encontrada.</td></tr>}
             </tbody>
           </table>
         </div>

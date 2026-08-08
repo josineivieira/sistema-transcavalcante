@@ -3,6 +3,7 @@ import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Driver } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const emptyDriver: Driver = {
   id: '',
@@ -90,7 +91,7 @@ function driverForEdit(driver?: Driver): Driver {
 }
 
 export function DriversPage() {
-  const { drivers, setDrivers } = useLocalData()
+  const { drivers, loading, setDrivers } = useLocalData()
   const canEditPage = canEdit('drivers')
   const [editing, setEditing] = useState<Driver | null>(null)
   const [mainTab, setMainTab] = useState('GERAIS')
@@ -201,7 +202,7 @@ export function DriversPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
-        <div className="text-xs text-zinc-600">{rows.length} de {drivers.length} registros</div>
+        <div className="text-xs text-zinc-600">{loading ? 'Carregando...' : `${rows.length} de ${drivers.length} registros`}</div>
         <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
           <Search size={15} className="mr-2" />
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-full w-64 border-0 p-0 outline-none" placeholder="Busca rapida" />
@@ -220,7 +221,7 @@ export function DriversPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((driver) => (
+            {!loading && rows.map((driver) => (
               <tr key={driver.id} className="hover:bg-sky-50">
                 <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{driver.cpf}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.name}</td>
@@ -237,7 +238,8 @@ export function DriversPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {loading && <LoadingRow colSpan={9} />}
+            {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
                   Nenhum condutor encontrado.

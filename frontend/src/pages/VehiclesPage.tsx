@@ -3,6 +3,7 @@ import { Check, Pencil, Save, Search, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Vehicle } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 type VehicleType = 'Cavalo' | 'Carreta'
 
@@ -91,7 +92,7 @@ function openVehicle(type: VehicleType, vehicle?: Vehicle): Vehicle {
 }
 
 export function VehiclesPage() {
-  const { vehicles, setVehicles } = useLocalData()
+  const { vehicles, loading, setVehicles } = useLocalData()
   const canEditPage = canEdit('vehicles')
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [modalTab, setModalTab] = useState('GERAL')
@@ -183,7 +184,7 @@ export function VehiclesPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
           <div className="text-xs text-zinc-600">
-            {rows.length} veiculo{rows.length === 1 ? '' : 's'} listado{rows.length === 1 ? '' : 's'}
+            {loading ? 'Carregando...' : `${rows.length} veiculo${rows.length === 1 ? '' : 's'} listado${rows.length === 1 ? '' : 's'}`}
           </div>
           <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
             <Search size={15} className="mr-2" />
@@ -203,7 +204,7 @@ export function VehiclesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((vehicle) => (
+              {!loading && rows.map((vehicle) => (
                 <tr key={vehicle.id} className="hover:bg-sky-50">
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetNumber || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetRelation || '-'}</td>
@@ -223,7 +224,8 @@ export function VehiclesPage() {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {loading && <LoadingRow colSpan={12} />}
+              {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={12} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
                     Nenhum veiculo encontrado.

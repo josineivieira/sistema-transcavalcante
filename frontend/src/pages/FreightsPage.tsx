@@ -3,6 +3,7 @@ import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Set
 import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightInvoiceEntry, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const freightTabs = [
   'GERAIS',
@@ -412,7 +413,7 @@ const freightTaskOptions = [
 ]
 
 export function FreightsPage() {
-  const { customers, drivers, vehicles, freights, priceLists, issuerSettings, setFreights } = useLocalData()
+  const { customers, drivers, vehicles, freights, priceLists, issuerSettings, loading, setFreights } = useLocalData()
   const canEditPage = canEdit('freights')
   const authUser = getAuthUser()
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
@@ -1846,7 +1847,7 @@ export function FreightsPage() {
             <section className="min-w-0 bg-white">
               <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
                 <div className="px-2 font-semibold">Transportes de carga rodoviario</div>
-                <div className="ml-auto px-2">{visibleFreights.length} registros</div>
+                <div className="ml-auto px-2">{loading ? 'Carregando...' : `${visibleFreights.length} registros`}</div>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
                 <div className="relative flex items-center gap-2 pr-2">
                   <button onClick={() => setColumnMenuOpen(!columnMenuOpen)} className="inline-flex h-6 items-center gap-1 border border-zinc-500 bg-zinc-200 px-2 hover:bg-white">
@@ -1905,7 +1906,8 @@ export function FreightsPage() {
                         ))}
                       </tr>
                     ))}
-                    {!visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
+                    {loading && <LoadingRow colSpan={visibleFreightColumns.length} />}
+                    {!loading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
                   </tbody>
                 </table>
               </div>

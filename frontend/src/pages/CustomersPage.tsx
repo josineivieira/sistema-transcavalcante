@@ -3,6 +3,7 @@ import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const emptyCustomer: Customer = {
   id: '',
@@ -90,7 +91,7 @@ function customerForEdit(customer?: Customer): Customer {
 }
 
 export function CustomersPage() {
-  const { customers, setCustomers } = useLocalData()
+  const { customers, loading, setCustomers } = useLocalData()
   const canEditPage = canEdit('customers')
   const [editing, setEditing] = useState<Customer | null>(null)
   const [mainTab, setMainTab] = useState('GERAIS')
@@ -192,7 +193,7 @@ export function CustomersPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
-        <div className="text-xs text-zinc-600">{rows.length} de {customers.length} registros</div>
+        <div className="text-xs text-zinc-600">{loading ? 'Carregando...' : `${rows.length} de ${customers.length} registros`}</div>
         <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
           <Search size={15} className="mr-2" />
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-full w-64 border-0 p-0 outline-none" placeholder="Busca rapida" />
@@ -220,7 +221,7 @@ export function CustomersPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((customer) => (
+            {!loading && rows.map((customer) => (
               <tr key={customer.id} className="hover:bg-sky-50">
                 <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{customer.name}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.emailFiscal || '-'}</td>
@@ -244,7 +245,8 @@ export function CustomersPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {loading && <LoadingRow colSpan={16} />}
+            {!loading && rows.length === 0 && (
               <tr><td colSpan={16} className="px-3 py-10 text-center text-zinc-500">Nenhum cliente encontrado.</td></tr>
             )}
           </tbody>

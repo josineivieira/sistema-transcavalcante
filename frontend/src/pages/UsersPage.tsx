@@ -3,6 +3,7 @@ import { Pencil, Save, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type SystemUser, type UserPermission } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { LoadingRow } from '../components/LoadingState'
 
 const modules = [
   ['dashboard', 'Visao geral'],
@@ -63,7 +64,7 @@ function userForEdit(user?: SystemUser): SystemUser {
 }
 
 export function UsersPage() {
-  const { users, setUsers } = useLocalData()
+  const { users, loading, setUsers } = useLocalData()
   const canEditPage = canEdit('users')
   const [editing, setEditing] = useState<SystemUser | null>(null)
   const [query, setQuery] = useState('')
@@ -153,7 +154,7 @@ export function UsersPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
-        <div className="text-xs text-zinc-600">{rows.length} de {users.length} registros</div>
+        <div className="text-xs text-zinc-600">{loading ? 'Carregando...' : `${rows.length} de ${users.length} registros`}</div>
         <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-8 w-72 border border-zinc-300 px-2 text-xs outline-none" placeholder="Busca rapida" />
       </div>
 
@@ -163,7 +164,7 @@ export function UsersPage() {
             <tr>{['Nome', 'E-mail', 'Perfil', 'Setor', 'Telas com acesso', 'Pode editar', 'Situacao', 'Acoes'].map((heading) => <th key={heading} className="border-b border-zinc-300 text-left font-medium text-zinc-600">{heading}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((user) => {
+            {!loading && rows.map((user) => {
               const allowed = Object.values(user.permissions).filter((item) => item !== 'none').length
               const editable = Object.values(user.permissions).filter((item) => item === 'edit').length
               return (
@@ -183,7 +184,8 @@ export function UsersPage() {
                 </tr>
               )
             })}
-            {!rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhum usuario encontrado.</td></tr>}
+            {loading && <LoadingRow colSpan={8} />}
+            {!loading && !rows.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-zinc-500">Nenhum usuario encontrado.</td></tr>}
           </tbody>
         </table>
       </div>
