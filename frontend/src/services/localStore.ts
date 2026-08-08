@@ -184,6 +184,54 @@ export type Freight = {
   product?: string
   recipientDocument?: string
   recipient?: string
+  urgent?: boolean
+  consolidateCargo?: boolean
+  routeName?: string
+  originLatitude?: string
+  originLongitude?: string
+  destinationLatitude?: string
+  destinationLongitude?: string
+  originZipCode?: string
+  destinationZipCode?: string
+  distance?: string
+  contractorDocument?: string
+  contractor?: string
+  negotiationCondition?: string
+  helper?: string
+  auxiliaryDriver?: string
+  tractorId?: string
+  trailerId?: string
+  auxiliaryPlate?: string
+  tollTag?: string
+  cargoType?: string
+  shippingLineDocument?: string
+  shippingLine?: string
+  vessel?: string
+  tripNumber?: string
+  booking?: string
+  terminalEmpty?: string
+  terminalReturn?: string
+  deliveryForecast?: string
+  arrivalDate?: string
+  cntrUnloadingDate?: string
+  documentReleaseDate?: string
+  portWithdrawalDate?: string
+  destinationScheduleDate?: string
+  destinationScheduleTime?: string
+  destinationArrivalDate?: string
+  destinationArrivalTime?: string
+  destinationDepartureDate?: string
+  destinationDepartureTime?: string
+  cntrReturnDate?: string
+  plannedFreightCost?: string
+  plannedTollCost?: string
+  extraCost?: string
+  invoiceNumber?: string
+  invoiceValue?: string
+  smNumber?: string
+  ciotNumber?: string
+  dfeNumber?: string
+  protocolStatus?: string
   container: string
   driver: string
   tractorPlate: string

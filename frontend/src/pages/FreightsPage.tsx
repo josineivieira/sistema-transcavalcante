@@ -458,9 +458,11 @@ export function FreightsPage() {
   function openFreightDetail(freight: (typeof freights)[number]) {
     const tractor = tractors.find((vehicle) => vehicle.tractorPlate === freight.tractorPlate)
     const trailer = trailers.find((vehicle) => vehicle.trailerPlate === freight.trailerPlate)
+    const savedForm = freight as unknown as Partial<FreightForm>
     setEditingFreightId(freight.id)
     setForm({
       ...emptyForm,
+      ...savedForm,
       customer: freight.customer,
       process: freight.process,
       processType: freight.processType ?? 'Multimodal [M]',
@@ -470,20 +472,20 @@ export function FreightsPage() {
       serviceTaker: freight.serviceTaker || issuerName,
       senderDocument: freight.senderDocument ?? '',
       sender: freight.sender ?? '',
-      contractorDocument: issuerDocument,
-      contractor: issuerName,
+      contractorDocument: freight.contractorDocument || issuerDocument,
+      contractor: freight.contractor || issuerName,
       product: freight.product || emptyForm.product,
       recipientDocument: freight.recipientDocument ?? '',
       recipient: freight.recipient ?? freight.customer,
-      routeName: `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
+      routeName: freight.routeName || `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
       origin: freight.origin,
       destination: freight.destination,
       driver: freight.driver,
-      tractorId: tractor?.id ?? '',
-      trailerId: trailer?.id ?? '',
+      tractorId: freight.tractorId || (tractor?.id ?? ''),
+      trailerId: freight.trailerId || (trailer?.id ?? ''),
       container: freight.container,
-      plannedFreightCost: String(freight.value),
-      value: String(freight.value),
+      plannedFreightCost: freight.plannedFreightCost ?? String(freight.value),
+      value: String(savedForm.value ?? freight.value),
     })
     setActiveTab('GERAIS')
     setShowForm(true)
@@ -510,7 +512,9 @@ export function FreightsPage() {
       return
     }
 
+    const formSnapshot = { ...form }
     const nextRecord = {
+        ...formSnapshot,
         id: nextId('fr'),
         number: `FRT-${String(freights.length + 1).padStart(6, '0')}`,
         date: new Date().toISOString().slice(0, 10),
@@ -539,24 +543,12 @@ export function FreightsPage() {
     setFreights(editingFreightId
       ? freights.map((freight) => freight.id === editingFreightId ? {
         ...freight,
-        customer: nextRecord.customer,
-        process: nextRecord.process,
-        processType: nextRecord.processType,
-        customerIdentification: nextRecord.customerIdentification,
-        serviceTakerDocument: nextRecord.serviceTakerDocument,
-        serviceTaker: nextRecord.serviceTaker,
-        senderDocument: nextRecord.senderDocument,
-        sender: nextRecord.sender,
-        product: nextRecord.product,
-        recipientDocument: nextRecord.recipientDocument,
-        recipient: nextRecord.recipient,
-        container: nextRecord.container,
-        driver: nextRecord.driver,
-        tractorPlate: nextRecord.tractorPlate,
-        trailerPlate: nextRecord.trailerPlate,
-        origin: nextRecord.origin,
-        destination: nextRecord.destination,
-        value: nextRecord.value,
+        ...nextRecord,
+        id: freight.id,
+        number: freight.number,
+        date: freight.date,
+        fiscalStatus: freight.fiscalStatus,
+        closing: freight.closing,
         operationalStatus: form.status || freight.operationalStatus,
       } : freight)
       : [...freights, nextRecord],
