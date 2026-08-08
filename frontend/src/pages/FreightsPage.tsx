@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
-import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightTask } from '../services/localStore'
+import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightInvoiceEntry, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 
@@ -88,6 +88,7 @@ type FreightForm = {
   invoiceGoodsValue: string
   invoiceValue: string
   invoiceAccessKey: string
+  invoiceEntries: FreightInvoiceEntry[]
   smNumber: string
   ciotNumber: string
   ciotDraft: string
@@ -124,6 +125,7 @@ type ExtraProduct = {
 
 type InvoiceImport = {
   fileName: string
+  invoices: FreightInvoiceEntry[]
   senderDocument: string
   sender: string
   recipientDocument: string
@@ -206,6 +208,7 @@ const emptyForm: FreightForm = {
   invoiceGoodsValue: '0',
   invoiceValue: '0',
   invoiceAccessKey: '',
+  invoiceEntries: [],
   smNumber: '',
   ciotNumber: '',
   ciotDraft: '',
@@ -218,6 +221,7 @@ const emptyForm: FreightForm = {
 
 const emptyInvoiceImport: InvoiceImport = {
   fileName: '',
+  invoices: [],
   senderDocument: '',
   sender: '',
   recipientDocument: '',
@@ -498,6 +502,18 @@ export function FreightsPage() {
       [product.reference, product.product, product.structuredCode].some((value) => value.toLowerCase().includes(term)),
     )
   }, [extraProductSearch])
+  const invoiceSenderOptions = useMemo(() => {
+    const options = invoiceImport.invoices
+      .map((invoice) => ({ document: invoice.senderDocument, name: invoice.sender }))
+      .filter((option) => option.document || option.name)
+    return Array.from(new Map(options.map((option) => [`${option.document}|${option.name}`, option])).values())
+  }, [invoiceImport])
+  const invoiceRecipientOptions = useMemo(() => {
+    const options = invoiceImport.invoices
+      .map((invoice) => ({ document: invoice.recipientDocument, name: invoice.recipient }))
+      .filter((option) => option.document || option.name)
+    return Array.from(new Map(options.map((option) => [`${option.document}|${option.name}`, option])).values())
+  }, [invoiceImport.invoices])
 
   const tabAvailability: Record<FreightTab, boolean> = {
     GERAIS: true,
@@ -925,6 +941,23 @@ export function FreightsPage() {
     return match?.[1] ?? ''
   }
 
+  function invoiceEntryFromImport(invoice: InvoiceImport): FreightInvoiceEntry {
+    return {
+      id: nextId('nfe'),
+      fileName: invoice.fileName,
+      senderDocument: invoice.senderDocument,
+      sender: invoice.sender,
+      recipientDocument: invoice.recipientDocument,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceSeries: invoice.invoiceSeries,
+      invoiceIssueDate: invoice.invoiceIssueDate,
+      recipient: invoice.recipient,
+      invoiceGoodsValue: invoice.invoiceGoodsValue,
+      invoiceValue: invoice.invoiceValue,
+      invoiceAccessKey: invoice.invoiceAccessKey,
+    }
+  }
+
   function extractInvoiceFromXml(text: string, fileName: string): InvoiceImport | null {
     const xml = new DOMParser().parseFromString(text, 'application/xml')
     if (xml.getElementsByTagName('parsererror').length) return null
@@ -936,8 +969,9 @@ export function FreightsPage() {
     const infNfe = xml.getElementsByTagName('infNFe')[0]
     if (!emit && !dest) return null
 
-    return {
+    const invoice = {
       fileName,
+      invoices: [],
       senderDocument: getXmlText(emit, 'CNPJ') || getXmlText(emit, 'CPF'),
       sender: getXmlText(emit, 'xNome'),
       recipientDocument: getXmlText(dest, 'CNPJ') || getXmlText(dest, 'CPF'),
@@ -949,6 +983,7 @@ export function FreightsPage() {
       invoiceValue: getXmlText(total, 'vNF').replace('.', ','),
       invoiceAccessKey: infNfe?.getAttribute('Id')?.replace(/^NFe/i, '') || accessKeyFromText(text),
     }
+    return { ...invoice, invoices: [invoiceEntryFromImport(invoice)] }
   }
 
   function extractAfterLabel(text: string, label: string) {
@@ -1045,8 +1080,9 @@ export function FreightsPage() {
     const invoiceIssueDate = normalized.match(/DATA DA EMISS[ÃA]O\s+(\d{2}\/\d{2}\/\d{4})/i)?.[1] ?? ''
 
     if (!sender && !recipient) return null
-    return {
+    const invoice = {
       fileName,
+      invoices: [],
       senderDocument,
       sender,
       recipientDocument,
@@ -1058,6 +1094,7 @@ export function FreightsPage() {
       invoiceValue,
       invoiceAccessKey,
     }
+    return { ...invoice, invoices: [invoiceEntryFromImport(invoice)] }
   }
 
   function openInvoiceImport() {
@@ -1068,6 +1105,49 @@ export function FreightsPage() {
     setInvoiceImport(emptyInvoiceImport)
     setInvoiceImportMessage('')
     setInvoiceImportOpen(true)
+  }
+
+  function mergeInvoiceImport(current: InvoiceImport, extracted: InvoiceImport) {
+    const invoices = [...current.invoices, ...extracted.invoices]
+    return {
+      ...extracted,
+      fileName: invoices.map((invoice) => invoice.fileName).join(', '),
+      senderDocument: current.senderDocument || extracted.senderDocument,
+      sender: current.sender || extracted.sender,
+      recipientDocument: current.recipientDocument || extracted.recipientDocument,
+      recipient: current.recipient || extracted.recipient,
+      invoices,
+    }
+  }
+
+  async function readInvoiceFiles(files: FileList | File[]) {
+    const fileList = Array.from(files)
+    if (!fileList.length) return
+    let nextImport = { ...emptyInvoiceImport }
+    let extractedCount = 0
+    const failedFiles: string[] = []
+    for (const file of fileList) {
+      try {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        const text = isPdf ? await extractTextFromPdf(file) : await file.text()
+        const extracted = extractInvoiceFromXml(text, file.name) ?? extractInvoiceFromDanfText(text, file.name)
+        if (extracted) {
+          nextImport = mergeInvoiceImport(nextImport, extracted)
+          extractedCount += 1
+        } else {
+          failedFiles.push(file.name)
+        }
+      } catch {
+        failedFiles.push(file.name)
+      }
+    }
+    if (!extractedCount) {
+      setInvoiceImport({ ...emptyInvoiceImport, fileName: fileList.map((file) => file.name).join(', ') })
+      setInvoiceImportMessage('Nao consegui ler as notas automaticamente. Se for PDF escaneado ou imagem, anexe o XML da NF-e ou preencha manualmente.')
+      return
+    }
+    setInvoiceImport(nextImport)
+    setInvoiceImportMessage(failedFiles.length ? `${extractedCount} nota(s) extraida(s). Falhou: ${failedFiles.join(', ')}.` : `${extractedCount} nota(s) extraida(s). Confira antes de aplicar no frete.`)
   }
 
   async function readInvoiceFile(file: File) {
@@ -1090,18 +1170,29 @@ export function FreightsPage() {
 
   function applyInvoiceImport() {
     setForm((current) => {
+      const importedInvoices = invoiceImport.invoices.length ? invoiceImport.invoices : [invoiceEntryFromImport(invoiceImport)]
+      const existingInvoices = current.invoiceEntries ?? []
+      const mergedInvoices = [
+        ...existingInvoices,
+        ...importedInvoices.filter((invoice) => {
+          const key = invoice.invoiceAccessKey || `${invoice.invoiceNumber}-${invoice.invoiceSeries}-${invoice.fileName}`
+          return !existingInvoices.some((existing) => (existing.invoiceAccessKey || `${existing.invoiceNumber}-${existing.invoiceSeries}-${existing.fileName}`) === key)
+        }),
+      ]
+      const firstInvoice = mergedInvoices[0]
       const next = {
         ...current,
         senderDocument: invoiceImport.senderDocument || current.senderDocument,
         sender: invoiceImport.sender || current.sender,
         recipientDocument: invoiceImport.recipientDocument || current.recipientDocument,
         recipient: invoiceImport.recipient || current.recipient,
-        invoiceNumber: invoiceImport.invoiceNumber || current.invoiceNumber,
-        invoiceSeries: invoiceImport.invoiceSeries || current.invoiceSeries,
-        invoiceIssueDate: invoiceImport.invoiceIssueDate || current.invoiceIssueDate,
-        invoiceGoodsValue: invoiceImport.invoiceGoodsValue || current.invoiceGoodsValue,
-        invoiceValue: invoiceImport.invoiceValue || current.invoiceValue,
-        invoiceAccessKey: invoiceImport.invoiceAccessKey || current.invoiceAccessKey,
+        invoiceNumber: firstInvoice?.invoiceNumber || current.invoiceNumber,
+        invoiceSeries: firstInvoice?.invoiceSeries || current.invoiceSeries,
+        invoiceIssueDate: firstInvoice?.invoiceIssueDate || current.invoiceIssueDate,
+        invoiceGoodsValue: firstInvoice?.invoiceGoodsValue || current.invoiceGoodsValue,
+        invoiceValue: firstInvoice?.invoiceValue || current.invoiceValue,
+        invoiceAccessKey: firstInvoice?.invoiceAccessKey || current.invoiceAccessKey,
+        invoiceEntries: mergedInvoices,
       }
       if (editingFreightId) {
         setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
@@ -1431,6 +1522,22 @@ export function FreightsPage() {
     }
 
     if (activeTab === 'NOTAS FISCAIS') {
+      const invoiceRows = form.invoiceEntries.length
+        ? form.invoiceEntries
+        : [{
+            id: 'invoice-draft',
+            fileName: '',
+            senderDocument: form.senderDocument,
+            sender: form.sender,
+            recipientDocument: form.recipientDocument,
+            invoiceNumber: form.invoiceNumber,
+            invoiceSeries: form.invoiceSeries,
+            invoiceIssueDate: form.invoiceIssueDate,
+            recipient: form.recipient,
+            invoiceGoodsValue: form.invoiceGoodsValue,
+            invoiceValue: form.invoiceValue,
+            invoiceAccessKey: form.invoiceAccessKey,
+          }]
       return (
         <div className="p-3">
           <Field label="Arquivo"><div className="flex gap-2"><input className={`${textInputClass()} w-72`} /><button className="border px-2">...</button><Paperclip size={18} /></div></Field>
@@ -1439,16 +1546,18 @@ export function FreightsPage() {
             <table className="w-full min-w-[900px] text-xs">
               <thead><tr>{['Nr. nfe', 'Tipo de documento', 'Serie', 'Dt. emissao', 'Destinatario', 'Vlr. mercadoria', 'Vlr. nf-e', 'Chave'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
               <tbody>
-                <tr>
-                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceNumber} onChange={(event) => updateForm('invoiceNumber', event.target.value)} className={textInputClass()} /></td>
-                  <td className="border-b border-r px-2 py-2">NF-e</td>
-                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceSeries} onChange={(event) => updateForm('invoiceSeries', event.target.value)} className={textInputClass()} /></td>
-                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceIssueDate} onChange={(event) => updateForm('invoiceIssueDate', event.target.value)} className={textInputClass()} /></td>
-                  <td className="border-b border-r px-2 py-2">{form.recipient || '-'}</td>
-                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceGoodsValue} onChange={(event) => updateForm('invoiceGoodsValue', event.target.value)} className={textInputClass()} /></td>
-                  <td className="border-b border-r px-2 py-2"><input value={form.invoiceValue} onChange={(event) => updateForm('invoiceValue', event.target.value)} className={textInputClass()} /></td>
-                  <td className="border-b px-2 py-2">{form.invoiceAccessKey || '-'}</td>
-                </tr>
+                {invoiceRows.map((invoice) => (
+                  <tr key={invoice.id}>
+                    <td className="border-b border-r px-2 py-2">{invoice.invoiceNumber || '-'}</td>
+                    <td className="border-b border-r px-2 py-2">NF-e</td>
+                    <td className="border-b border-r px-2 py-2">{invoice.invoiceSeries || '-'}</td>
+                    <td className="border-b border-r px-2 py-2">{invoice.invoiceIssueDate || '-'}</td>
+                    <td className="border-b border-r px-2 py-2">{invoice.recipient || '-'}</td>
+                    <td className="border-b border-r px-2 py-2 text-right">{invoice.invoiceGoodsValue || '0'}</td>
+                    <td className="border-b border-r px-2 py-2 text-right">{invoice.invoiceValue || '0'}</td>
+                    <td className="border-b px-2 py-2">{invoice.invoiceAccessKey || '-'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1957,7 +2066,7 @@ export function FreightsPage() {
 
       {invoiceImportOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/30 px-4 py-8">
-          <div className="max-h-[calc(100vh-64px)] w-full max-w-5xl overflow-hidden border border-zinc-500 bg-zinc-100 shadow-2xl">
+          <div className="max-h-[calc(100vh-64px)] w-full max-w-5xl overflow-auto border border-zinc-500 bg-zinc-100 shadow-2xl">
             <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
               <h3 className="text-lg font-normal text-red-600">Anexar NF-e</h3>
               <div className="flex items-center gap-3 text-xs">
@@ -1972,10 +2081,11 @@ export function FreightsPage() {
                   <Field label="Arquivo">
                     <input
                       type="file"
+                      multiple
                       accept=".xml,.txt,.pdf,application/xml,text/xml,application/pdf"
                       onChange={(event) => {
-                        const file = event.target.files?.[0]
-                        if (file) readInvoiceFile(file)
+                        const files = event.target.files
+                        if (files?.length) void readInvoiceFiles(files)
                       }}
                       className="h-7 w-full border border-zinc-300 bg-white px-2 text-xs"
                     />
@@ -1990,15 +2100,63 @@ export function FreightsPage() {
               <div className="grid gap-x-24 gap-y-1 pt-4 md:grid-cols-2">
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">REMETENTE / EMITENTE DA NF</div>
+                  {invoiceSenderOptions.length > 1 && (
+                    <Field label="Escolher">
+                      <select
+                        value={`${invoiceImport.senderDocument}|${invoiceImport.sender}`}
+                        onChange={(event) => {
+                          const [document, name] = event.target.value.split('|')
+                          setInvoiceImport({ ...invoiceImport, senderDocument: document, sender: name })
+                        }}
+                        className={textInputClass()}
+                      >
+                        {invoiceSenderOptions.map((option) => <option key={`${option.document}|${option.name}`} value={`${option.document}|${option.name}`}>{option.name} - {option.document}</option>)}
+                      </select>
+                    </Field>
+                  )}
                   <Field label="CNPJ/CPF"><input value={invoiceImport.senderDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderDocument: event.target.value })} className={textInputClass()} /></Field>
                   <Field label="Remetente"><input value={invoiceImport.sender} onChange={(event) => setInvoiceImport({ ...invoiceImport, sender: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
                 </div>
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / RECEBEDOR</div>
+                  {invoiceRecipientOptions.length > 1 && (
+                    <Field label="Escolher">
+                      <select
+                        value={`${invoiceImport.recipientDocument}|${invoiceImport.recipient}`}
+                        onChange={(event) => {
+                          const [document, name] = event.target.value.split('|')
+                          setInvoiceImport({ ...invoiceImport, recipientDocument: document, recipient: name })
+                        }}
+                        className={textInputClass()}
+                      >
+                        {invoiceRecipientOptions.map((option) => <option key={`${option.document}|${option.name}`} value={`${option.document}|${option.name}`}>{option.name} - {option.document}</option>)}
+                      </select>
+                    </Field>
+                  )}
                   <Field label="CNPJ/CPF"><input value={invoiceImport.recipientDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientDocument: event.target.value })} className={textInputClass()} /></Field>
                   <Field label="Destinatario"><input value={invoiceImport.recipient} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipient: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
                 </div>
               </div>
+              {invoiceImport.invoices.length > 1 && (
+                <div className="mt-4 overflow-x-auto border border-zinc-300 bg-white">
+                  <div className="bg-zinc-400 px-2 py-1 text-xs">{invoiceImport.invoices.length} notas extraidas</div>
+                  <table className="w-full min-w-[900px] text-xs">
+                    <thead><tr>{['Nr. nfe', 'Serie', 'Dt. emissao', 'Destinatario', 'Vlr. nf-e', 'Chave'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
+                    <tbody>
+                      {invoiceImport.invoices.map((invoice) => (
+                        <tr key={invoice.id}>
+                          <td className="border-b border-r px-2 py-1">{invoice.invoiceNumber}</td>
+                          <td className="border-b border-r px-2 py-1">{invoice.invoiceSeries}</td>
+                          <td className="border-b border-r px-2 py-1">{invoice.invoiceIssueDate}</td>
+                          <td className="border-b border-r px-2 py-1">{invoice.recipient}</td>
+                          <td className="border-b border-r px-2 py-1 text-right">{invoice.invoiceValue}</td>
+                          <td className="border-b px-2 py-1">{invoice.invoiceAccessKey}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-4 md:grid-cols-2">
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DADOS DA NF-E</div>

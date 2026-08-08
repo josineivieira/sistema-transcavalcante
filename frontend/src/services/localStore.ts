@@ -211,6 +211,21 @@ export type FreightCiotEntry = {
   rectificationDate: string
 }
 
+export type FreightInvoiceEntry = {
+  id: string
+  fileName: string
+  senderDocument: string
+  sender: string
+  recipientDocument: string
+  invoiceNumber: string
+  invoiceSeries: string
+  invoiceIssueDate: string
+  recipient: string
+  invoiceGoodsValue: string
+  invoiceValue: string
+  invoiceAccessKey: string
+}
+
 export type Freight = {
   id: string
   number: string
@@ -279,6 +294,7 @@ export type Freight = {
   invoiceGoodsValue?: string
   invoiceValue?: string
   invoiceAccessKey?: string
+  invoiceEntries?: FreightInvoiceEntry[]
   smNumber?: string
   ciotNumber?: string
   ciotEntries?: FreightCiotEntry[]
