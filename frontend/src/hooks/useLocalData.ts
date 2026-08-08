@@ -45,7 +45,11 @@ export function useLocalData() {
     return api.get<OperationalFreightsResponse>('/operational-freights', {
       params: { limit: 500, offset: 0, ...params },
     }).then((response) => {
-      const items = (response.data.items || []).filter((freight) => !deletedFreightIdsRef.current.has(freight.id))
+      const items = (response.data.items || []).filter((freight) => (
+        !deletedFreightIdsRef.current.has(freight.id)
+        && !deletedFreightIdsRef.current.has(freight.process)
+        && !deletedFreightIdsRef.current.has(freight.number)
+      ))
       setData((current) => normalizeData({ ...current, freights: items }))
       setFreightsTotal(Math.max(0, (response.data.total ?? items.length) - deletedFreightIdsRef.current.size))
       setError('')
@@ -77,7 +81,11 @@ export function useLocalData() {
         const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
           params: { limit: 500 },
         })
-        const freights = (freightsResponse.data.items || []).filter((freight) => !deletedFreightIdsRef.current.has(freight.id))
+        const freights = (freightsResponse.data.items || []).filter((freight) => (
+          !deletedFreightIdsRef.current.has(freight.id)
+          && !deletedFreightIdsRef.current.has(freight.process)
+          && !deletedFreightIdsRef.current.has(freight.number)
+        ))
         nextData = normalizeData({ ...nextData, freights })
 
         if (active) {
@@ -158,16 +166,20 @@ export function useLocalData() {
     })
   }
 
-  function deleteFreightRecord(id: string) {
+  function deleteFreightRecord(id: string, extraIds: string[] = []) {
     const previousFreights = data.freights
-    deletedFreightIdsRef.current.add(id)
-    setData((current) => normalizeData({ ...current, freights: current.freights.filter((freight) => freight.id !== id) }))
+    const deleteIds = Array.from(new Set([id, ...extraIds].filter(Boolean)))
+    deleteIds.forEach((deleteId) => deletedFreightIdsRef.current.add(deleteId))
+    setData((current) => normalizeData({
+      ...current,
+      freights: current.freights.filter((freight) => !deleteIds.includes(freight.id) && !deleteIds.includes(freight.process) && !deleteIds.includes(freight.number)),
+    }))
     setFreightsTotal((current) => Math.max(0, current - 1))
 
     return api.delete(`/operational-freights/${encodeURIComponent(id)}`).then(() => {
       setError('')
     }).catch((reason) => {
-      deletedFreightIdsRef.current.delete(id)
+      deleteIds.forEach((deleteId) => deletedFreightIdsRef.current.delete(deleteId))
       setData((current) => normalizeData({ ...current, freights: previousFreights }))
       setFreightsTotal(previousFreights.length)
       setError('Nao foi possivel excluir frete no banco de dados.')

@@ -962,15 +962,22 @@ export function FreightsPage() {
     setDeleteConfirmOpen(true)
   }
 
-  function confirmDeleteFreight() {
+  async function confirmDeleteFreight() {
     if (!editingFreightId) {
       setDeleteConfirmOpen(false)
       return
     }
-    void deleteFreightRecord(editingFreightId)
-    setDeleteConfirmOpen(false)
-    setShowForm(false)
-    resetForm()
+    const currentFreight = freights.find((freight) => freight.id === editingFreightId || freight.process === form.process || freight.number === form.process)
+    const deleteId = currentFreight?.id || editingFreightId
+    try {
+      await deleteFreightRecord(deleteId, [form.process, currentFreight?.process ?? '', currentFreight?.number ?? ''])
+      setDeleteConfirmOpen(false)
+      setShowForm(false)
+      resetForm()
+      await loadFreights({ limit: 500 })
+    } catch {
+      window.alert('Nao foi possivel excluir este frete no banco. Tente novamente.')
+    }
   }
 
   function getXmlText(parent: Element | null, tag: string) {

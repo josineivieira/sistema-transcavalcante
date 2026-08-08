@@ -370,7 +370,11 @@ def delete_operational_freight(
     db: Session = Depends(get_db),
 ):
     _require_permission(db, email, "edit")
-    freight = db.query(Freight).filter(Freight.external_id == external_id).first()
+    freight = db.query(Freight).filter(or_(
+        Freight.external_id == external_id,
+        Freight.process_number == external_id,
+        Freight.internal_number == external_id,
+    )).first()
     if freight is None:
         return None
     snapshot = _get_or_create_snapshot(db)
