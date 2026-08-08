@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
-import { formatMoney, nextId, type Freight, type FreightTask } from '../services/localStore'
+import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 
@@ -90,6 +90,8 @@ type FreightForm = {
   invoiceAccessKey: string
   smNumber: string
   ciotNumber: string
+  ciotDraft: string
+  ciotEntries: FreightCiotEntry[]
   dfeNumber: string
   protocolStatus: string
   taskHistory: FreightTask[]
@@ -206,6 +208,8 @@ const emptyForm: FreightForm = {
   invoiceAccessKey: '',
   smNumber: '',
   ciotNumber: '',
+  ciotDraft: '',
+  ciotEntries: [],
   dfeNumber: '',
   protocolStatus: 'Aguardando',
   taskHistory: [],
@@ -442,6 +446,7 @@ export function FreightsPage() {
   const [extraProductOpen, setExtraProductOpen] = useState(false)
   const [extraProductSearch, setExtraProductSearch] = useState('')
   const [editingExtraExpense, setEditingExtraExpense] = useState<ExtraExpense>(emptyExtraExpense)
+  const [editingCiotId, setEditingCiotId] = useState<string | null>(null)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -605,8 +610,85 @@ export function FreightsPage() {
     setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(snapshot, freight) : freight))
   }
 
+  function legacyCiotRows(snapshot: Partial<FreightForm>) {
+    if (snapshot.ciotEntries?.length) return snapshot.ciotEntries
+    if (!snapshot.ciotNumber) return []
+    const startDate = snapshot.deliveryForecast || new Date().toISOString().slice(0, 10)
+    const endDate = snapshot.cntrReturnDate || snapshot.destinationScheduleDate || startDate
+    return [{
+      id: 'ciot-legacy',
+      number: snapshot.ciotNumber,
+      status: 'REGISTRADO',
+      startDate,
+      endDate,
+      registrationDate: startDate,
+      dischargeDate: '',
+      rectificationDate: '',
+    }]
+  }
+
+  function materializeCiotDraft(snapshot: FreightForm, draftValue = snapshot.ciotDraft) {
+    const number = draftValue.trim()
+    const currentEntries = legacyCiotRows(snapshot).filter((entry) => entry.id !== 'ciot-legacy' || entry.number)
+    if (!number) {
+      return {
+        ...snapshot,
+        ciotDraft: '',
+        ciotNumber: currentEntries[0]?.number ?? '',
+        ciotEntries: currentEntries,
+      }
+    }
+
+    const startDate = snapshot.deliveryForecast || new Date().toISOString().slice(0, 10)
+    const endDate = snapshot.cntrReturnDate || snapshot.destinationScheduleDate || startDate
+    const newEntry: FreightCiotEntry = {
+      id: editingCiotId ?? nextId('ciot'),
+      number,
+      status: 'REGISTRADO',
+      startDate,
+      endDate,
+      registrationDate: startDate,
+      dischargeDate: '',
+      rectificationDate: '',
+    }
+    const exists = currentEntries.some((entry) => entry.id === newEntry.id)
+    const ciotEntries = exists
+      ? currentEntries.map((entry) => entry.id === newEntry.id ? { ...entry, ...newEntry } : entry)
+      : [...currentEntries, newEntry]
+
+    return {
+      ...snapshot,
+      ciotDraft: '',
+      ciotNumber: ciotEntries[0]?.number ?? '',
+      ciotEntries,
+    }
+  }
+
+  function commitCiotDraft(draftValue = form.ciotDraft) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    const number = draftValue.trim()
+    if (!number) return
+    const next = materializeCiotDraft({ ...form, ciotDraft: number }, number)
+    setForm(next)
+    setEditingCiotId(null)
+    persistFreightForm(next)
+  }
+
+  function editCiotEntry(entry: FreightCiotEntry) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    setEditingCiotId(entry.id)
+    setForm((current) => ({ ...current, ciotDraft: entry.number }))
+  }
+
   function resetForm() {
     setEditingFreightId(null)
+    setEditingCiotId(null)
     setForm({
       ...emptyForm,
       customer: customers[0]?.name ?? '',
@@ -636,7 +718,9 @@ export function FreightsPage() {
     const tractor = tractors.find((vehicle) => vehicle.tractorPlate === freight.tractorPlate)
     const trailer = trailers.find((vehicle) => vehicle.trailerPlate === freight.trailerPlate)
     const savedForm = freight as unknown as Partial<FreightForm>
+    const ciotEntries = legacyCiotRows(savedForm)
     setEditingFreightId(freight.id)
+    setEditingCiotId(null)
     setForm({
       ...emptyForm,
       ...savedForm,
@@ -661,6 +745,9 @@ export function FreightsPage() {
       tractorId: freight.tractorId || (tractor?.id ?? ''),
       trailerId: freight.trailerId || (trailer?.id ?? ''),
       container: freight.container,
+      ciotDraft: '',
+      ciotNumber: ciotEntries[0]?.number ?? '',
+      ciotEntries,
       plannedFreightCost: freight.plannedFreightCost ?? String(freight.value),
       value: String(savedForm.value ?? freight.value),
     })
@@ -752,7 +839,9 @@ export function FreightsPage() {
       return
     }
 
-    const formSnapshot = { ...form }
+    const formSnapshot = materializeCiotDraft({ ...form })
+    setForm(formSnapshot)
+    setEditingCiotId(null)
 
     setFreights(editingFreightId
       ? freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(formSnapshot, freight) : freight)
@@ -1144,8 +1233,8 @@ export function FreightsPage() {
       destinationDepartureHour: freight.destinationDepartureTime || '',
       cntrReturn: freight.cntrReturnDate || '',
       fiscalNumber: freight.invoiceNumber || '',
-      ciot: freight.ciotNumber || '',
-      ciotStatus: freight.ciotNumber ? 'REGISTRADO' : '',
+      ciot: freight.ciotEntries?.length ? freight.ciotEntries.map((entry) => entry.number).join(', ') : freight.ciotNumber || '',
+      ciotStatus: freight.ciotEntries?.length || freight.ciotNumber ? 'REGISTRADO' : '',
     }
 
     return values[columnKey]
@@ -1370,12 +1459,13 @@ export function FreightsPage() {
     if (activeTab === 'CIOT') {
       const date = form.deliveryForecast || new Date().toISOString().slice(0, 10)
       const endDate = form.cntrReturnDate || form.destinationScheduleDate || date
+      const ciotRows = legacyCiotRows(form)
       return (
         <div className="p-3">
           <Field label="Tipo de viagem"><input value="P-Padrao" className={`${textInputClass(true)} max-w-md`} disabled /></Field>
           <div className="mt-2 overflow-x-auto border border-zinc-300 bg-white">
             <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2 text-xs">
-              <div className="ml-auto">{form.ciotNumber ? '2' : '1'} de {form.ciotNumber ? '2' : '1'} registros</div>
+              <div className="ml-auto">{ciotRows.length + 1} de {ciotRows.length + 1} registros</div>
               <input className="ml-2 h-6 w-32 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
               <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>&lt;-&gt;</span><span>☑</span><span>1:1</span></div>
             </div>
@@ -1394,34 +1484,34 @@ export function FreightsPage() {
                 <tr className="bg-sky-300">
                   <td className="border-b border-r border-zinc-200 px-2 py-1">
                     <input
-                      value={form.ciotNumber}
-                      onChange={(event) => updateForm('ciotNumber', event.target.value)}
+                      value={form.ciotDraft}
+                      onChange={(event) => updateForm('ciotDraft', event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
-                          persistFreightForm({ ...form, ciotNumber: event.currentTarget.value })
+                          commitCiotDraft(event.currentTarget.value)
                         }
                       }}
                       className={textInputClass()}
                     />
                   </td>
-                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber ? 'REGISTRADO' : ''} className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotDraft ? 'REGISTRADO' : ''} className={textInputClass(true)} disabled /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass()} /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={endDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass()} /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} className={textInputClass()} readOnly /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" className={textInputClass()} /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" className={textInputClass()} /></td>
                 </tr>
-                {form.ciotNumber && (
-                  <tr>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1">{form.ciotNumber}</td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1">REGISTRADO</td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1">{date}</td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1">{endDate}</td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1">{date}</td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1"></td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1"></td>
+                {ciotRows.map((entry, index) => (
+                  <tr key={entry.id} onDoubleClick={() => editCiotEntry(entry)} title="Dois cliques para editar" className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.number}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.status}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.startDate}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.endDate}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.registrationDate}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.dischargeDate}</td>
+                    <td className="border-b border-r border-zinc-200 px-2 py-1">{entry.rectificationDate}</td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>

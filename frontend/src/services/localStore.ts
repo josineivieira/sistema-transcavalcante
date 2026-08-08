@@ -200,6 +200,17 @@ export type FreightExtraExpense = {
   calculatedPurchaseExtraDays: string
 }
 
+export type FreightCiotEntry = {
+  id: string
+  number: string
+  status: string
+  startDate: string
+  endDate: string
+  registrationDate: string
+  dischargeDate: string
+  rectificationDate: string
+}
+
 export type Freight = {
   id: string
   number: string
@@ -270,6 +281,7 @@ export type Freight = {
   invoiceAccessKey?: string
   smNumber?: string
   ciotNumber?: string
+  ciotEntries?: FreightCiotEntry[]
   dfeNumber?: string
   protocolStatus?: string
   taskHistory?: FreightTask[]
