@@ -379,7 +379,7 @@ const freightGridColumns = [
   { key: 'destinationDepartureHour', label: 'Hr. saida destinatario', width: 146, minWidth: 118 },
   { key: 'cntrReturn', label: 'Dt. devolucao CNTR', width: 142, minWidth: 116 },
   { key: 'fiscalNumber', label: 'NFS-e', width: 116, minWidth: 96 },
-  { key: 'ciot', label: 'No CIOT', width: 128, minWidth: 100 },
+  { key: 'ciot', label: 'CIOT', width: 128, minWidth: 100 },
   { key: 'ciotStatus', label: 'Situacao CIOT', width: 122, minWidth: 100 },
   { key: 'actions', label: 'Acoes', width: 58, minWidth: 54, locked: true },
 ] as const
@@ -598,6 +598,11 @@ export function FreightsPage() {
       }
       return next
     })
+  }
+
+  function persistFreightForm(snapshot: FreightForm) {
+    if (!editingFreightId) return
+    setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(snapshot, freight) : freight))
   }
 
   function resetForm() {
@@ -1139,8 +1144,8 @@ export function FreightsPage() {
       destinationDepartureHour: freight.destinationDepartureTime || '',
       cntrReturn: freight.cntrReturnDate || '',
       fiscalNumber: freight.invoiceNumber || '',
-      ciot: freight.closing ? '5200029452035879' : '',
-      ciotStatus: freight.closing ? 'REGISTRADO' : '',
+      ciot: freight.ciotNumber || '',
+      ciotStatus: freight.ciotNumber ? 'REGISTRADO' : '',
     }
 
     return values[columnKey]
@@ -1377,7 +1382,7 @@ export function FreightsPage() {
             <table className="w-full min-w-[780px] table-fixed text-xs">
               <thead className="bg-white">
                 <tr>
-                  {['No CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
+                  {['CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
                     <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                       {heading}
                       {heading && <span className="float-right text-zinc-400">▾</span>}
@@ -1387,7 +1392,18 @@ export function FreightsPage() {
               </thead>
               <tbody>
                 <tr className="bg-sky-300">
-                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber} onChange={(event) => updateForm('ciotNumber', event.target.value)} className={textInputClass()} /></td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-1">
+                    <input
+                      value={form.ciotNumber}
+                      onChange={(event) => updateForm('ciotNumber', event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          persistFreightForm({ ...form, ciotNumber: event.currentTarget.value })
+                        }
+                      }}
+                      className={textInputClass()}
+                    />
+                  </td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber ? 'REGISTRADO' : ''} className={textInputClass(true)} disabled /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass()} /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={endDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass()} /></td>
