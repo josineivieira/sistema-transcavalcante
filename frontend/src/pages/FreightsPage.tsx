@@ -1374,10 +1374,10 @@ export function FreightsPage() {
               <input className="ml-2 h-6 w-32 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
               <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>&lt;-&gt;</span><span>☑</span><span>1:1</span></div>
             </div>
-            <table className="w-full min-w-[980px] table-fixed text-xs">
+            <table className="w-full min-w-[780px] table-fixed text-xs">
               <thead className="bg-white">
                 <tr>
-                  {['', '', 'No CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
+                  {['No CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
                     <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                       {heading}
                       {heading && <span className="float-right text-zinc-400">▾</span>}
@@ -1387,8 +1387,6 @@ export function FreightsPage() {
               </thead>
               <tbody>
                 <tr className="bg-sky-300">
-                  <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" defaultChecked /></td>
-                  <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-500">⋮</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber} onChange={(event) => updateForm('ciotNumber', event.target.value)} className={textInputClass()} /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input value={form.ciotNumber ? 'REGISTRADO' : ''} className={textInputClass(true)} disabled /></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="date" value={date} onChange={(event) => updateForm('deliveryForecast', event.target.value)} className={textInputClass()} /></td>
@@ -1399,8 +1397,6 @@ export function FreightsPage() {
                 </tr>
                 {form.ciotNumber && (
                   <tr>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1"><input type="checkbox" /></td>
-                    <td className="border-b border-r border-zinc-200 px-2 py-1 text-zinc-500">⋮</td>
                     <td className="border-b border-r border-zinc-200 px-2 py-1">{form.ciotNumber}</td>
                     <td className="border-b border-r border-zinc-200 px-2 py-1">REGISTRADO</td>
                     <td className="border-b border-r border-zinc-200 px-2 py-1">{date}</td>
