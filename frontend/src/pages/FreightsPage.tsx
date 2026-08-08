@@ -1460,8 +1460,8 @@ export function FreightsPage() {
                   <Field label="Situacao"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Tomador do servico"><input value={form.serviceTaker} className={textInputClass(true)} disabled /></Field>
-                  <Field label="CNPJ/CPF"><input value={form.senderDocument} onChange={(event) => updateForm('senderDocument', event.target.value)} className={textInputClass()} /></Field>
-                  <Field label="Remetente"><input value={form.sender} onChange={(event) => updateForm('sender', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="CNPJ/CPF"><input value={form.senderDocument} className={textInputClass(true)} disabled /></Field>
+                  <Field label="Remetente"><input value={form.sender} className={textInputClass(true)} disabled /></Field>
                 </div>
                 <div className="grid gap-1">
                   <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
@@ -1474,8 +1474,8 @@ export function FreightsPage() {
                       {form.product && !productOptions.includes(form.product) && <option value={form.product}>{form.product}</option>}
                     </select>
                   </Field>
-                  <Field label="CNPJ/CPF"><input value={form.recipientDocument} onChange={(event) => updateForm('recipientDocument', event.target.value)} className={textInputClass()} /></Field>
-                  <Field label="Destinatario"><input value={form.recipient} onChange={(event) => updateForm('recipient', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="CNPJ/CPF"><input value={form.recipientDocument} className={textInputClass(true)} disabled /></Field>
+                  <Field label="Destinatario"><input value={form.recipient} className={textInputClass(true)} disabled /></Field>
                 </div>
               </div>
 
