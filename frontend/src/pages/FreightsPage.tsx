@@ -206,6 +206,16 @@ function EmptyGridMessage({ text }: { text: string }) {
   )
 }
 
+function parseBrazilianNumber(value: string | number | null | undefined) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const normalized = String(value ?? '')
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 const freightGridColumns = [
   { key: 'select', label: '', width: 30, locked: true },
   { key: 'code', label: 'Codigo', width: 118, minWidth: 82, locked: true },
@@ -486,11 +496,11 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
-    const value = Number(form.value || form.plannedFreightCost || 0)
+    const value = parseBrazilianNumber(form.value || form.plannedFreightCost)
     const tractor = tractors.find((item) => item.id === form.tractorId)
     const trailer = trailers.find((item) => item.id === form.trailerId)
-    if (!generalReady || !routeReady || !form.driver || !tractor || value <= 0) {
-      window.alert('Informe GERAIS, ROTA, motorista, cavalo e valor maior que zero.')
+    if (!form.process || !form.processType || !form.customer || !form.serviceTaker) {
+      window.alert('Informe Codigo do processo, Tipo processo, Cliente e Tomador do servico.')
       return
     }
 
@@ -502,12 +512,12 @@ export function FreightsPage() {
         process: form.process,
         container: form.container,
         driver: form.driver,
-        tractorPlate: tractor.tractorPlate,
+        tractorPlate: tractor?.tractorPlate ?? '',
         trailerPlate: trailer?.trailerPlate ?? '',
         origin: form.origin,
         destination: form.destination,
         value,
-        operationalStatus: 'Aguardando aprovacao',
+        operationalStatus: form.status || 'Em digitacao',
         fiscalStatus: 'Pendente',
     }
 
@@ -905,7 +915,7 @@ export function FreightsPage() {
     }
 
     if (activeTab === 'DESPESAS PREVISTAS') {
-      const total = Number(form.plannedFreightCost || 0) + Number(form.plannedTollCost || 0)
+      const total = parseBrazilianNumber(form.plannedFreightCost) + parseBrazilianNumber(form.plannedTollCost)
       return (
         <div className="p-3">
           <div className="overflow-x-auto border border-zinc-300 bg-white">
