@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.operational_data import _find_user, _get_or_create_snapshot, _require_operational_auth
 from app.database.session import get_db
+from app.models.closing import ClosingItem
 from app.models.company import Company
 from app.models.customer import Customer
 from app.models.freight import Freight, FreightTask
@@ -243,8 +244,14 @@ def _migrate_legacy_freights(db: Session) -> None:
     if not legacy_freights:
         return
 
+    deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
     for freight_data in legacy_freights:
         if isinstance(freight_data, dict):
+            legacy_id = str(freight_data.get("id") or "")
+            legacy_process = str(freight_data.get("process") or "")
+            legacy_number = str(freight_data.get("number") or "")
+            if legacy_id in deleted_ids or legacy_process in deleted_ids or legacy_number in deleted_ids:
+                continue
             _upsert_freight_data(db, deepcopy(freight_data))
 
     snapshot.data = {**snapshot.data, "freights": []}
@@ -366,6 +373,12 @@ def delete_operational_freight(
     freight = db.query(Freight).filter(Freight.external_id == external_id).first()
     if freight is None:
         return None
+    snapshot = _get_or_create_snapshot(db)
+    deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
+    deleted_ids.update(filter(None, [freight.external_id, freight.process_number, freight.internal_number]))
+    snapshot.data = {**snapshot.data, "deletedFreightIds": sorted(deleted_ids)}
+    for item in db.query(ClosingItem).filter(ClosingItem.freight_id == freight.id).all():
+        db.delete(item)
     for task in db.query(FreightTask).filter(FreightTask.freight_id == freight.id).all():
         db.delete(task)
     db.delete(freight)

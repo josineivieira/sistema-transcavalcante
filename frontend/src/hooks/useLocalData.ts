@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadData, normalizeData } from '../services/localStore'
 import { api } from '../services/api'
 import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, PriceList, Receivable, SystemUser, Vehicle } from '../services/localStore'
@@ -38,15 +38,16 @@ export function useLocalData() {
   const [freightsLoading, setFreightsLoading] = useState(true)
   const [freightsTotal, setFreightsTotal] = useState(0)
   const [error, setError] = useState('')
+  const deletedFreightIdsRef = useRef(new Set<string>())
 
   const loadFreights = useCallback((params: FreightQuery = {}) => {
     setFreightsLoading(true)
     return api.get<OperationalFreightsResponse>('/operational-freights', {
       params: { limit: 500, offset: 0, ...params },
     }).then((response) => {
-      const items = response.data.items || []
+      const items = (response.data.items || []).filter((freight) => !deletedFreightIdsRef.current.has(freight.id))
       setData((current) => normalizeData({ ...current, freights: items }))
-      setFreightsTotal(response.data.total ?? items.length)
+      setFreightsTotal(Math.max(0, (response.data.total ?? items.length) - deletedFreightIdsRef.current.size))
       setError('')
     }).catch(() => {
       setError('Nao foi possivel carregar fretes.')
@@ -76,7 +77,8 @@ export function useLocalData() {
         const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
           params: { limit: 500 },
         })
-        nextData = normalizeData({ ...nextData, freights: freightsResponse.data.items || [] })
+        const freights = (freightsResponse.data.items || []).filter((freight) => !deletedFreightIdsRef.current.has(freight.id))
+        nextData = normalizeData({ ...nextData, freights })
 
         if (active) {
           setData(nextData)
@@ -158,12 +160,14 @@ export function useLocalData() {
 
   function deleteFreightRecord(id: string) {
     const previousFreights = data.freights
+    deletedFreightIdsRef.current.add(id)
     setData((current) => normalizeData({ ...current, freights: current.freights.filter((freight) => freight.id !== id) }))
     setFreightsTotal((current) => Math.max(0, current - 1))
 
     return api.delete(`/operational-freights/${encodeURIComponent(id)}`).then(() => {
       setError('')
     }).catch((reason) => {
+      deletedFreightIdsRef.current.delete(id)
       setData((current) => normalizeData({ ...current, freights: previousFreights }))
       setFreightsTotal(previousFreights.length)
       setError('Nao foi possivel excluir frete no banco de dados.')
