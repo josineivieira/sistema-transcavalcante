@@ -510,8 +510,10 @@ export function FreightsPage() {
   }, [invoiceImport])
   const invoiceRecipientOptions = useMemo(() => {
     const options = invoiceImport.invoices
-      .map((invoice) => ({ document: invoice.recipientDocument, name: invoice.recipient }))
-      .filter((option) => option.document || option.name)
+      .map((invoice) => ({
+        document: invoice.recipientDocument,
+        name: invoice.recipient || `Nota ${invoice.invoiceNumber || invoice.fileName} - informar destinatario`,
+      }))
     return Array.from(new Map(options.map((option) => [`${option.document}|${option.name}`, option])).values())
   }, [invoiceImport.invoices])
 
@@ -924,6 +926,10 @@ export function FreightsPage() {
     return accessKey.length === 44 ? accessKey.slice(25, 34) : ''
   }
 
+  function invoiceSeriesFromAccessKey(accessKey: string) {
+    return accessKey.length === 44 ? accessKey.slice(22, 25) : ''
+  }
+
   function normalizeInvoiceNumber(value: string) {
     const digits = value.replace(/\D/g, '')
     return digits.replace(/^0+(?=\d)/, '') || digits
@@ -1111,6 +1117,8 @@ export function FreightsPage() {
       || ''
     const invoiceNumber = normalizeInvoiceNumber(invoiceNumberFromLabel || invoiceNumberFromKey)
     const invoiceSeries = normalized.match(/S[ÉE]RIE\s*:?\s*(\d+)/i)?.[1] || ''
+    const invoiceSeriesFromKey = invoiceSeriesFromAccessKey(invoiceAccessKey)
+    const safeInvoiceSeries = normalizeInvoiceNumber((invoiceSeries.length <= 3 ? invoiceSeries : '') || invoiceSeriesFromKey)
     const invoiceGoodsValue = firstMoneyAfter(normalized, 'VALOR TOTAL DOS PRODUTOS')
     const invoiceValue = firstMoneyAfter(normalized, 'VALOR TOTAL DA NOTA') || invoiceGoodsValue
     const invoiceIssueDate = normalized.match(/DATA DA EMISS[ÃA]O\s+(\d{2}\/\d{2}\/\d{4})/i)?.[1] ?? ''
@@ -1124,7 +1132,7 @@ export function FreightsPage() {
       recipientDocument,
       recipient,
       invoiceNumber,
-      invoiceSeries,
+      invoiceSeries: safeInvoiceSeries,
       invoiceIssueDate,
       invoiceGoodsValue,
       invoiceValue,
@@ -1154,6 +1162,22 @@ export function FreightsPage() {
       recipient: current.recipient || extracted.recipient,
       invoices,
     }
+  }
+
+  function updateImportedInvoice(id: string, patch: Partial<FreightInvoiceEntry>) {
+    setInvoiceImport((current) => {
+      const invoices = current.invoices.map((invoice) => invoice.id === id ? { ...invoice, ...patch } : invoice)
+      const selectedStillExists = invoices.some((invoice) =>
+        invoice.recipientDocument === current.recipientDocument && invoice.recipient === current.recipient
+      )
+      const selectedInvoice = invoices.find((invoice) => invoice.id === id)
+      return {
+        ...current,
+        invoices,
+        recipientDocument: selectedStillExists ? current.recipientDocument : selectedInvoice?.recipientDocument ?? current.recipientDocument,
+        recipient: selectedStillExists ? current.recipient : selectedInvoice?.recipient ?? current.recipient,
+      }
+    })
   }
 
   async function readInvoiceFiles(files: FileList | File[]) {
@@ -2182,10 +2206,10 @@ export function FreightsPage() {
                       {invoiceImport.invoices.map((invoice) => (
                         <tr key={invoice.id}>
                           <td className="border-b border-r px-2 py-1">{invoice.invoiceNumber}</td>
-                          <td className="border-b border-r px-2 py-1">{invoice.invoiceSeries}</td>
-                          <td className="border-b border-r px-2 py-1">{invoice.invoiceIssueDate}</td>
-                          <td className="border-b border-r px-2 py-1">{invoice.recipient}</td>
-                          <td className="border-b border-r px-2 py-1 text-right">{invoice.invoiceValue}</td>
+                          <td className="border-b border-r px-2 py-1"><input value={invoice.invoiceSeries} onChange={(event) => updateImportedInvoice(invoice.id, { invoiceSeries: event.target.value })} className={textInputClass()} /></td>
+                          <td className="border-b border-r px-2 py-1"><input value={invoice.invoiceIssueDate} onChange={(event) => updateImportedInvoice(invoice.id, { invoiceIssueDate: event.target.value })} className={textInputClass()} /></td>
+                          <td className="border-b border-r px-2 py-1"><input value={invoice.recipient} onChange={(event) => updateImportedInvoice(invoice.id, { recipient: event.target.value.toUpperCase() })} className={textInputClass()} placeholder="Informe o destinatario" /></td>
+                          <td className="border-b border-r px-2 py-1 text-right"><input value={invoice.invoiceValue} onChange={(event) => updateImportedInvoice(invoice.id, { invoiceValue: event.target.value, invoiceGoodsValue: event.target.value })} className={`${textInputClass()} text-right`} /></td>
                           <td className="border-b px-2 py-1">{invoice.invoiceAccessKey}</td>
                         </tr>
                       ))}
