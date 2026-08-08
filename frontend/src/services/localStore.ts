@@ -183,6 +183,23 @@ export type FreightTask = {
   user: string
 }
 
+export type FreightExtraExpense = {
+  id: string
+  reference: string
+  product: string
+  justificationType: string
+  observation: string
+  supplierDocument: string
+  supplier: string
+  currency: string
+  exchangeRate: string
+  expenseValue: string
+  cteBillingValue: string
+  purchaseExtraDays: string
+  purchaseFreeDays: string
+  calculatedPurchaseExtraDays: string
+}
+
 export type Freight = {
   id: string
   number: string
@@ -240,6 +257,7 @@ export type Freight = {
   plannedFreightCost?: string
   plannedTollCost?: string
   extraCost?: string
+  extraExpenses?: FreightExtraExpense[]
   invoiceNumber?: string
   invoiceValue?: string
   smNumber?: string
@@ -645,6 +663,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
         recipientDocument: legacyFreight.recipientDocument ?? '',
         recipient: legacyFreight.recipient ?? legacyFreight.customer ?? '',
         taskHistory: legacyFreight.taskHistory ?? [],
+        extraExpenses: legacyFreight.extraExpenses ?? [],
       } as Freight
     }),
     closings: data.closings ?? [],

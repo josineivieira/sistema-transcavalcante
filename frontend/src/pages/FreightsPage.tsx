@@ -77,6 +77,7 @@ type FreightForm = {
   plannedFreightCost: string
   plannedTollCost: string
   extraCost: string
+  extraExpenses: ExtraExpense[]
   invoiceNumber: string
   invoiceValue: string
   smNumber: string
@@ -85,6 +86,30 @@ type FreightForm = {
   protocolStatus: string
   taskHistory: FreightTask[]
   value: string
+}
+
+type ExtraExpense = {
+  id: string
+  reference: string
+  product: string
+  justificationType: string
+  observation: string
+  supplierDocument: string
+  supplier: string
+  currency: string
+  exchangeRate: string
+  expenseValue: string
+  cteBillingValue: string
+  purchaseExtraDays: string
+  purchaseFreeDays: string
+  calculatedPurchaseExtraDays: string
+}
+
+type ExtraProduct = {
+  reference: string
+  product: string
+  structuredCode: string
+  createdAt: string
 }
 
 type InvoiceImport = {
@@ -154,6 +179,7 @@ const emptyForm: FreightForm = {
   plannedFreightCost: '0',
   plannedTollCost: '0',
   extraCost: '0',
+  extraExpenses: [],
   invoiceNumber: '',
   invoiceValue: '0',
   smNumber: '',
@@ -171,6 +197,78 @@ const emptyInvoiceImport: InvoiceImport = {
   recipientDocument: '',
   recipient: '',
 }
+
+const emptyExtraExpense: ExtraExpense = {
+  id: '',
+  reference: '',
+  product: '',
+  justificationType: '',
+  observation: '',
+  supplierDocument: '',
+  supplier: '',
+  currency: 'BRL  REAL/BI',
+  exchangeRate: '1,00000',
+  expenseValue: '0,00',
+  cteBillingValue: '0,00',
+  purchaseExtraDays: '',
+  purchaseFreeDays: '',
+  calculatedPurchaseExtraDays: '',
+}
+
+const extraProducts: ExtraProduct[] = [
+  ['DIESEL', 'ABASTECIMENTO EXTERNO', 'EXT-DIESEL', '24/04/2019'],
+  ['EXT044', 'ADICIONAL BI-TREM', 'EXT044', '25/03/2026'],
+  ['EXT022', 'AGENDAMENTO EXPRESSO', 'EXT022', '10/05/2019'],
+  ['ARLA 32E MANAUS', 'ARLA 32 GRANEL EXTERNO MANAUS', 'ARLA32', '17/07/2018'],
+  ['EXT31', 'ARMAZENAGEM DESTINO', 'EXT31', '08/11/2019'],
+  ['EXT42', 'ARMAZENAGEM ORIGEM', 'EXT42', '16/02/2022'],
+  ['EXT010', 'AVARIA', 'EXT010', '21/08/2018'],
+  ['EXT02025', 'BALSA MANAUS', 'EXT02025', '10/09/2025'],
+  ['EXT008', 'CARREGAMENTO', 'EXT008', '02/08/2018'],
+  ['COLETA / ENTREGA ADIC', 'COLETA / ENTREGA ADICIONAL', 'COLETA-ENTREGA', '16/02/2022'],
+  ['COLETA DE CNTR VAZIO', 'COLETA DE CNTR VAZIO - PULMAO', 'COLETA-CNTR', '15/08/2018'],
+  ['EXT35', 'COMISSAO', 'EXT35', '10/08/2020'],
+  ['EXT30', 'CONFERENTE', 'EXT30', '06/11/2019'],
+  ['EXT28', 'DEMURRAGE', 'EXT28', '16/10/2019'],
+  ['DETENTION', 'DETENTION', 'DETENTION', '16/02/2022'],
+  ['ENTREGA DE CONTAINER', 'DEVOLUCAO DE CONTAINER', 'DEV-CNTR', '10/03/2021'],
+  ['EXT015', 'DIARIA DO VEICULO NA ENTREGA', 'EXT015', '08/08/2018'],
+  ['EXT006', 'DIARIA DO VEICULO NO CARREGAMENTO', 'EXT006', '08/08/2018'],
+  ['EXT016', 'DIVERGENCIA VGM', 'EXT016', '31/10/2018'],
+  ['EXT41', 'ESCOLTA ARMADA', 'EXT41', '02/08/2022'],
+  ['EXTRAS001', 'ESTACIONAMENTO', 'EXTRAS001', '02/12/2025'],
+  ['EXT043', 'FRETE ADICIONAL (COMPLEMENTO)', 'EXT043', '16/08/2018'],
+  ['SER005', 'FRETE MORTO', 'SER005', '16/01/2019'],
+  ['EXT27', 'FRETE RESGATE', 'EXT27', '11/10/2019'],
+  ['EXT021', 'HANDLING IN/OUT', 'EXT021', '24/04/2019'],
+  ['EXT005', 'ISCA MOVEL', 'EXT005', '21/08/2018'],
+  ['EXT024', 'LAVAGEM DE CONTAINER SIMPLES', 'EXT024', '04/07/2019'],
+  ['MATERIAL DE PEACAO E', 'MATERIAL DE PEACAO E DESPEACAO', 'MAT-PEACAO', '17/10/2019'],
+  ['EXT011', 'MULTA', 'EXT011', '21/08/2018'],
+  ['EXT004', 'NO SHOW', 'EXT004', '21/08/2018'],
+  ['S10E MANAUS', 'OLEO DIESEL B S10 EXTERNO MANAUS', 'S10E-MAO', '16/07/2018'],
+  ['S500E MANAUS', 'OLEO DIESEL B S500 EXTERNO MANAUS', 'S500E-MAO', '16/07/2018'],
+  ['EXT025', 'OVA/DESOVA/CAPATAZIA', 'EXT025', '17/07/2019'],
+  ['TRA014', 'PEDAGIO', 'TRA014', '16/07/2018'],
+  ['EXT013', 'PEDAGIO ADICIONAL', 'EXT013', '21/08/2018'],
+  ['EXT023', 'PLANTAO TERMINAL DE APOIO', 'EXT023', '26/06/2019'],
+  ['POSICIONAMENTO DE C', 'POSICIONAMENTO DE CONTAINER', 'POS-CNTR', '20/01/2020'],
+  ['EXT34', 'PRONTA RESPOSTA', 'EXT34', '08/04/2020'],
+  ['TRA018', 'PULMAO DRY (ORIGEM)', 'TRA018', '04/02/2019'],
+  ['EXT012', 'RASTREADOR', 'EXT012', '21/08/2018'],
+  ['EXTR2025', 'REATIVACAO DE GUIA', 'EXTR2025', '24/09/2025'],
+  ['EXT018', 'RECEBIMENTO DE CONTEINER APOS DEAD-LINE DO NAVIO', 'EXT018', '12/02/2019'],
+  ['REDESTINACAO', 'REDESTINACAO', 'REDESTINACAO', '16/02/2022'],
+  ['EXT33', 'REEMBOLSO', 'EXT33', '12/03/2020'],
+  ['EXT32', 'REEMBOLSO DIFERENCA DIESEL', 'EXT32', '03/02/2020'],
+  ['EXT020', 'REMOCAO MUDANCA DE NAVIO', 'EXT020', '12/02/2019'],
+  ['EXT40', 'REPARO CONTAINER', 'EXT40', '28/01/2021'],
+  ['RETIRADA DE VAZIO', 'RETIRADA DE VAZIO', 'RET-VAZIO', '09/12/2019'],
+  ['EXT002', 'TAXA ADMINISTRATIVA', 'EXT002', '09/08/2018'],
+  ['EXT', 'TAXA DE TRIAGEM', 'EXT', '23/01/2021'],
+  ['TERMOGRAFO', 'TERMOGRAFO', 'TERMOGRAFO', '16/02/2022'],
+  ['EXT001', 'TRANSFERENCIA', 'EXT001', '09/08/2018'],
+].map(([reference, product, structuredCode, createdAt]) => ({ reference, product, structuredCode, createdAt }))
 
 function textInputClass(disabled = false) {
   return `h-7 w-full min-w-0 border border-zinc-300 px-2 text-xs outline-none ${disabled ? 'bg-zinc-200 text-zinc-500' : 'bg-white focus:border-zinc-500'}`
@@ -312,6 +410,10 @@ export function FreightsPage() {
   const [taskHistoryOpen, setTaskHistoryOpen] = useState(false)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [showPreviousTasks, setShowPreviousTasks] = useState(false)
+  const [extraExpenseOpen, setExtraExpenseOpen] = useState(false)
+  const [extraProductOpen, setExtraProductOpen] = useState(false)
+  const [extraProductSearch, setExtraProductSearch] = useState('')
+  const [editingExtraExpense, setEditingExtraExpense] = useState<ExtraExpense>(emptyExtraExpense)
   const [form, setForm] = useState<FreightForm>({
     ...emptyForm,
     customer: customers[0]?.name ?? '',
@@ -359,6 +461,12 @@ export function FreightsPage() {
   const availableTaskOptions = freightTaskOptions.filter((task) => (
     showPreviousTasks || !form.taskHistory.some((history) => history.name === task)
   ))
+  const filteredExtraProducts = useMemo(() => {
+    const term = extraProductSearch.toLowerCase()
+    return extraProducts.filter((product) =>
+      [product.reference, product.product, product.structuredCode].some((value) => value.toLowerCase().includes(term)),
+    )
+  }, [extraProductSearch])
 
   const tabAvailability: Record<FreightTab, boolean> = {
     GERAIS: true,
@@ -797,6 +905,53 @@ export function FreightsPage() {
     setInvoiceImportOpen(false)
   }
 
+  function openExtraExpense() {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    setEditingExtraExpense({ ...emptyExtraExpense, id: nextId('extra') })
+    setExtraProductSearch('')
+    setExtraExpenseOpen(true)
+  }
+
+  function updateExtraExpense(field: keyof ExtraExpense, value: string) {
+    setEditingExtraExpense((current) => ({ ...current, [field]: value }))
+  }
+
+  function selectExtraProduct(product: ExtraProduct) {
+    setEditingExtraExpense((current) => ({
+      ...current,
+      reference: product.reference,
+      product: product.product,
+    }))
+    setExtraProductOpen(false)
+  }
+
+  function saveExtraExpense(closeAfterSave = true) {
+    if (!editingExtraExpense.reference || !editingExtraExpense.product) {
+      window.alert('Escolha uma referencia/produto para a despesa extra.')
+      return
+    }
+    setForm((current) => {
+      const existing = current.extraExpenses.some((expense) => expense.id === editingExtraExpense.id)
+      const extraExpenses = existing
+        ? current.extraExpenses.map((expense) => expense.id === editingExtraExpense.id ? editingExtraExpense : expense)
+        : [...current.extraExpenses, editingExtraExpense]
+      const extraCost = extraExpenses
+        .reduce((total, expense) => total + parseBrazilianNumber(expense.expenseValue), 0)
+        .toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      const next = { ...current, extraExpenses, extraCost }
+      if (editingFreightId) {
+        setFreights(freights.map((freight) => freight.id === editingFreightId ? buildFreightRecord(next, freight) : freight))
+      }
+      return next
+    })
+    if (closeAfterSave) {
+      setExtraExpenseOpen(false)
+    }
+  }
+
   function renderFreightCell(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
     const date = freight.date || ''
     const origin = cityState(freight.origin)
@@ -1023,12 +1178,36 @@ export function FreightsPage() {
     }
 
     if (activeTab === 'DESPESAS EXTRAS') {
+      const total = form.extraExpenses.reduce((sum, expense) => sum + parseBrazilianNumber(expense.expenseValue), 0)
       return (
         <div className="p-3">
           <div className="border border-zinc-300 bg-white">
-            <div className="flex h-8 justify-end gap-2 bg-zinc-400 px-3 py-1"><Settings size={17} /><button className="grid h-5 w-5 place-items-center bg-black text-white">+</button></div>
-            <EmptyGridMessage text="Nao ha informacoes. Utilize o botao + para adicionar." />
-            <div className="border-t border-emerald-500 bg-emerald-50 px-8 py-2 text-right text-xs">Total = {formatMoney(Number(form.extraCost || 0))}</div>
+            <div className="flex h-8 justify-end gap-2 bg-zinc-400 px-3 py-1"><Settings size={17} /><button onClick={openExtraExpense} className="grid h-5 w-5 place-items-center bg-black text-white">+</button></div>
+            {form.extraExpenses.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-xs">
+                  <thead>
+                    <tr>{['Referencia', 'Produto', 'Fornecedor', 'Tipo justificativa', 'Observacao', 'Vlr. despesa', 'Vlr faturar CT-e'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {form.extraExpenses.map((expense, index) => (
+                      <tr key={expense.id} className={index % 2 ? 'bg-zinc-100' : 'bg-white'}>
+                        <td className="border-b border-r px-2 py-2">{expense.reference}</td>
+                        <td className="border-b border-r px-2 py-2">{expense.product}</td>
+                        <td className="border-b border-r px-2 py-2">{expense.supplier || '-'}</td>
+                        <td className="border-b border-r px-2 py-2">{expense.justificationType || '-'}</td>
+                        <td className="border-b border-r px-2 py-2">{expense.observation || '-'}</td>
+                        <td className="border-b border-r px-2 py-2 text-right">{parseBrazilianNumber(expense.expenseValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="border-b px-2 py-2 text-right">{parseBrazilianNumber(expense.cteBillingValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyGridMessage text="Nao ha informacoes. Utilize o botao + para adicionar." />
+            )}
+            <div className="border-t border-emerald-500 bg-emerald-50 px-8 py-2 text-right text-xs">Total = {formatMoney(total)}</div>
           </div>
         </div>
       )
@@ -1408,6 +1587,108 @@ export function FreightsPage() {
               ))}
               {!availableTaskOptions.length && (
                 <div className="px-2 py-1 font-normal text-zinc-500">Todos os status disponiveis ja foram adicionados.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {extraExpenseOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/25 px-4 py-6">
+          <div className="system-modal max-h-[calc(100vh-48px)] w-full max-w-6xl overflow-auto border border-zinc-500 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">Manutencao despesa extra</h3>
+              <div className="flex items-center gap-3 text-xs">
+                <button onClick={() => saveExtraExpense(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
+                <button onClick={() => saveExtraExpense(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
+                <button onClick={() => setExtraExpenseOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
+              </div>
+            </div>
+
+            <div className="relative p-2">
+              <div className="grid gap-x-24 gap-y-1 border-b-4 border-zinc-400 pb-3 md:grid-cols-2">
+                <div className="grid gap-1">
+                  <Field label="Referencia" required>
+                    <div className="flex">
+                      <input value={editingExtraExpense.reference} onChange={(event) => updateExtraExpense('reference', event.target.value.toUpperCase())} className={textInputClass()} />
+                      <button onClick={() => setExtraProductOpen(true)} className="grid h-7 w-8 place-items-center bg-white text-black" title="Consultar produto"><Filter size={18} fill="currentColor" /></button>
+                      <button onClick={() => setEditingExtraExpense((current) => ({ ...current, reference: '', product: '' }))} className="grid h-7 w-7 place-items-center bg-white"><X size={18} /></button>
+                    </div>
+                  </Field>
+                  <Field label="Produto" required><input value={editingExtraExpense.product} onChange={(event) => updateExtraExpense('product', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <div className="mt-6 grid grid-cols-[135px_90px_1fr_34px] items-center gap-1 text-xs">
+                    <span className="text-right text-red-600">Sigla</span>
+                    <select value={editingExtraExpense.currency} onChange={(event) => updateExtraExpense('currency', event.target.value)} className={textInputClass()}><option>BRL REAL/BI</option><option>USD DOLAR</option></select>
+                    <input value={editingExtraExpense.exchangeRate} onChange={(event) => updateExtraExpense('exchangeRate', event.target.value)} className={`${textInputClass()} text-right`} />
+                    <button className="h-7 border border-zinc-300 bg-zinc-200">▦</button>
+                  </div>
+                  <label className="ml-[145px] flex items-center gap-2 text-xs"><input type="checkbox" /> Ratear valor faturado?</label>
+                </div>
+
+                <div className="grid gap-1">
+                  <Field label="Tipo de justificativa">
+                    <div className="flex">
+                      <input value={editingExtraExpense.justificationType} onChange={(event) => updateExtraExpense('justificationType', event.target.value.toUpperCase())} className={textInputClass()} />
+                      <button className="grid h-7 w-8 place-items-center bg-white"><Filter size={18} fill="currentColor" /></button>
+                      <button onClick={() => updateExtraExpense('justificationType', '')} className="grid h-7 w-7 place-items-center bg-white"><X size={18} /></button>
+                    </div>
+                  </Field>
+                  <Field label="Observacao" required><input value={editingExtraExpense.observation} onChange={(event) => updateExtraExpense('observation', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="CNPJ/CPF/Codigo">
+                    <div className="flex">
+                      <input value={editingExtraExpense.supplierDocument} onChange={(event) => updateExtraExpense('supplierDocument', event.target.value)} className={textInputClass()} />
+                      <button className="grid h-7 w-8 place-items-center bg-white"><Filter size={18} fill="currentColor" /></button>
+                      <button onClick={() => updateExtraExpense('supplierDocument', '')} className="grid h-7 w-7 place-items-center bg-white"><X size={18} /></button>
+                    </div>
+                  </Field>
+                  <Field label="Fornecedor"><input value={editingExtraExpense.supplier} onChange={(event) => updateExtraExpense('supplier', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
+                  <Field label="Vlr. despesa" required><input value={editingExtraExpense.expenseValue} onChange={(event) => updateExtraExpense('expenseValue', event.target.value)} className={`${textInputClass()} text-right`} /></Field>
+                  <Field label="Vlr Faturar CT-e"><input value={editingExtraExpense.cteBillingValue} onChange={(event) => updateExtraExpense('cteBillingValue', event.target.value)} className={`${textInputClass()} text-right`} /></Field>
+                </div>
+              </div>
+
+              <div className="mt-3 border-t-2 border-zinc-500 pt-1">
+                <div className="mb-2 text-xs font-semibold">COMPRA</div>
+                <div className="grid gap-x-24 gap-y-1 md:grid-cols-2">
+                  <div className="grid gap-1">
+                    <Field label="Dias extra compra"><input value={editingExtraExpense.purchaseExtraDays} onChange={(event) => updateExtraExpense('purchaseExtraDays', event.target.value)} className={textInputClass()} /></Field>
+                    <Field label="(-) Dias livre compra"><input value={editingExtraExpense.purchaseFreeDays} onChange={(event) => updateExtraExpense('purchaseFreeDays', event.target.value)} className={textInputClass()} /></Field>
+                    <Field label="(=) Dias extra compra calc."><input value={editingExtraExpense.calculatedPurchaseExtraDays} onChange={(event) => updateExtraExpense('calculatedPurchaseExtraDays', event.target.value)} className={textInputClass()} /></Field>
+                  </div>
+                  <div className="grid gap-1">
+                    <Field label="Vlr. dia compra"><input value="0,00" className={`${textInputClass(true)} text-right`} disabled /></Field>
+                    <Field label="Valor extra compra"><input value={editingExtraExpense.expenseValue || '0,00'} className={`${textInputClass(true)} text-right`} disabled /></Field>
+                  </div>
+                </div>
+              </div>
+
+              {extraProductOpen && (
+                <div className="absolute left-6 right-6 top-24 z-[70] border-4 border-red-700 bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-3 py-2">
+                    <h3 className="text-lg font-normal text-red-600">Produto</h3>
+                    <button onClick={() => setExtraProductOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
+                  </div>
+                  <div className="flex h-8 items-center bg-zinc-400 px-2 text-xs">
+                    <div className="ml-auto">{filteredExtraProducts.length} de {extraProducts.length} registros</div>
+                    <input value={extraProductSearch} onChange={(event) => setExtraProductSearch(event.target.value)} className="ml-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
+                    <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>1:1</span><Filter size={18} fill="currentColor" /><span>▤</span></div>
+                  </div>
+                  <div className="max-h-[430px] overflow-auto">
+                    <table className="w-full min-w-[820px] text-xs">
+                      <thead><tr>{['Referencia', 'Produto', 'Codigo estruturado', 'Dt. cadastro'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
+                      <tbody>
+                        {filteredExtraProducts.map((product, index) => (
+                          <tr key={`${product.reference}-${product.product}`} onDoubleClick={() => selectExtraProduct(product)} onClick={() => selectExtraProduct(product)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-200`}>
+                            <td className="border-b border-r border-zinc-200 px-2 py-2">{product.reference}</td>
+                            <td className="border-b border-r border-zinc-200 px-2 py-2">{product.product}</td>
+                            <td className="border-b border-r border-zinc-200 px-2 py-2">{product.structuredCode}</td>
+                            <td className="border-b border-zinc-200 px-2 py-2">{product.createdAt}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
           </div>
