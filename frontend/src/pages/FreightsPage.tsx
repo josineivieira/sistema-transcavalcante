@@ -64,6 +64,8 @@ type FreightForm = {
   booking: string
   terminalEmpty: string
   terminalReturn: string
+  containerDraft: string
+  containerEntries: FreightContainerEntry[]
   recordDates: boolean
   deliveryForecast: string
   arrivalDate: string
@@ -116,6 +118,18 @@ type ExtraExpense = {
   purchaseExtraDays: string
   purchaseFreeDays: string
   calculatedPurchaseExtraDays: string
+}
+
+type FreightContainerEntry = {
+  id: string
+  code: string
+  type: string
+  number: string
+  tare: string
+  maxWeight: string
+  mgw: string
+  seal: string
+  exportSeal: string
 }
 
 type ExtraProduct = {
@@ -203,6 +217,8 @@ const emptyForm: FreightForm = {
   booking: '',
   terminalEmpty: '',
   terminalReturn: '',
+  containerDraft: '',
+  containerEntries: [],
   recordDates: false,
   deliveryForecast: '',
   arrivalDate: '',
@@ -563,7 +579,8 @@ export function FreightsPage() {
   const serviceReady = Boolean(generalReady && routeReady && form.driver && form.tractorId)
   const hasAbastecido = form.taskHistory.some((task) => task.name === 'ABASTECIDO 17')
   const hasNotasRecebidas = form.taskHistory.some((task) => task.name === 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20')
-  const containerReady = Boolean(serviceReady && form.container)
+  const containerRows = legacyContainerRows(form)
+  const containerReady = Boolean(serviceReady && containerRows.length)
   const datesReady = Boolean(containerReady && form.deliveryForecast && form.destinationScheduleDate)
   const fiscalReady = Boolean(containerReady && form.invoiceNumber)
   const availableTaskOptions = freightTaskOptions.filter((task) => (
@@ -839,6 +856,84 @@ export function FreightsPage() {
     }
   }
 
+  function legacyContainerRows(snapshot: Partial<FreightForm>) {
+    if (snapshot.containerEntries?.length) return snapshot.containerEntries
+    if (!snapshot.container) return []
+    return [{
+      id: 'container-legacy',
+      code: '40 HC',
+      type: 'Dry',
+      number: snapshot.container,
+      tare: '3800',
+      maxWeight: '25000',
+      mgw: '32.500,0000',
+      seal: 'LCR-1001',
+      exportSeal: '-',
+    }]
+  }
+
+  function materializeContainerDraft(snapshot: FreightForm, draftValue = snapshot.containerDraft) {
+    const number = draftValue.trim().toUpperCase()
+    const currentEntries = legacyContainerRows(snapshot).filter((entry) => entry.id !== 'container-legacy' || entry.number)
+    if (!number) {
+      return {
+        ...snapshot,
+        containerDraft: '',
+        container: currentEntries[0]?.number ?? '',
+        containerEntries: currentEntries,
+      }
+    }
+
+    const existsByNumber = currentEntries.some((entry) => entry.number.toUpperCase() === number)
+    const containerEntries = existsByNumber
+      ? currentEntries
+      : [...currentEntries, {
+        id: nextId('cntr'),
+        code: '40 HC',
+        type: 'Dry',
+        number,
+        tare: '3800',
+        maxWeight: '25000',
+        mgw: '32.500,0000',
+        seal: 'LCR-1001',
+        exportSeal: '-',
+      }]
+
+    return {
+      ...snapshot,
+      containerDraft: '',
+      container: containerEntries[0]?.number ?? '',
+      containerEntries,
+    }
+  }
+
+  function commitContainerDraft(draftValue = form.containerDraft) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    const number = draftValue.trim()
+    if (!number) return
+    const next = materializeContainerDraft({ ...form, containerDraft: number }, number)
+    setForm(next)
+    persistFreightForm(next)
+  }
+
+  function removeContainerEntry(id: string) {
+    if (!canEditPage) {
+      denyNoPrivilege()
+      return
+    }
+    const containerEntries = legacyContainerRows(form).filter((entry) => entry.id !== id)
+    const next = {
+      ...form,
+      container: containerEntries[0]?.number ?? '',
+      containerEntries,
+    }
+    setForm(next)
+    persistFreightForm(next)
+  }
+
   function commitCiotDraft(draftValue = form.ciotDraft) {
     if (!canEditPage) {
       denyNoPrivilege()
@@ -890,6 +985,7 @@ export function FreightsPage() {
     const trailer = trailers.find((vehicle) => vehicle.trailerPlate === freight.trailerPlate)
     const savedForm = freight as unknown as Partial<FreightForm>
     const ciotEntries = legacyCiotRows(savedForm)
+    const containerEntries = legacyContainerRows(savedForm)
     setEditingFreightId(freight.id)
     setEditingCiotId(null)
     setForm({
@@ -915,7 +1011,9 @@ export function FreightsPage() {
       driver: freight.driver,
       tractorId: freight.tractorId || (tractor?.id ?? ''),
       trailerId: freight.trailerId || (trailer?.id ?? ''),
-      container: freight.container,
+      container: containerEntries[0]?.number ?? freight.container,
+      containerDraft: '',
+      containerEntries,
       ciotDraft: '',
       ciotNumber: ciotEntries[0]?.number ?? '',
       ciotEntries,
@@ -992,7 +1090,9 @@ export function FreightsPage() {
       product: formSnapshot.product,
       recipientDocument: formSnapshot.recipientDocument,
       recipient: formSnapshot.recipient,
-      container: formSnapshot.container,
+      container: formSnapshot.containerEntries[0]?.number ?? formSnapshot.container,
+      containerDraft: '',
+      containerEntries: formSnapshot.containerEntries,
       driver: formSnapshot.driver,
       tractorPlate: tractor?.tractorPlate ?? tractorOption?.plate ?? existing?.tractorPlate ?? formSnapshot.tractorId,
       trailerPlate: trailer?.trailerPlate ?? trailerOption?.plate ?? existing?.trailerPlate ?? formSnapshot.trailerId,
@@ -1023,7 +1123,7 @@ export function FreightsPage() {
       return
     }
 
-    const formSnapshot = materializeCiotDraft({ ...form, process })
+    const formSnapshot = materializeCiotDraft(materializeContainerDraft({ ...form, process }))
     setForm(formSnapshot)
     setEditingCiotId(null)
 
@@ -1738,10 +1838,52 @@ export function FreightsPage() {
             </div>
           </div>
           <div className="mt-4 overflow-x-auto border border-zinc-300 bg-white">
-            <div className="flex h-8 items-center justify-between bg-zinc-400 px-3 text-xs text-zinc-950"><span>1 registro</span><Settings size={16} /></div>
+            <div className="flex h-8 items-center justify-between bg-zinc-400 px-3 text-xs text-zinc-950"><span>{containerRows.length} registro{containerRows.length === 1 ? '' : 's'}</span><Settings size={16} /></div>
             <table className="w-full min-w-[900px] text-xs">
-              <thead><tr>{['Codigo', 'Tipo de Container', 'No Container', 'Tara', 'Peso maximo', 'MGW', 'No Lacre Cia', 'No Lacre export.'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody><tr><td className="border-b border-r px-2 py-2">40 HC</td><td className="border-b border-r px-2 py-2">Dry</td><td className="border-b border-r px-2 py-2"><input value={form.container} onChange={(event) => updateForm('container', event.target.value.toUpperCase())} className={textInputClass()} placeholder="MSCU1234567" /></td><td className="border-b border-r px-2 py-2">3800</td><td className="border-b border-r px-2 py-2">25000</td><td className="border-b border-r px-2 py-2">32.500,0000</td><td className="border-b border-r px-2 py-2">LCR-1001</td><td className="border-b px-2 py-2">-</td></tr></tbody>
+              <thead><tr>{['Codigo', 'Tipo de Container', 'No Container', 'Tara', 'Peso maximo', 'MGW', 'No Lacre Cia', 'No Lacre export.', 'Acoes'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
+              <tbody>
+                <tr className="bg-sky-300">
+                  <td className="border-b border-r px-2 py-2"><input value="40 HC" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2"><input value="Dry" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2">
+                    <input
+                      value={form.containerDraft}
+                      onChange={(event) => updateForm('containerDraft', event.target.value.toUpperCase())}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          commitContainerDraft()
+                        }
+                      }}
+                      className={textInputClass()}
+                      placeholder="MSCU1234567"
+                    />
+                  </td>
+                  <td className="border-b border-r px-2 py-2"><input value="3800" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2"><input value="25000" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2"><input value="32.500,0000" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2"><input value="LCR-1001" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b border-r px-2 py-2"><input value="-" className={textInputClass(true)} disabled /></td>
+                  <td className="border-b px-2 py-2">
+                    <button type="button" onClick={() => commitContainerDraft()} className="border border-zinc-400 bg-white px-2 py-1 text-xs">Salvar</button>
+                  </td>
+                </tr>
+                {containerRows.map((entry, index) => (
+                  <tr key={entry.id} className={index % 2 ? 'bg-zinc-100' : 'bg-white'}>
+                    <td className="border-b border-r px-2 py-2">{entry.code}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.type}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.number}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.tare}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.maxWeight}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.mgw}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.seal}</td>
+                    <td className="border-b border-r px-2 py-2">{entry.exportSeal}</td>
+                    <td className="border-b px-2 py-2">
+                      <button type="button" onClick={() => removeContainerEntry(entry.id)} className="border border-zinc-400 bg-white px-2 py-1 text-xs text-red-700">Excluir</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>

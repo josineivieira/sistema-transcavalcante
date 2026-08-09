@@ -226,6 +226,18 @@ export type FreightInvoiceEntry = {
   invoiceAccessKey: string
 }
 
+export type FreightContainerEntry = {
+  id: string
+  code: string
+  type: string
+  number: string
+  tare: string
+  maxWeight: string
+  mgw: string
+  seal: string
+  exportSeal: string
+}
+
 export type Freight = {
   id: string
   number: string
@@ -266,6 +278,8 @@ export type Freight = {
   vessel?: string
   tripNumber?: string
   booking?: string
+  containerDraft?: string
+  containerEntries?: FreightContainerEntry[]
   terminalEmpty?: string
   terminalReturn?: string
   recordDates?: boolean
