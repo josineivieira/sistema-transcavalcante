@@ -70,6 +70,31 @@ def _lookup_driving_distance_km(origin_latitude: float, origin_longitude: float,
         return None
 
 
+def _lookup_zip_coordinates(zip_code: str) -> dict:
+    digits = _digits(zip_code)
+    if len(digits) != 8:
+        return {}
+    try:
+        response = httpx.get(f"https://cep.awesomeapi.com.br/json/{digits}", timeout=4.0)
+        response.raise_for_status()
+        data = response.json()
+        latitude = data.get("lat")
+        longitude = data.get("lng")
+        if not latitude or not longitude:
+            return {}
+        return {
+            "zipCode": _format_zip_code(str(data.get("cep") or digits)),
+            "address": _clean_text(data.get("address")),
+            "district": _clean_text(data.get("district")),
+            "city": _clean_text(data.get("city")),
+            "state": _clean_text(data.get("state")).upper(),
+            "latitude": _safe_float(latitude),
+            "longitude": _safe_float(longitude),
+        }
+    except Exception:
+        return {}
+
+
 def _lookup_zip_code(zip_code: str) -> dict:
     digits = _digits(zip_code)
     if len(digits) != 8:
@@ -136,13 +161,19 @@ def resolve_route_destination(
     payload: RouteDestinationRequest,
     _: str = Depends(_require_operational_auth),
 ):
-    zip_data = _lookup_zip_code(payload.zip_code)
+    coordinate_zip_data = _lookup_zip_coordinates(payload.zip_code)
+    zip_data = {**_lookup_zip_code(payload.zip_code), **coordinate_zip_data}
     address = zip_data.get("address", "") or _clean_text(payload.address)
     district = zip_data.get("district", "") or _clean_text(payload.district)
     city = zip_data.get("city", "") or _clean_text(payload.city)
     state = zip_data.get("state", "") or _clean_text(payload.state).upper()
     zip_code = zip_data.get("zipCode", "") or _format_zip_code(payload.zip_code)
-    coordinates = _lookup_coordinates(address, district, city, state, zip_code)
+    coordinates = {
+        "latitude": zip_data.get("latitude", ""),
+        "longitude": zip_data.get("longitude", ""),
+    }
+    if not coordinates["latitude"] or not coordinates["longitude"]:
+        coordinates = _lookup_coordinates(address, district, city, state, zip_code)
 
     destination = f"{city}/{state}" if city and state else city or state
     return {

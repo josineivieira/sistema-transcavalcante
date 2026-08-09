@@ -1704,23 +1704,25 @@ export function FreightsPage() {
         state,
       })
       const data = response.data
-      const originLatitude = side === 'origin' ? data.latitude : form.originLatitude
-      const originLongitude = side === 'origin' ? data.longitude : form.originLongitude
-      const destinationLatitude = side === 'destination' ? data.latitude : form.destinationLatitude
-      const destinationLongitude = side === 'destination' ? data.longitude : form.destinationLongitude
+      const resolvedLatitude = data.latitude && data.latitude !== '0,0000000' ? data.latitude : ''
+      const resolvedLongitude = data.longitude && data.longitude !== '0,0000000' ? data.longitude : ''
+      const originLatitude = side === 'origin' ? resolvedLatitude || form.originLatitude : form.originLatitude
+      const originLongitude = side === 'origin' ? resolvedLongitude || form.originLongitude : form.originLongitude
+      const destinationLatitude = side === 'destination' ? resolvedLatitude || form.destinationLatitude : form.destinationLatitude
+      const destinationLongitude = side === 'destination' ? resolvedLongitude || form.destinationLongitude : form.destinationLongitude
       const distanceKm = await resolveRouteDistanceKm(originLatitude, originLongitude, destinationLatitude, destinationLongitude)
       setForm((current) => {
         const next = { ...current }
         if (side === 'origin') {
           next.origin = data.destination || current.origin
           next.originZipCode = data.zipCode || current.originZipCode
-          next.originLatitude = data.latitude || current.originLatitude
-          next.originLongitude = data.longitude || current.originLongitude
+          next.originLatitude = resolvedLatitude || current.originLatitude
+          next.originLongitude = resolvedLongitude || current.originLongitude
         } else {
           next.destination = data.destination || current.destination
           next.destinationZipCode = data.zipCode || current.destinationZipCode
-          next.destinationLatitude = data.latitude || current.destinationLatitude
-          next.destinationLongitude = data.longitude || current.destinationLongitude
+          next.destinationLatitude = resolvedLatitude || current.destinationLatitude
+          next.destinationLongitude = resolvedLongitude || current.destinationLongitude
         }
         if (distanceKm) {
           next.distance = distanceKm
