@@ -16,6 +16,7 @@ import { LoginPage } from './pages/LoginPage'
 import { UsersPage } from './pages/UsersPage'
 import { PriceListsPage } from './pages/PriceListsPage'
 import { PayrollPage } from './pages/PayrollPage'
+import { TvCorinthiansPage } from './pages/TvCorinthiansPage'
 import { canAccessPath, firstAllowedPath, isAuthenticated } from './services/authSession'
 
 function ProtectedPage({ path, children }: { path: string, children: ReactNode }) {
@@ -47,6 +48,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/tvcorinthians" element={<TvCorinthiansPage />} />
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Navigate to={authenticated ? firstAllowedPath() : '/login'} replace />} />
         <Route path="dashboard" element={<ProtectedPage path="/dashboard"><DashboardPage /></ProtectedPage>} />
