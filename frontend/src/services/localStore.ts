@@ -216,11 +216,19 @@ export type FreightInvoiceEntry = {
   fileName: string
   senderDocument: string
   sender: string
+  senderAddress?: string
+  senderDistrict?: string
+  senderZipCode?: string
   recipientDocument: string
   invoiceNumber: string
   invoiceSeries: string
   invoiceIssueDate: string
   recipient: string
+  recipientAddress?: string
+  recipientDistrict?: string
+  recipientZipCode?: string
+  recipientCity?: string
+  recipientState?: string
   invoiceGoodsValue: string
   invoiceValue: string
   invoiceAccessKey: string

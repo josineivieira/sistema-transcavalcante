@@ -162,14 +162,29 @@ type InvoiceImport = {
   invoices: FreightInvoiceEntry[]
   senderDocument: string
   sender: string
+  senderAddress: string
+  senderDistrict: string
+  senderZipCode: string
   recipientDocument: string
   recipient: string
+  recipientAddress: string
+  recipientDistrict: string
+  recipientZipCode: string
+  recipientCity: string
+  recipientState: string
   invoiceNumber: string
   invoiceSeries: string
   invoiceIssueDate: string
   invoiceGoodsValue: string
   invoiceValue: string
   invoiceAccessKey: string
+}
+
+type RouteDestinationResponse = {
+  destination: string
+  zipCode: string
+  latitude: string
+  longitude: string
 }
 
 const emptyForm: FreightForm = {
@@ -260,8 +275,16 @@ const emptyInvoiceImport: InvoiceImport = {
   invoices: [],
   senderDocument: '',
   sender: '',
+  senderAddress: '',
+  senderDistrict: '',
+  senderZipCode: '',
   recipientDocument: '',
   recipient: '',
+  recipientAddress: '',
+  recipientDistrict: '',
+  recipientZipCode: '',
+  recipientCity: '',
+  recipientState: '',
   invoiceNumber: '',
   invoiceSeries: '',
   invoiceIssueDate: '',
@@ -592,7 +615,13 @@ export function FreightsPage() {
   }, [extraProductSearch])
   const invoiceSenderOptions = useMemo(() => {
     const options = invoiceImport.invoices
-      .map((invoice) => ({ document: invoice.senderDocument, name: invoice.sender }))
+      .map((invoice) => ({
+        document: invoice.senderDocument,
+        name: invoice.sender,
+        address: invoice.senderAddress ?? '',
+        district: invoice.senderDistrict ?? '',
+        zipCode: invoice.senderZipCode ?? '',
+      }))
       .filter((option) => option.document || option.name)
     return Array.from(new Map(options.map((option) => [`${option.document}|${option.name}`, option])).values())
   }, [invoiceImport])
@@ -601,6 +630,11 @@ export function FreightsPage() {
       .map((invoice) => ({
         document: invoice.recipientDocument,
         name: invoice.recipient || `Nota ${invoice.invoiceNumber || invoice.fileName} - informar destinatario`,
+        address: invoice.recipientAddress ?? '',
+        district: invoice.recipientDistrict ?? '',
+        zipCode: invoice.recipientZipCode ?? '',
+        city: invoice.recipientCity ?? '',
+        state: invoice.recipientState ?? '',
       }))
     return Array.from(new Map(options.map((option) => [`${option.document}|${option.name}`, option])).values())
   }, [invoiceImport.invoices])
@@ -1282,17 +1316,41 @@ export function FreightsPage() {
     return formatDanfDate(match?.[1] ?? '')
   }
 
+  function firstZipCode(text: string) {
+    return text.match(/\b\d{5}-?\d{3}\b/)?.[0] ?? ''
+  }
+
+  function lineValueAfterPattern(lines: string[], pattern: RegExp) {
+    return lineAfterPattern(lines, pattern)
+      .replace(/\b\d{5}-?\d{3}\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
+
+  function ufFromLines(lines: string[]) {
+    const joined = `\n${lines.join('\n')}\n`
+    return joined.match(/\nUF\s*\n?\s*([A-Z]{2})\b/i)?.[1]?.toUpperCase() ?? ''
+  }
+
   function invoiceEntryFromImport(invoice: InvoiceImport): FreightInvoiceEntry {
     return {
       id: nextId('nfe'),
       fileName: invoice.fileName,
       senderDocument: invoice.senderDocument,
       sender: invoice.sender,
+      senderAddress: invoice.senderAddress,
+      senderDistrict: invoice.senderDistrict,
+      senderZipCode: invoice.senderZipCode,
       recipientDocument: invoice.recipientDocument,
       invoiceNumber: invoice.invoiceNumber,
       invoiceSeries: invoice.invoiceSeries,
       invoiceIssueDate: invoice.invoiceIssueDate,
       recipient: invoice.recipient,
+      recipientAddress: invoice.recipientAddress,
+      recipientDistrict: invoice.recipientDistrict,
+      recipientZipCode: invoice.recipientZipCode,
+      recipientCity: invoice.recipientCity,
+      recipientState: invoice.recipientState,
       invoiceGoodsValue: invoice.invoiceGoodsValue,
       invoiceValue: invoice.invoiceValue,
       invoiceAccessKey: invoice.invoiceAccessKey,
@@ -1305,6 +1363,8 @@ export function FreightsPage() {
 
     const emit = xml.getElementsByTagName('emit')[0]
     const dest = xml.getElementsByTagName('dest')[0]
+    const enderEmit = emit?.getElementsByTagName('enderEmit')[0] ?? null
+    const enderDest = dest?.getElementsByTagName('enderDest')[0] ?? null
     const ide = xml.getElementsByTagName('ide')[0]
     const total = xml.getElementsByTagName('ICMSTot')[0]
     const infNfe = xml.getElementsByTagName('infNFe')[0]
@@ -1315,8 +1375,16 @@ export function FreightsPage() {
       invoices: [],
       senderDocument: getXmlText(emit, 'CNPJ') || getXmlText(emit, 'CPF'),
       sender: getXmlText(emit, 'xNome'),
+      senderAddress: [getXmlText(enderEmit, 'xLgr'), getXmlText(enderEmit, 'nro')].filter(Boolean).join(', '),
+      senderDistrict: getXmlText(enderEmit, 'xBairro'),
+      senderZipCode: getXmlText(enderEmit, 'CEP'),
       recipientDocument: getXmlText(dest, 'CNPJ') || getXmlText(dest, 'CPF'),
       recipient: getXmlText(dest, 'xNome'),
+      recipientAddress: [getXmlText(enderDest, 'xLgr'), getXmlText(enderDest, 'nro')].filter(Boolean).join(', '),
+      recipientDistrict: getXmlText(enderDest, 'xBairro'),
+      recipientZipCode: getXmlText(enderDest, 'CEP'),
+      recipientCity: getXmlText(enderDest, 'xMun'),
+      recipientState: getXmlText(enderDest, 'UF'),
       invoiceNumber: getXmlText(ide, 'nNF'),
       invoiceSeries: getXmlText(ide, 'serie'),
       invoiceIssueDate: formatIsoDate(getXmlText(ide, 'dhEmi') || getXmlText(ide, 'dEmi')),
@@ -1475,14 +1543,23 @@ export function FreightsPage() {
     const transportBlock = normalized.match(/TRANSPORTADOR\/VOLUMES TRANSPORTADOS([\s\S]*?)(?:DADOS DO PRODUTO|C[ÁA]LCULO DO ISSQN|$)/i)?.[1] ?? ''
 
     const senderFromReceipt = normalized.match(/RECEBEMOS DE\s+(.+?)\s+OS PRODUTOS/i)?.[1]?.trim() ?? ''
+    const issuerBlockLines = natureIndex > 0 ? lines.slice(0, natureIndex) : lines.slice(0, 25)
+    const issuerBlock = issuerBlockLines.join('\n')
     const sender = senderFromReceipt || issuerCandidates[0] || extractAfterLabel(normalized, 'NOME / RAZAO SOCIAL') || extractAfterLabel(transportBlock, 'NOME / RAZAO SOCIAL')
     const senderDocument = documentFromAccessKey(normalized) || firstFormattedDocument(normalized) || extractAfterLabel(normalized, 'CNPJ')
+    const senderAddress = issuerBlockLines.find((line) => /\b(RUA|AV\.?|AVENIDA|ROD\.?|RODOVIA|ESTRADA|TRAVESSA|ALAMEDA)\b/i.test(plainText(line))) ?? ''
+    const senderZipCode = firstZipCode(issuerBlock)
     const recipient = recipientFromDanfText(normalized, sender)
       || recipientFromDanfSection(lines, sender)
       || lineAfterPattern(recipientContextLines, /NOME\s*\/?\s*RAZ/i)
       || extractAfterLabel(destBlock, 'NOME/RAZAO SOCIAL')
       || extractAfterLabel(destBlock, 'NOME / RAZAO SOCIAL')
     const recipientDocument = firstFormattedDocument(destBlock) || firstFormattedDocument(recipientContextLines.join('\n')) || extractAfterLabel(destBlock, 'CNPJ/CPF') || extractAfterLabel(destBlock, 'CNPJ / CPF')
+    const recipientAddress = lineValueAfterPattern(destinationLines, /ENDERE[CÇ]O/i)
+    const recipientDistrict = lineValueAfterPattern(destinationLines, /BAIRRO/i)
+    const recipientZipCode = firstZipCode(destBlock)
+    const recipientCity = lineValueAfterPattern(destinationLines, /MUNIC[IÍ]PIO/i)
+    const recipientState = ufFromLines(destinationLines)
     const invoiceAccessKey = accessKeyFromText(normalized)
     const invoiceNumberFromKey = invoiceNumberFromAccessKey(invoiceAccessKey)
     const invoiceNumberFromLabel = normalized.match(/N[ºo]\s*(?:NF-?E|NF)?\s*((?:\d[\s.]*){6,12})/i)?.[1]
@@ -1510,8 +1587,16 @@ export function FreightsPage() {
       invoices: [],
       senderDocument,
       sender,
+      senderAddress,
+      senderDistrict: '',
+      senderZipCode,
       recipientDocument,
       recipient,
+      recipientAddress,
+      recipientDistrict,
+      recipientZipCode,
+      recipientCity,
+      recipientState,
       invoiceNumber,
       invoiceSeries: safeInvoiceSeries,
       invoiceIssueDate,
@@ -1539,8 +1624,16 @@ export function FreightsPage() {
       fileName: invoices.map((invoice) => invoice.fileName).join(', '),
       senderDocument: current.senderDocument || extracted.senderDocument,
       sender: current.sender || extracted.sender,
+      senderAddress: current.senderAddress || extracted.senderAddress,
+      senderDistrict: current.senderDistrict || extracted.senderDistrict,
+      senderZipCode: current.senderZipCode || extracted.senderZipCode,
       recipientDocument: current.recipientDocument || extracted.recipientDocument,
       recipient: current.recipient || extracted.recipient,
+      recipientAddress: current.recipientAddress || extracted.recipientAddress,
+      recipientDistrict: current.recipientDistrict || extracted.recipientDistrict,
+      recipientZipCode: current.recipientZipCode || extracted.recipientZipCode,
+      recipientCity: current.recipientCity || extracted.recipientCity,
+      recipientState: current.recipientState || extracted.recipientState,
       invoices,
     }
   }
@@ -1557,8 +1650,28 @@ export function FreightsPage() {
         invoices,
         recipientDocument: selectedStillExists ? current.recipientDocument : selectedInvoice?.recipientDocument ?? current.recipientDocument,
         recipient: selectedStillExists ? current.recipient : selectedInvoice?.recipient ?? current.recipient,
+        recipientAddress: selectedStillExists ? current.recipientAddress : selectedInvoice?.recipientAddress ?? current.recipientAddress,
+        recipientDistrict: selectedStillExists ? current.recipientDistrict : selectedInvoice?.recipientDistrict ?? current.recipientDistrict,
+        recipientZipCode: selectedStillExists ? current.recipientZipCode : selectedInvoice?.recipientZipCode ?? current.recipientZipCode,
+        recipientCity: selectedStillExists ? current.recipientCity : selectedInvoice?.recipientCity ?? current.recipientCity,
+        recipientState: selectedStillExists ? current.recipientState : selectedInvoice?.recipientState ?? current.recipientState,
       }
     })
+  }
+
+  async function resolveImportedDestination(importData: InvoiceImport) {
+    try {
+      const response = await api.post<RouteDestinationResponse>('/operational-options/route-destination', {
+        zip_code: importData.recipientZipCode,
+        address: importData.recipientAddress,
+        district: importData.recipientDistrict,
+        city: importData.recipientCity,
+        state: importData.recipientState,
+      })
+      return response.data
+    } catch {
+      return null
+    }
   }
 
   async function readInvoiceFiles(files: FileList | File[]) {
@@ -1609,7 +1722,8 @@ export function FreightsPage() {
     }
   }
 
-  function applyInvoiceImport() {
+  async function applyInvoiceImport() {
+    const routeDestination = await resolveImportedDestination(invoiceImport)
     setForm((current) => {
       const importedInvoices = invoiceImport.invoices.length ? invoiceImport.invoices : [invoiceEntryFromImport(invoiceImport)]
       const existingInvoices = current.invoiceEntries ?? []
@@ -1634,6 +1748,13 @@ export function FreightsPage() {
         invoiceValue: firstInvoice?.invoiceValue || current.invoiceValue,
         invoiceAccessKey: firstInvoice?.invoiceAccessKey || current.invoiceAccessKey,
         invoiceEntries: mergedInvoices,
+      }
+      if (routeDestination?.destination) {
+        next.destination = routeDestination.destination
+        next.destinationZipCode = routeDestination.zipCode || current.destinationZipCode
+        next.destinationLatitude = routeDestination.latitude || current.destinationLatitude
+        next.destinationLongitude = routeDestination.longitude || current.destinationLongitude
+        next.routeName = `${next.origin || 'Manaus/AM'} X ${routeDestination.destination}`
       }
       if (editingFreightId) {
         const currentFreight = freights.find((freight) => freight.id === editingFreightId)
@@ -2645,8 +2766,17 @@ export function FreightsPage() {
                       <select
                         value={`${invoiceImport.senderDocument}|${invoiceImport.sender}`}
                         onChange={(event) => {
-                          const [document, name] = event.target.value.split('|')
-                          setInvoiceImport({ ...invoiceImport, senderDocument: document, sender: name })
+                          const option = invoiceSenderOptions.find((item) => `${item.document}|${item.name}` === event.target.value)
+                          if (option) {
+                            setInvoiceImport({
+                              ...invoiceImport,
+                              senderDocument: option.document,
+                              sender: option.name,
+                              senderAddress: option.address,
+                              senderDistrict: option.district,
+                              senderZipCode: option.zipCode,
+                            })
+                          }
                         }}
                         className={textInputClass()}
                       >
@@ -2656,6 +2786,9 @@ export function FreightsPage() {
                   )}
                   <Field label="CNPJ/CPF"><input value={invoiceImport.senderDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderDocument: event.target.value })} className={textInputClass()} /></Field>
                   <Field label="Remetente"><input value={invoiceImport.sender} onChange={(event) => setInvoiceImport({ ...invoiceImport, sender: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="Endereco"><input value={invoiceImport.senderAddress} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderAddress: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="Bairro"><input value={invoiceImport.senderDistrict} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderDistrict: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="CEP"><input value={invoiceImport.senderZipCode} onChange={(event) => setInvoiceImport({ ...invoiceImport, senderZipCode: event.target.value })} className={textInputClass()} /></Field>
                 </div>
                 <div className="grid gap-1">
                   <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / RECEBEDOR</div>
@@ -2664,8 +2797,19 @@ export function FreightsPage() {
                       <select
                         value={`${invoiceImport.recipientDocument}|${invoiceImport.recipient}`}
                         onChange={(event) => {
-                          const [document, name] = event.target.value.split('|')
-                          setInvoiceImport({ ...invoiceImport, recipientDocument: document, recipient: name })
+                          const option = invoiceRecipientOptions.find((item) => `${item.document}|${item.name}` === event.target.value)
+                          if (option) {
+                            setInvoiceImport({
+                              ...invoiceImport,
+                              recipientDocument: option.document,
+                              recipient: option.name,
+                              recipientAddress: option.address,
+                              recipientDistrict: option.district,
+                              recipientZipCode: option.zipCode,
+                              recipientCity: option.city,
+                              recipientState: option.state,
+                            })
+                          }
                         }}
                         className={textInputClass()}
                       >
@@ -2675,6 +2819,9 @@ export function FreightsPage() {
                   )}
                   <Field label="CNPJ/CPF"><input value={invoiceImport.recipientDocument} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientDocument: event.target.value })} className={textInputClass()} /></Field>
                   <Field label="Destinatario"><input value={invoiceImport.recipient} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipient: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="Endereco"><input value={invoiceImport.recipientAddress} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientAddress: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="Bairro"><input value={invoiceImport.recipientDistrict} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientDistrict: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
+                  <Field label="CEP"><input value={invoiceImport.recipientZipCode} onChange={(event) => setInvoiceImport({ ...invoiceImport, recipientZipCode: event.target.value })} className={textInputClass()} /></Field>
                 </div>
               </div>
               {invoiceImport.invoices.length > 1 && (

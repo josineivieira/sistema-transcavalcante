@@ -1,10 +1,87 @@
+import re
+
+import httpx
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.v1.operational_data import _get_or_create_snapshot, _require_operational_auth
 from app.database.session import get_db
 
 router = APIRouter()
+
+
+class RouteDestinationRequest(BaseModel):
+    zip_code: str = ""
+    address: str = ""
+    district: str = ""
+    city: str = ""
+    state: str = ""
+
+
+def _digits(value: str) -> str:
+    return "".join(char for char in str(value or "") if char.isdigit())
+
+
+def _clean_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _format_zip_code(value: str) -> str:
+    digits = _digits(value)[:8]
+    if len(digits) == 8:
+        return f"{digits[:5]}-{digits[5:]}"
+    return str(value or "").strip()
+
+
+def _safe_float(value: object) -> str:
+    text = str(value or "").strip()
+    return text.replace(".", ",") if text else "0,0000000"
+
+
+def _lookup_zip_code(zip_code: str) -> dict:
+    digits = _digits(zip_code)
+    if len(digits) != 8:
+        return {}
+    try:
+        response = httpx.get(f"https://viacep.com.br/ws/{digits}/json/", timeout=4.0)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("erro"):
+            return {}
+        return {
+            "zipCode": _format_zip_code(str(data.get("cep") or digits)),
+            "address": _clean_text(data.get("logradouro")),
+            "district": _clean_text(data.get("bairro")),
+            "city": _clean_text(data.get("localidade")),
+            "state": _clean_text(data.get("uf")).upper(),
+        }
+    except Exception:
+        return {}
+
+
+def _lookup_coordinates(address: str, district: str, city: str, state: str, zip_code: str) -> dict:
+    query = ", ".join(part for part in [address, district, city, state, zip_code, "Brasil"] if part)
+    if not query.strip(", "):
+        return {}
+    try:
+        response = httpx.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": query, "format": "json", "limit": 1, "addressdetails": 0},
+            headers={"User-Agent": "transcavalcante-operational-system/1.0"},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not rows:
+            return {}
+        first = rows[0]
+        return {
+            "latitude": _safe_float(first.get("lat")),
+            "longitude": _safe_float(first.get("lon")),
+        }
+    except Exception:
+        return {}
 
 
 def _matches(value: object, search: str) -> bool:
@@ -15,6 +92,32 @@ def _matches(value: object, search: str) -> bool:
 
 def _limit_rows(rows: list[dict], limit: int) -> list[dict]:
     return rows[: max(1, min(limit, 200))]
+
+
+@router.post("/route-destination")
+def resolve_route_destination(
+    payload: RouteDestinationRequest,
+    _: str = Depends(_require_operational_auth),
+):
+    zip_data = _lookup_zip_code(payload.zip_code)
+    address = _clean_text(payload.address) or zip_data.get("address", "")
+    district = _clean_text(payload.district) or zip_data.get("district", "")
+    city = _clean_text(payload.city) or zip_data.get("city", "")
+    state = _clean_text(payload.state).upper() or zip_data.get("state", "")
+    zip_code = _format_zip_code(payload.zip_code) or zip_data.get("zipCode", "")
+    coordinates = _lookup_coordinates(address, district, city, state, zip_code)
+
+    destination = f"{city}/{state}" if city and state else city or state
+    return {
+        "destination": destination,
+        "address": address,
+        "district": district,
+        "zipCode": zip_code,
+        "city": city,
+        "state": state,
+        "latitude": coordinates.get("latitude", "0,0000000"),
+        "longitude": coordinates.get("longitude", "0,0000000"),
+    }
 
 
 @router.get("/freight-form")
