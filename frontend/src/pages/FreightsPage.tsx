@@ -1674,6 +1674,39 @@ export function FreightsPage() {
     }
   }
 
+  async function resolveRouteZip(side: 'origin' | 'destination') {
+    const zipCode = side === 'origin' ? form.originZipCode : form.destinationZipCode
+    if (zipCode.replace(/\D/g, '').length < 8) return
+    const place = side === 'origin' ? form.origin : form.destination
+    const [city = '', state = ''] = place.split('/').map((part) => part.trim())
+    try {
+      const response = await api.post<RouteDestinationResponse>('/operational-options/route-destination', {
+        zip_code: zipCode,
+        city,
+        state,
+      })
+      const data = response.data
+      setForm((current) => {
+        const next = { ...current }
+        if (side === 'origin') {
+          next.origin = data.destination || current.origin
+          next.originZipCode = data.zipCode || current.originZipCode
+          next.originLatitude = data.latitude || current.originLatitude
+          next.originLongitude = data.longitude || current.originLongitude
+        } else {
+          next.destination = data.destination || current.destination
+          next.destinationZipCode = data.zipCode || current.destinationZipCode
+          next.destinationLatitude = data.latitude || current.destinationLatitude
+          next.destinationLongitude = data.longitude || current.destinationLongitude
+        }
+        next.routeName = `${next.origin} X ${next.destination}`.replace(/^ X | X $/g, '')
+        return next
+      })
+    } catch {
+      // CEP sem retorno mantem os campos atuais para o usuario conferir manualmente.
+    }
+  }
+
   async function readInvoiceFiles(files: FileList | File[]) {
     const fileList = Array.from(files)
     if (!fileList.length) return
@@ -1952,14 +1985,40 @@ export function FreightsPage() {
                 <Field label="Porto/Cidade origem" required><input value={form.origin} onChange={(event) => updateForm('origin', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
                 <Field label="Latitude"><input value={form.originLatitude} onChange={(event) => updateForm('originLatitude', event.target.value)} className={textInputClass()} /></Field>
                 <Field label="Longitude"><input value={form.originLongitude} onChange={(event) => updateForm('originLongitude', event.target.value)} className={textInputClass()} /></Field>
-                <Field label="CEP"><input value={form.originZipCode} onChange={(event) => updateForm('originZipCode', event.target.value)} className={textInputClass()} /></Field>
+                <Field label="CEP">
+                  <input
+                    value={form.originZipCode}
+                    onChange={(event) => updateForm('originZipCode', event.target.value)}
+                    onBlur={() => void resolveRouteZip('origin')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void resolveRouteZip('origin')
+                      }
+                    }}
+                    className={textInputClass()}
+                  />
+                </Field>
               </div>
               <div className="grid gap-1">
                 <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINO</div>
                 <Field label="Porto/Cidade destino" required><input value={form.destination} onChange={(event) => updateForm('destination', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
                 <Field label="Latitude"><input value={form.destinationLatitude} onChange={(event) => updateForm('destinationLatitude', event.target.value)} className={textInputClass()} /></Field>
                 <Field label="Longitude"><input value={form.destinationLongitude} onChange={(event) => updateForm('destinationLongitude', event.target.value)} className={textInputClass()} /></Field>
-                <Field label="CEP"><input value={form.destinationZipCode} onChange={(event) => updateForm('destinationZipCode', event.target.value)} className={textInputClass()} /></Field>
+                <Field label="CEP">
+                  <input
+                    value={form.destinationZipCode}
+                    onChange={(event) => updateForm('destinationZipCode', event.target.value)}
+                    onBlur={() => void resolveRouteZip('destination')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void resolveRouteZip('destination')
+                      }
+                    }}
+                    className={textInputClass()}
+                  />
+                </Field>
               </div>
             </div>
             <div className="mt-5 max-w-xl border-t border-zinc-400 pt-3">
