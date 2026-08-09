@@ -1,3 +1,4 @@
+import math
 import re
 
 import httpx
@@ -19,6 +20,13 @@ class RouteDestinationRequest(BaseModel):
     state: str = ""
 
 
+class RouteDistanceRequest(BaseModel):
+    origin_latitude: str = ""
+    origin_longitude: str = ""
+    destination_latitude: str = ""
+    destination_longitude: str = ""
+
+
 def _digits(value: str) -> str:
     return "".join(char for char in str(value or "") if char.isdigit())
 
@@ -37,6 +45,42 @@ def _format_zip_code(value: str) -> str:
 def _safe_float(value: object) -> str:
     text = str(value or "").strip()
     return text.replace(".", ",") if text else "0,0000000"
+
+
+def _parse_coordinate(value: str) -> float:
+    return float(str(value or "0").replace(",", "."))
+
+
+def _format_km(value: float) -> str:
+    return f"{value:.4f}".replace(".", ",")
+
+
+def _haversine_km(origin_latitude: float, origin_longitude: float, destination_latitude: float, destination_longitude: float) -> float:
+    earth_radius_km = 6371.0
+    lat1 = math.radians(origin_latitude)
+    lon1 = math.radians(origin_longitude)
+    lat2 = math.radians(destination_latitude)
+    lon2 = math.radians(destination_longitude)
+    delta_lat = lat2 - lat1
+    delta_lon = lon2 - lon1
+    value = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
+    return earth_radius_km * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
+
+
+def _lookup_driving_distance_km(origin_latitude: float, origin_longitude: float, destination_latitude: float, destination_longitude: float) -> float | None:
+    try:
+        response = httpx.get(
+            f"https://router.project-osrm.org/route/v1/driving/{origin_longitude},{origin_latitude};{destination_longitude},{destination_latitude}",
+            params={"overview": "false"},
+            timeout=6.0,
+        )
+        response.raise_for_status()
+        routes = response.json().get("routes") or []
+        if not routes:
+            return None
+        return float(routes[0].get("distance") or 0) / 1000
+    except Exception:
+        return None
 
 
 def _lookup_zip_code(zip_code: str) -> dict:
@@ -124,6 +168,30 @@ def resolve_route_destination(
         "latitude": coordinates.get("latitude", "0,0000000"),
         "longitude": coordinates.get("longitude", "0,0000000"),
     }
+
+
+@router.post("/route-distance")
+def resolve_route_distance(
+    payload: RouteDistanceRequest,
+    _: str = Depends(_require_operational_auth),
+):
+    try:
+        origin_latitude = _parse_coordinate(payload.origin_latitude)
+        origin_longitude = _parse_coordinate(payload.origin_longitude)
+        destination_latitude = _parse_coordinate(payload.destination_latitude)
+        destination_longitude = _parse_coordinate(payload.destination_longitude)
+    except ValueError:
+        return {"distanceKm": "0,0000", "source": "invalid"}
+
+    if not all([origin_latitude, origin_longitude, destination_latitude, destination_longitude]):
+        return {"distanceKm": "0,0000", "source": "empty"}
+
+    driving_distance = _lookup_driving_distance_km(origin_latitude, origin_longitude, destination_latitude, destination_longitude)
+    if driving_distance is not None and driving_distance > 0:
+        return {"distanceKm": _format_km(driving_distance), "source": "route"}
+
+    straight_distance = _haversine_km(origin_latitude, origin_longitude, destination_latitude, destination_longitude)
+    return {"distanceKm": _format_km(straight_distance), "source": "estimated"}
 
 
 @router.get("/freight-form")
