@@ -489,6 +489,7 @@ export function FreightsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
   const [plannedExpenseEdit, setPlannedExpenseEdit] = useState<string | null>(null)
+  const [savingFreightMode, setSavingFreightMode] = useState<'save' | 'save-close' | null>(null)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({
     processNumber: '',
@@ -1127,15 +1128,19 @@ export function FreightsPage() {
       denyNoPrivilege()
       return
     }
+    if (savingFreightMode) return
+    setSavingFreightMode(closeAfterSave ? 'save-close' : 'save')
     const process = form.process || nextProcessCode()
     const existingByProcess = freights.find((freight) => freight.process.toUpperCase() === process.toUpperCase())
     const activeFreightId = editingFreightId || existingByProcess?.id || null
     const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== activeFreightId)
     if (duplicatedProcess) {
+      setSavingFreightMode(null)
       window.alert('Codigo do processo ja existe. Gere ou informe outro codigo.')
       return
     }
     if (!process || !form.processType || !form.customer || !form.serviceTaker) {
+      setSavingFreightMode(null)
       window.alert('Informe Codigo do processo, Tipo processo, Cliente e Tomador do servico.')
       return
     }
@@ -1167,6 +1172,8 @@ export function FreightsPage() {
       }
     } catch {
       window.alert('Nao foi possivel salvar este frete no banco. Verifique os dados e tente novamente.')
+    } finally {
+      setSavingFreightMode(null)
     }
   }
 
@@ -2259,8 +2266,12 @@ export function FreightsPage() {
             <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
               <h3 className="text-lg font-normal text-red-600">Transporte rodoviario de container</h3>
               <div className="flex flex-wrap items-center gap-3 text-xs">
-                <button onClick={() => saveFreight(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
-                <button onClick={() => saveFreight(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
+                <button onClick={() => saveFreight(false)} disabled={Boolean(savingFreightMode)} className="inline-flex items-center gap-1 disabled:opacity-70">
+                  {savingFreightMode === 'save' ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-950" /> : <Save size={15} />} SALVAR
+                </button>
+                <button onClick={() => saveFreight(true)} disabled={Boolean(savingFreightMode)} className="inline-flex items-center gap-1 disabled:opacity-70">
+                  {savingFreightMode === 'save-close' ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-950" /> : <Save size={15} />} SALVAR E SAIR
+                </button>
                 <button onClick={requestDeleteFreight} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
                 <button className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
                 <Info size={16} />
