@@ -981,6 +981,7 @@ export function FreightsPage() {
       contractorDocument: issuerDocument,
       contractor: issuerName,
       container: '',
+      documentReleaseDate: new Date().toISOString().slice(0, 10),
     })
     setActiveTab('GERAIS')
   }
@@ -1020,6 +1021,7 @@ export function FreightsPage() {
       recipientDocument: freight.recipientDocument ?? '',
       recipient: freight.recipient ?? freight.customer,
       routeName: freight.routeName || `${freight.origin || ''} X ${freight.destination || ''}`.replace(/^ X | X $/g, ''),
+      documentReleaseDate: savedForm.documentReleaseDate || freight.date,
       origin: freight.origin,
       destination: freight.destination,
       driver: freight.driver,
@@ -1080,6 +1082,7 @@ export function FreightsPage() {
   }
 
   function buildFreightRecord(formSnapshot: FreightForm, existing?: Freight): Freight {
+    const createdDate = existing?.date ?? new Date().toISOString().slice(0, 10)
     const matchedPrice = priceValueForProcess(formSnapshot.product, formSnapshot.origin, formSnapshot.destination)
     const rawValue = parseBrazilianNumber(formSnapshot.value || formSnapshot.plannedFreightCost)
     const value = rawValue > 0 ? rawValue : parseBrazilianNumber(matchedPrice)
@@ -1091,7 +1094,7 @@ export function FreightsPage() {
       ...formSnapshot,
       id: existing?.id ?? nextId('fr'),
       number: existing?.number ?? formSnapshot.process,
-      date: existing?.date ?? new Date().toISOString().slice(0, 10),
+      date: createdDate,
       customer: formSnapshot.customer,
       process: formSnapshot.process,
       processType: formSnapshot.processType,
@@ -1111,6 +1114,7 @@ export function FreightsPage() {
       trailerPlate: trailer?.trailerPlate ?? trailerOption?.plate ?? existing?.trailerPlate ?? formSnapshot.trailerId,
       origin: formSnapshot.origin,
       destination: formSnapshot.destination,
+      documentReleaseDate: formSnapshot.documentReleaseDate || createdDate,
       value,
       operationalStatus: formSnapshot.status || existing?.operationalStatus || 'AGENDAMENTO E CARREGAMENTO 15',
       fiscalStatus: existing?.fiscalStatus ?? 'Pendente',
@@ -1923,14 +1927,14 @@ export function FreightsPage() {
               <Field label="Dt. liberacao documento"><input type="date" value={form.documentReleaseDate} onChange={(event) => updateForm('documentReleaseDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. retirada porto destino"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. agendamento entrega" required><input type="date" value={form.destinationScheduleDate} onChange={(event) => updateForm('destinationScheduleDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Hr. agendamento entrega"><input value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. agendamento entrega"><input type="time" value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
             </div>
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / DEVOLUCAO</div>
               <Field label="Dt.chegada destinatario"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Hr. chegada destinatario"><input value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. chegada destinatario"><input type="time" value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. saida destinatario"><input type="date" value={form.destinationDepartureDate} onChange={(event) => updateForm('destinationDepartureDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Hr. saida destinatario"><input value={form.destinationDepartureTime} onChange={(event) => updateForm('destinationDepartureTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. saida destinatario"><input type="time" value={form.destinationDepartureTime} onChange={(event) => updateForm('destinationDepartureTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. devolucao CNTR"><input type="date" value={form.cntrReturnDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
             </div>
           </div>
