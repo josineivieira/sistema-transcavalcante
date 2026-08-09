@@ -61,27 +61,33 @@ def _lookup_zip_code(zip_code: str) -> dict:
 
 
 def _lookup_coordinates(address: str, district: str, city: str, state: str, zip_code: str) -> dict:
-    query = ", ".join(part for part in [address, district, city, state, zip_code, "Brasil"] if part)
-    if not query.strip(", "):
+    queries = [
+        ", ".join(part for part in [address, district, city, state, zip_code, "Brasil"] if part),
+        ", ".join(part for part in [zip_code, city, state, "Brasil"] if part),
+        ", ".join(part for part in [city, state, "Brasil"] if part),
+    ]
+    queries = [query for index, query in enumerate(queries) if query.strip(", ") and query not in queries[:index]]
+    if not queries:
         return {}
-    try:
-        response = httpx.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": query, "format": "json", "limit": 1, "addressdetails": 0},
-            headers={"User-Agent": "transcavalcante-operational-system/1.0"},
-            timeout=5.0,
-        )
-        response.raise_for_status()
-        rows = response.json()
-        if not rows:
-            return {}
-        first = rows[0]
-        return {
-            "latitude": _safe_float(first.get("lat")),
-            "longitude": _safe_float(first.get("lon")),
-        }
-    except Exception:
-        return {}
+    for query in queries:
+        try:
+            response = httpx.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": query, "format": "json", "limit": 1, "addressdetails": 0},
+                headers={"User-Agent": "transcavalcante-operational-system/1.0"},
+                timeout=5.0,
+            )
+            response.raise_for_status()
+            rows = response.json()
+            if rows:
+                first = rows[0]
+                return {
+                    "latitude": _safe_float(first.get("lat")),
+                    "longitude": _safe_float(first.get("lon")),
+                }
+        except Exception:
+            continue
+    return {}
 
 
 def _matches(value: object, search: str) -> bool:
@@ -100,11 +106,11 @@ def resolve_route_destination(
     _: str = Depends(_require_operational_auth),
 ):
     zip_data = _lookup_zip_code(payload.zip_code)
-    address = _clean_text(payload.address) or zip_data.get("address", "")
-    district = _clean_text(payload.district) or zip_data.get("district", "")
-    city = _clean_text(payload.city) or zip_data.get("city", "")
-    state = _clean_text(payload.state).upper() or zip_data.get("state", "")
-    zip_code = _format_zip_code(payload.zip_code) or zip_data.get("zipCode", "")
+    address = zip_data.get("address", "") or _clean_text(payload.address)
+    district = zip_data.get("district", "") or _clean_text(payload.district)
+    city = zip_data.get("city", "") or _clean_text(payload.city)
+    state = zip_data.get("state", "") or _clean_text(payload.state).upper()
+    zip_code = zip_data.get("zipCode", "") or _format_zip_code(payload.zip_code)
     coordinates = _lookup_coordinates(address, district, city, state, zip_code)
 
     destination = f"{city}/{state}" if city and state else city or state
