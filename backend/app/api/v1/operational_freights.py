@@ -234,6 +234,10 @@ def _date_from_payload(value: object, fallback: date | None = None) -> date:
         return fallback or date.today()
 
 
+def _freight_internal_number(data: dict, external_id: str) -> str:
+    return str(data.get("process") or data.get("number") or external_id).strip()[:50]
+
+
 def _upsert_freight_data(db: Session, data: dict) -> Freight:
     external_id = str(data.get("id") or data.get("number") or data.get("process") or "").strip()
     if not external_id:
@@ -241,13 +245,16 @@ def _upsert_freight_data(db: Session, data: dict) -> Freight:
 
     company = _get_company(db, data)
     customer = _get_customer(db, company.id, data)
+    process_number = str(data.get("process") or "").strip()
     freight = db.query(Freight).filter(Freight.company_id == company.id, Freight.external_id == external_id).first()
+    if freight is None and process_number:
+        freight = db.query(Freight).filter(Freight.company_id == company.id, Freight.process_number == process_number).first()
     if freight is None:
         freight = Freight(
             company_id=company.id,
             customer_id=customer.id,
             external_id=external_id,
-            internal_number=str(data.get("number") or data.get("process") or external_id),
+            internal_number=_freight_internal_number(data, external_id),
             service_type=str(data.get("product") or data.get("processType") or "Frete"),
             execution_date=_date_from_payload(data.get("date")),
             origin_city=_city_from_value(data.get("origin")),
@@ -259,8 +266,9 @@ def _upsert_freight_data(db: Session, data: dict) -> Freight:
         db.add(freight)
 
     freight.customer_id = customer.id
-    freight.internal_number = str(data.get("number") or freight.internal_number or external_id)
-    freight.process_number = str(data.get("process") or "")
+    freight.external_id = freight.external_id or external_id
+    freight.internal_number = _freight_internal_number(data, external_id)
+    freight.process_number = process_number
     freight.container_number = str(data.get("container") or "")
     freight.service_type = str(data.get("product") or data.get("processType") or "Frete")
     freight.execution_date = _date_from_payload(data.get("date"), freight.execution_date)

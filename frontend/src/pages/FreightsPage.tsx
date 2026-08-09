@@ -1087,11 +1087,10 @@ export function FreightsPage() {
     const trailer = trailers.find((item) => item.id === formSnapshot.trailerId)
     const tractorOption = lookupOptions.tractors.find((item) => item.id === formSnapshot.tractorId || item.plate === formSnapshot.tractorId)
     const trailerOption = lookupOptions.trailers.find((item) => item.id === formSnapshot.trailerId || item.plate === formSnapshot.trailerId)
-    const createdNumber = `FRT-${String(freights.length + 1).padStart(6, '0')}`
     return {
       ...formSnapshot,
       id: existing?.id ?? nextId('fr'),
-      number: existing?.number ?? createdNumber,
+      number: existing?.number ?? formSnapshot.process,
       date: existing?.date ?? new Date().toISOString().slice(0, 10),
       customer: formSnapshot.customer,
       process: formSnapshot.process,
