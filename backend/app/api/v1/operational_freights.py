@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,10 +16,58 @@ from app.models.customer import Customer
 from app.models.freight import Freight, FreightTask
 
 router = APIRouter()
+_freight_schema_checked = False
 
 
 class OperationalFreightPayload(BaseModel):
     data: dict = Field(default_factory=dict)
+
+
+def _ensure_freight_operational_schema(db: Session) -> None:
+    global _freight_schema_checked
+    if _freight_schema_checked or db.bind is None or db.bind.dialect.name != "postgresql":
+        return
+
+    statements = [
+        "ALTER TABLE freights ALTER COLUMN operational_status TYPE VARCHAR(255)",
+        "ALTER TABLE freights ALTER COLUMN container_number TYPE VARCHAR(120)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS external_id VARCHAR(120)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS sender_document VARCHAR(30)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS recipient_name VARCHAR(255)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS recipient_document VARCHAR(30)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS tractor_plate VARCHAR(20)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS trailer_plate VARCHAR(20)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS payload JSONB",
+        """
+        CREATE TABLE IF NOT EXISTS freight_tasks (
+            id UUID PRIMARY KEY,
+            company_id UUID NOT NULL REFERENCES companies(id),
+            freight_id UUID NOT NULL REFERENCES freights(id),
+            external_id VARCHAR(120) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            description VARCHAR(255) NOT NULL DEFAULT '',
+            status VARCHAR(50) NOT NULL DEFAULT 'ENCERRADO',
+            send_to_customer VARCHAR(5) NOT NULL DEFAULT 'N',
+            start_date VARCHAR(50) NOT NULL DEFAULT '',
+            end_date VARCHAR(50) NOT NULL DEFAULT '',
+            completion_percent INTEGER NOT NULL DEFAULT 0,
+            internal_use VARCHAR(5) NOT NULL DEFAULT 'N',
+            time_label VARCHAR(50) NOT NULL DEFAULT '',
+            user_name VARCHAR(255) NOT NULL DEFAULT '',
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL
+        )
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_freights_company_external_id ON freights (company_id, external_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_freight_tasks_freight_external ON freight_tasks (freight_id, external_id)",
+    ]
+    for statement in statements:
+        db.execute(text(statement))
+    db.commit()
+    _freight_schema_checked = True
 
 
 def _require_permission(db: Session, email: str, permission: str) -> dict:
@@ -285,6 +333,7 @@ def list_operational_freights(
     db: Session = Depends(get_db),
 ):
     _require_permission(db, email, "view")
+    _ensure_freight_operational_schema(db)
     _migrate_legacy_freights(db)
     snapshot = _get_or_create_snapshot(db)
     deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
@@ -369,6 +418,7 @@ def upsert_operational_freight(
     db: Session = Depends(get_db),
 ):
     _require_permission(db, email, "edit")
+    _ensure_freight_operational_schema(db)
     data = deepcopy(payload.data)
     data["id"] = external_id
     freight = _upsert_freight_data(db, data)
@@ -385,6 +435,7 @@ def delete_operational_freight(
     db: Session = Depends(get_db),
 ):
     _require_permission(db, email, "edit")
+    _ensure_freight_operational_schema(db)
     freight = db.query(Freight).filter(or_(
         Freight.external_id == external_id,
         Freight.process_number == external_id,
