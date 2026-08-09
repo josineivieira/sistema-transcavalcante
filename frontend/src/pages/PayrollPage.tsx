@@ -698,23 +698,23 @@ function PayrollGrid({
 function Payslip({ closing, payrollTotals, issuer }: { closing: PayrollForm, payrollTotals: PayrollTotals, issuer: IssuerSettings }) {
   const baseLegal = payrollTaxBase(closing)
   const rows: PayslipRow[] = [
-    { code: '001', description: 'Salario base - 1a quinzena', reference: '15 dias', earning: closing.firstFortnightSalary },
-    { code: '002', description: 'Horas extras - 1a quinzena', reference: 'HE', earning: closing.firstFortnightOvertime },
+    { code: '100', description: 'SALARIO MENSAL - 1A QUINZENA', reference: '15,00', earning: closing.firstFortnightSalary },
+    { code: '120', description: 'HORAS EXTRAS - 1A QUINZENA', reference: 'HE', earning: closing.firstFortnightOvertime },
     { code: '501', description: 'Desconto - 1a quinzena', reference: 'Lancamento', discount: closing.firstFortnightDiscount },
-    { code: '003', description: 'Salario base - 2a quinzena', reference: '15 dias', earning: closing.secondFortnightSalary },
-    { code: '004', description: 'Horas extras - 2a quinzena', reference: 'HE', earning: closing.secondFortnightOvertime },
-    { code: '110', description: 'Ajuda de custo / transporte', reference: 'Informado', earning: closing.transport },
-    { code: '120', description: 'Media salarial', reference: 'Folha', earning: closing.average },
-    { code: '130', description: 'Cesta / beneficio', reference: 'Beneficio', earning: closing.basket },
-    { code: '140', description: 'Reembolso despesa de viagem', reference: `${closing.tripQuantity || 0} viagem(ns)`, earning: closing.tripExpenses },
-    { code: '150', description: 'Ferias / decimo terceiro', reference: 'Evento', earning: closing.vacationBonus },
-    { code: '199', description: 'Outros proventos', reference: 'Manual', earning: closing.otherEarnings },
-    { code: '901', description: 'INSS segurado', reference: 'Tabela legal', discount: closing.inss },
-    { code: '902', description: 'IRRF sobre folha', reference: `${closing.dependents || 0} dependente(s)`, discount: closing.irrf },
-    { code: '903', description: 'Vale transporte', reference: 'Desconto', discount: closing.transportDiscount },
-    { code: '904', description: 'Faltas / atrasos', reference: 'Ocorrencia', discount: closing.absenceDiscount },
-    { code: '905', description: 'Adiantamento salarial', reference: 'Adiantamento', discount: closing.advancePayment },
-    { code: '999', description: 'Outros descontos', reference: 'Manual', discount: closing.otherDiscounts },
+    { code: '101', description: 'SALARIO MENSAL - 2A QUINZENA', reference: '15,00', earning: closing.secondFortnightSalary },
+    { code: '121', description: 'HORAS EXTRAS - 2A QUINZENA', reference: 'HE', earning: closing.secondFortnightOvertime },
+    { code: '150', description: 'AJUDA DE CUSTO / TRANSPORTE', reference: '0,00', earning: closing.transport },
+    { code: '160', description: 'MEDIA SALARIAL', reference: '0,00', earning: closing.average },
+    { code: '170', description: 'CESTA / BENEFICIO', reference: '0,00', earning: closing.basket },
+    { code: '180', description: 'REEMBOLSO DESPESA DE VIAGEM', reference: String(closing.tripQuantity || 0), earning: closing.tripExpenses },
+    { code: '190', description: 'FERIAS / DECIMO TERCEIRO', reference: '0,00', earning: closing.vacationBonus },
+    { code: '198', description: 'OUTROS PROVENTOS', reference: '0,00', earning: closing.otherEarnings },
+    { code: '821', description: 'INSS', reference: '0,00', discount: closing.inss },
+    { code: '822', description: 'IRRF', reference: `${closing.dependents || 0} DEP.`, discount: closing.irrf },
+    { code: '823', description: 'VALE TRANSPORTE', reference: '0,00', discount: closing.transportDiscount },
+    { code: '824', description: 'FALTAS / ATRASOS', reference: '0,00', discount: closing.absenceDiscount },
+    { code: '825', description: 'ADIANTAMENTO SALARIAL', reference: '0,00', discount: closing.advancePayment },
+    { code: '899', description: 'OUTROS DESCONTOS', reference: '0,00', discount: closing.otherDiscounts },
     ...closing.items.map((item) => ({
       code: item.type === 'earning' ? '190' : '990',
       description: item.description || 'Lancamento avulso',
@@ -725,64 +725,87 @@ function Payslip({ closing, payrollTotals, issuer }: { closing: PayrollForm, pay
   ].filter((item) => (item.earning ?? 0) > 0 || (item.discount ?? 0) > 0)
 
   return (
-    <div className="p-6 text-xs">
-      <div className="border border-zinc-700">
-        <div className="grid grid-cols-[minmax(0,1fr)_190px] border-b border-zinc-700">
-          <div className="p-3">
-            <div className="text-sm font-bold uppercase">{issuer.legalName}</div>
-            <div>CNPJ: {issuer.document || '-'}</div>
-            <div>{companyAddress(issuer) || '-'}</div>
+    <div className="bg-white p-6 text-[10px] text-black print:p-0">
+      <div className="mx-auto grid max-w-[980px] grid-cols-[minmax(0,1fr)_112px] gap-1 border-2 border-black p-0.5 print:max-w-none">
+        <div className="border border-black">
+          <div className="grid grid-cols-[minmax(0,1fr)_250px] border-b border-black">
+            <div className="min-h-[68px] p-2">
+              <div className="font-semibold uppercase">{issuer.legalName || issuer.tradeName}</div>
+              <div>CNPJ: {issuer.document || '-'}</div>
+              <div>{companyAddress(issuer) || '-'}</div>
+              <div>Recibo: {closing.id || '-'}</div>
+            </div>
+            <div className="border-l border-black p-2 text-center">
+              <div className="font-semibold">Recibo de Pagamento</div>
+              <div>Folha Mensal</div>
+              <div>{formatCompetence(closing)}</div>
+            </div>
           </div>
-          <div className="border-l border-zinc-700 bg-cyan-700 p-3 text-center font-bold uppercase text-white">
-            Demonstrativo de pagamento
-            <div className="mt-2 text-xs font-normal">{formatCompetence(closing)}</div>
+          <div className="min-h-[78px] border-b border-black p-2">
+            <div>{closing.employeeId || '000000'} <span className="ml-5">Funcao:</span> {closing.category}</div>
+            <div className="mt-3 grid grid-cols-5 text-center">
+              <div></div>
+              <div>CBO<br />-</div>
+              <div>Depto<br />001</div>
+              <div>Setor<br />002</div>
+              <div>Pag.: 1</div>
+            </div>
+            <div className="mt-1 font-semibold uppercase">{closing.employeeName}</div>
+            <div>Admissao: {closing.admissionDate || '-'}</div>
           </div>
-        </div>
-        <div className="grid grid-cols-4 gap-px bg-zinc-700">
-          <div className="bg-white p-2"><strong>Funcionario</strong><br />{closing.employeeName}</div>
-          <div className="bg-white p-2"><strong>Funcao/Categoria</strong><br />{closing.category}</div>
-          <div className="bg-white p-2"><strong>Admissao</strong><br />{closing.admissionDate || '-'}</div>
-          <div className="bg-white p-2"><strong>Situacao</strong><br />{closing.status}</div>
-        </div>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-zinc-200">
-              <th className="border px-2 py-2 text-left">Codigo</th>
-              <th className="border px-2 py-2 text-left">Descricao da rubrica</th>
-              <th className="border px-2 py-2 text-left">Referencia</th>
-              <th className="border px-2 py-2 text-right">Vencimentos</th>
-              <th className="border px-2 py-2 text-right">Descontos</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => (
-              <tr key={`${item.code}-${item.description}-${item.reference}`}>
-                <td className="border px-2 py-2">{item.code}</td>
-                <td className="border px-2 py-2">{item.description}</td>
-                <td className="border px-2 py-2">{item.reference}</td>
-                <td className="border px-2 py-2 text-right">{item.earning ? formatMoney(item.earning) : '-'}</td>
-                <td className="border px-2 py-2 text-right">{item.discount ? formatMoney(item.discount) : '-'}</td>
+          <table className="w-full table-fixed border-collapse text-[10px]">
+            <thead>
+              <tr>
+                <th className="w-14 border-b border-r border-black font-normal">Cod</th>
+                <th className="border-b border-r border-black font-normal">Descricao</th>
+                <th className="w-20 border-b border-r border-black font-normal">Referencia</th>
+                <th className="w-24 border-b border-r border-black font-normal">Vencimentos</th>
+                <th className="w-24 border-b border-black font-normal">Descontos</th>
               </tr>
-            ))}
-            {!rows.length && <tr><td className="border px-2 py-8 text-center text-zinc-500" colSpan={5}>Nenhum lancamento no contracheque.</td></tr>}
-          </tbody>
-          <tfoot>
-            <tr className="bg-zinc-100"><td className="border px-2 py-2 font-bold" colSpan={3}>Totais</td><td className="border px-2 py-2 text-right font-bold">{formatMoney(payrollTotals.grossTotal)}</td><td className="border px-2 py-2 text-right font-bold">{formatMoney(payrollTotals.discountTotal)}</td></tr>
-            <tr className="bg-zinc-100 font-bold"><td className="border px-2 py-2" colSpan={3}>Liquido a receber</td><td className="border px-2 py-2 text-right" colSpan={2}>{formatMoney(payrollTotals.netTotal)}</td></tr>
-          </tfoot>
-        </table>
-        <div className="grid grid-cols-4 gap-px bg-zinc-700 text-xs">
-          <div className="bg-white p-2"><strong>Base INSS</strong><br />{formatMoney(baseLegal)}</div>
-          <div className="bg-white p-2"><strong>Base IRRF</strong><br />{formatMoney(roundMoney(baseLegal - closing.inss - (closing.dependents * dependentDeduction)))}</div>
-          <div className="bg-white p-2"><strong>Base FGTS</strong><br />{formatMoney(baseLegal)}</div>
-          <div className="bg-white p-2"><strong>FGTS do mes</strong><br />{formatMoney(closing.fgts)}</div>
+            </thead>
+            <tbody>
+              {rows.map((item) => (
+                <tr key={`${item.code}-${item.description}-${item.reference}`}>
+                  <td className="border-r border-black px-1 align-top">{item.code}</td>
+                  <td className="border-r border-black px-1 align-top uppercase">{item.description}</td>
+                  <td className="border-r border-black px-1 text-right align-top">{item.reference}</td>
+                  <td className="border-r border-black px-1 text-right align-top">{item.earning ? formatMoney(item.earning).replace('R$ ', '') : ''}</td>
+                  <td className="px-1 text-right align-top">{item.discount ? formatMoney(item.discount).replace('R$ ', '') : ''}</td>
+                </tr>
+              ))}
+              {Array.from({ length: Math.max(0, 12 - rows.length) }).map((_, index) => (
+                <tr key={`blank-${index}`}>
+                  <td className="h-4 border-r border-black px-1">&nbsp;</td>
+                  <td className="border-r border-black px-1">&nbsp;</td>
+                  <td className="border-r border-black px-1">&nbsp;</td>
+                  <td className="border-r border-black px-1">&nbsp;</td>
+                  <td className="px-1">&nbsp;</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="grid grid-cols-[minmax(0,1fr)_280px] border-t border-black">
+            <div className="min-h-[54px]"></div>
+            <div className="grid grid-cols-2 border-l border-black">
+              <div className="border-b border-r border-black p-2">Total Vencimentos<br /><div className="text-right">{formatMoney(payrollTotals.grossTotal).replace('R$ ', '')}</div></div>
+              <div className="border-b border-black p-2">Total Descontos<br /><div className="text-right">{formatMoney(payrollTotals.discountTotal).replace('R$ ', '')}</div></div>
+              <div className="col-span-2 p-2 font-semibold">VALOR LIQUIDO <span className="float-right">{formatMoney(payrollTotals.netTotal).replace('R$ ', '')}</span></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-5 border-t border-black text-center">
+            <div className="p-1">Salario Base<br />{formatMoney(closing.salary || baseLegal).replace('R$ ', '')}</div>
+            <div className="border-l border-black p-1">Sal. Contr. INSS<br />{formatMoney(baseLegal).replace('R$ ', '')}</div>
+            <div className="border-l border-black p-1">Base Calc. FGTS<br />{formatMoney(baseLegal).replace('R$ ', '')}</div>
+            <div className="border-l border-black p-1">FGTS mes<br />{formatMoney(closing.fgts).replace('R$ ', '')}</div>
+            <div className="border-l border-black p-1">Base Calc. IRRF<br />{formatMoney(roundMoney(baseLegal - closing.inss - (closing.dependents * dependentDeduction))).replace('R$ ', '')}</div>
+          </div>
         </div>
-        <div className="border-t border-zinc-700 p-3 text-[11px] leading-relaxed text-zinc-700">
-          Este demonstrativo registra vencimentos, descontos e bases da competencia. O FGTS e demonstrado como obrigacao da empresa e nao reduz o liquido do colaborador.
-        </div>
-        <div className="grid grid-cols-2 gap-12 p-8">
-          <div className="border-t border-zinc-700 pt-2 text-center">Assinatura do colaborador</div>
-          <div className="border-t border-zinc-700 pt-2 text-center">Responsavel financeiro</div>
+        <div className="relative border border-black">
+          <div className="[writing-mode:vertical-rl] mx-auto mt-24 rotate-180 text-center">
+            Declaro ter recebido a importancia liquida discriminada neste recibo.
+          </div>
+          <div className="absolute bottom-8 left-1/2 h-40 -translate-x-1/2 border-l border-black"></div>
+          <div className="absolute bottom-4 left-0 right-0 text-center [writing-mode:vertical-rl] rotate-180">Assinatura do Funcionario</div>
         </div>
       </div>
     </div>
