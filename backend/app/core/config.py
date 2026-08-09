@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     fiscal_xml_storage_path: str = "./storage/fiscal/xml"
     fiscal_pdf_storage_path: str = "./storage/fiscal/pdf"
     google_maps_api_key: str = ""
+    tv_corinthians_stream_url: str = ""
     cors_origins: List[str] = ["http://localhost:3000"]
 
     @field_validator("cors_origins", mode="before")

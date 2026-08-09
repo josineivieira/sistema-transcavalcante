@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { api } from '../services/api'
 
-const streamUrl = 'https://1.tvlibre.pe/premiere2/mono.m3u8?token=1974db3b1caba098d00d05ad127056cbf7aadb6f-b4-1786327215-1786309215'
+const directStreamUrl = 'https://1.tvlibre.pe/premiere2/mono.m3u8?token=1974db3b1caba098d00d05ad127056cbf7aadb6f-b4-1786327215-1786309215'
+const proxiedStreamUrl = `${api.defaults.baseURL}/tvcorinthians/stream.m3u8`
 
 type HlsPlayer = {
   loadSource: (url: string) => void
   attachMedia: (video: HTMLVideoElement) => void
   destroy: () => void
-  on: (event: string, callback: (...args: unknown[]) => void) => void
+  on: (event: string, callback: (eventName: string, data?: { fatal?: boolean }) => void) => void
 }
 
 declare global {
@@ -62,7 +64,7 @@ export function TvCorinthiansPage() {
       if (!video) return
 
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl
+        video.src = directStreamUrl
         setStatus('Ao vivo')
         void video.play().catch(() => setStatus('Toque no play para assistir'))
         return
@@ -75,23 +77,33 @@ export function TvCorinthiansPage() {
           return
         }
 
-        hlsInstance = new window.Hls({
-          lowLatencyMode: true,
-          backBufferLength: 60,
-        })
-        hlsInstance.loadSource(streamUrl)
-        hlsInstance.attachMedia(video)
-        if (window.Hls) {
+        const attachStream = (url: string, fallbackUsed = false) => {
+          hlsInstance?.destroy()
+          if (!window.Hls) return
+
+          hlsInstance = new window.Hls({
+            lowLatencyMode: true,
+            backBufferLength: 60,
+          })
+          hlsInstance.loadSource(url)
+          hlsInstance.attachMedia(video)
           hlsInstance.on(window.Hls.Events.MANIFEST_PARSED, () => {
             setStatus('Ao vivo')
             void video.play().catch(() => setStatus('Toque no play para assistir'))
           })
-          hlsInstance.on(window.Hls.Events.ERROR, () => {
+          hlsInstance.on(window.Hls.Events.ERROR, (_eventName, errorData) => {
+            if (!fallbackUsed && errorData?.fatal) {
+              setStatus('Tentando transmissao direta...')
+              attachStream(directStreamUrl, true)
+              return
+            }
             setStatus('Reconectando transmissao...')
             setShowOpenLink(true)
           })
         }
-        setStatus('Ao vivo')
+
+        setStatus('Carregando transmissao pelo sistema...')
+        attachStream(proxiedStreamUrl)
       } catch {
         setStatus('Nao foi possivel carregar o player da transmissao.')
         setShowOpenLink(true)
@@ -133,7 +145,7 @@ export function TvCorinthiansPage() {
         {showOpenLink && (
           <div className="tv-help">
             <span>Se o video nao iniciar neste navegador, abra a transmissao diretamente.</span>
-            <a href={streamUrl} target="_blank" rel="noreferrer">Abrir transmissao</a>
+            <a href={directStreamUrl} target="_blank" rel="noreferrer">Abrir transmissao</a>
           </div>
         )}
       </section>
