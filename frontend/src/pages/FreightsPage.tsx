@@ -662,6 +662,23 @@ export function FreightsPage() {
 
   const freightGridMinWidth = visibleFreightColumns.reduce((total, column) => total + (columnWidths[column.key] ?? column.width), 0)
 
+  function clearFreightFilters() {
+    setSearch('')
+    setFilters({
+      processNumber: '',
+      processCode: '',
+      dateStart: '',
+      dateEnd: '',
+      processDescription: '',
+      status: '',
+      supplier: '',
+      processType: '',
+      container: '',
+      originDateStart: '',
+      originDateEnd: '',
+    })
+  }
+
   function findPriceForProcess(product: string, origin: string, destination: string) {
     const selectedProduct = product.toUpperCase()
     const selectedOrigin = origin.toUpperCase()
@@ -2126,7 +2143,7 @@ export function FreightsPage() {
                     <span className="text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</span>
                     <div className="flex items-center gap-2">
                       <Search size={22} strokeWidth={2.5} />
-                      <button onClick={() => setFilters({ processNumber: '', processCode: '', dateStart: '', dateEnd: '', processDescription: '', status: '', supplier: '', processType: '', container: '', originDateStart: '', originDateEnd: '' })} title="Limpar filtro">
+                      <button onClick={clearFreightFilters} title="Limpar filtro">
                         <Eraser size={20} strokeWidth={2.4} />
                       </button>
                     </div>

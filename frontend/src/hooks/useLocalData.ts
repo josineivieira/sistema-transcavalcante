@@ -39,12 +39,16 @@ export function useLocalData() {
   const [freightsTotal, setFreightsTotal] = useState(0)
   const [error, setError] = useState('')
   const deletedFreightIdsRef = useRef(new Set<string>())
+  const freightRequestSeqRef = useRef(0)
 
   const loadFreights = useCallback((params: FreightQuery = {}) => {
+    const requestSeq = freightRequestSeqRef.current + 1
+    freightRequestSeqRef.current = requestSeq
     setFreightsLoading(true)
     return api.get<OperationalFreightsResponse>('/operational-freights', {
       params: { limit: 500, offset: 0, ...params },
     }).then((response) => {
+      if (requestSeq !== freightRequestSeqRef.current) return
       const items = (response.data.items || []).filter((freight) => (
         !deletedFreightIdsRef.current.has(freight.id)
         && !deletedFreightIdsRef.current.has(freight.process)
@@ -54,8 +58,10 @@ export function useLocalData() {
       setFreightsTotal(Math.max(0, (response.data.total ?? items.length) - deletedFreightIdsRef.current.size))
       setError('')
     }).catch(() => {
+      if (requestSeq !== freightRequestSeqRef.current) return
       setError('Nao foi possivel carregar fretes.')
     }).finally(() => {
+      if (requestSeq !== freightRequestSeqRef.current) return
       setFreightsLoading(false)
     })
   }, [])
