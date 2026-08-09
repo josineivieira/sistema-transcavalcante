@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { api } from '../services/api'
 
-const streamUrl = 'https://1.tvlibre.pe/premiere2/mono.m3u8?token=1974db3b1caba098d00d05ad127056cbf7aadb6f-b4-1786327215-1786309215'
+const streamUrl = `${api.defaults.baseURL}/tvcorinthians/stream.m3u8`
 
 type HlsPlayer = {
   loadSource: (url: string) => void
