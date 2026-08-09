@@ -1678,13 +1678,26 @@ export function FreightsPage() {
     }
   }
 
-  async function resolveRouteDistanceKm(originLatitude: string, originLongitude: string, destinationLatitude: string, destinationLongitude: string) {
+  async function resolveRouteDistanceKm(
+    originLatitude: string,
+    originLongitude: string,
+    destinationLatitude: string,
+    destinationLongitude: string,
+    originZipCode = form.originZipCode,
+    destinationZipCode = form.destinationZipCode,
+    origin = form.origin,
+    destination = form.destination,
+  ) {
     try {
       const response = await api.post<RouteDistanceResponse>('/operational-options/route-distance', {
         origin_latitude: originLatitude,
         origin_longitude: originLongitude,
         destination_latitude: destinationLatitude,
         destination_longitude: destinationLongitude,
+        origin_zip_code: originZipCode,
+        destination_zip_code: destinationZipCode,
+        origin,
+        destination,
       })
       return response.data.distanceKm
     } catch {
@@ -1710,7 +1723,20 @@ export function FreightsPage() {
       const originLongitude = side === 'origin' ? resolvedLongitude || form.originLongitude : form.originLongitude
       const destinationLatitude = side === 'destination' ? resolvedLatitude || form.destinationLatitude : form.destinationLatitude
       const destinationLongitude = side === 'destination' ? resolvedLongitude || form.destinationLongitude : form.destinationLongitude
-      const distanceKm = await resolveRouteDistanceKm(originLatitude, originLongitude, destinationLatitude, destinationLongitude)
+      const originZipCode = side === 'origin' ? data.zipCode || form.originZipCode : form.originZipCode
+      const destinationZipCode = side === 'destination' ? data.zipCode || form.destinationZipCode : form.destinationZipCode
+      const originLabel = side === 'origin' ? data.destination || form.origin : form.origin
+      const destinationLabel = side === 'destination' ? data.destination || form.destination : form.destination
+      const distanceKm = await resolveRouteDistanceKm(
+        originLatitude,
+        originLongitude,
+        destinationLatitude,
+        destinationLongitude,
+        originZipCode,
+        destinationZipCode,
+        originLabel,
+        destinationLabel,
+      )
       setForm((current) => {
         const next = { ...current }
         if (side === 'origin') {
@@ -1786,7 +1812,16 @@ export function FreightsPage() {
   async function applyInvoiceImport() {
     const routeDestination = await resolveImportedDestination(invoiceImport)
     const importedDistance = routeDestination
-      ? await resolveRouteDistanceKm(form.originLatitude, form.originLongitude, routeDestination.latitude, routeDestination.longitude)
+      ? await resolveRouteDistanceKm(
+        form.originLatitude,
+        form.originLongitude,
+        routeDestination.latitude,
+        routeDestination.longitude,
+        form.originZipCode,
+        routeDestination.zipCode,
+        form.origin,
+        routeDestination.destination,
+      )
       : ''
     setForm((current) => {
       const importedInvoices = invoiceImport.invoices.length ? invoiceImport.invoices : [invoiceEntryFromImport(invoiceImport)]

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.v1.operational_data import _get_or_create_snapshot, _require_operational_auth
+from app.core.config import settings
 from app.database.session import get_db
 
 router = APIRouter()
@@ -24,6 +25,10 @@ class RouteDistanceRequest(BaseModel):
     origin_longitude: str = ""
     destination_latitude: str = ""
     destination_longitude: str = ""
+    origin_zip_code: str = ""
+    destination_zip_code: str = ""
+    origin: str = ""
+    destination: str = ""
 
 
 def _digits(value: str) -> str:
@@ -66,6 +71,38 @@ def _lookup_driving_distance_km(origin_latitude: float, origin_longitude: float,
         if not routes:
             return None
         return float(routes[0].get("distance") or 0) / 1000
+    except Exception:
+        return None
+
+
+def _google_place(zip_code: str, label: str) -> str:
+    formatted_zip = _format_zip_code(zip_code)
+    return ", ".join(part for part in [formatted_zip, label, "Brasil"] if part)
+
+
+def _lookup_google_distance_km(origin_zip_code: str, destination_zip_code: str, origin: str, destination: str) -> float | None:
+    if not settings.google_maps_api_key:
+        return None
+    try:
+        response = httpx.get(
+            "https://maps.googleapis.com/maps/api/distancematrix/json",
+            params={
+                "origins": _google_place(origin_zip_code, origin),
+                "destinations": _google_place(destination_zip_code, destination),
+                "mode": "driving",
+                "units": "metric",
+                "key": settings.google_maps_api_key,
+            },
+            timeout=8.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if data.get("status") != "OK":
+            return None
+        element = ((data.get("rows") or [{}])[0].get("elements") or [{}])[0]
+        if element.get("status") != "OK":
+            return None
+        return float(element.get("distance", {}).get("value") or 0) / 1000
     except Exception:
         return None
 
@@ -203,6 +240,15 @@ def resolve_route_distance(
 
     if not all([origin_latitude, origin_longitude, destination_latitude, destination_longitude]):
         return {"distanceKm": "0,0000", "source": "empty"}
+
+    google_distance = _lookup_google_distance_km(
+        payload.origin_zip_code,
+        payload.destination_zip_code,
+        payload.origin,
+        payload.destination,
+    )
+    if google_distance is not None and google_distance > 0:
+        return {"distanceKm": _format_km(google_distance), "source": "google"}
 
     driving_distance = _lookup_driving_distance_km(origin_latitude, origin_longitude, destination_latitude, destination_longitude)
     if driving_distance is not None and driving_distance > 0:
