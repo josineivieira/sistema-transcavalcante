@@ -1119,7 +1119,7 @@ export function FreightsPage() {
     }
   }
 
-  function saveFreight(closeAfterSave = true) {
+  async function saveFreight(closeAfterSave = true) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
@@ -1142,23 +1142,28 @@ export function FreightsPage() {
     setEditingCiotId(null)
     setPlannedExpenseEdit(null)
 
-    if (activeFreightId) {
-      const currentFreight = freights.find((freight) => freight.id === activeFreightId)
-      if (currentFreight) {
-        void saveFreightRecord(buildFreightRecord(formSnapshot, currentFreight))
+    try {
+      if (activeFreightId) {
+        const currentFreight = freights.find((freight) => freight.id === activeFreightId)
+        const freightToSave = currentFreight
+          ? buildFreightRecord(formSnapshot, currentFreight)
+          : { ...buildFreightRecord(formSnapshot), id: activeFreightId, number: formSnapshot.process }
+        await saveFreightRecord(freightToSave)
         setEditingFreightId(activeFreightId)
+      } else {
+        const createdFreight = buildFreightRecord(formSnapshot)
+        const savedFreight = await saveFreightRecord(createdFreight)
+        if (!closeAfterSave) {
+          setEditingFreightId(savedFreight.id)
+        }
       }
-    } else {
-      const createdFreight = buildFreightRecord(formSnapshot)
-      void saveFreightRecord(createdFreight)
-      if (!closeAfterSave) {
-        setEditingFreightId(createdFreight.id)
-      }
-    }
 
-    if (closeAfterSave) {
-      setShowForm(false)
-      resetForm()
+      if (closeAfterSave) {
+        setShowForm(false)
+        resetForm()
+      }
+    } catch {
+      window.alert('Nao foi possivel salvar este frete no banco. Verifique os dados e tente novamente.')
     }
   }
 
