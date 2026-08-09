@@ -655,43 +655,63 @@ function PayrollGrid({
   changeStatus: (id: string, status: string) => void
   payslipMode?: boolean
 }) {
+  const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null)
+  const selectedAction = rows.find((item) => item.id === actionOpen)
+
+  function toggleActionMenu(event: React.MouseEvent<HTMLButtonElement>, id: string) {
+    event.stopPropagation()
+    if (actionOpen === id) {
+      setActionOpen(null)
+      setMenuPosition(null)
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    setMenuPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, Math.min(window.innerWidth - 168, rect.right - 160)),
+    })
+    setActionOpen(id)
+  }
+
   return (
-    <div className="overflow-auto bg-white">
-      <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2"><span className="font-semibold">{payslipMode ? 'Contracheques gerados' : 'Fechamentos da folha'}</span><span className="ml-auto">{loading ? '' : `${rows.length} registros`}</span></div>
-      <table className="w-full min-w-[1180px] text-xs">
-        <thead><tr>{['Competencia', 'Funcionario', 'Categoria', 'Admissao', 'Salario', 'Qtde viagem', 'Proventos', 'Descontos', 'Liquido', 'Situacao', 'Acoes'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
-        <tbody>
-          {loading && <LoadingRow colSpan={11} label={payslipMode ? 'Carregando contracheques...' : 'Carregando fechamentos...'} />}
-          {!loading && rows.map((item, index) => (
-            <tr key={item.id} onDoubleClick={() => openEdit(item)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} hover:bg-sky-100`}>
-              <td className="border-b border-r px-2 py-2">{item.month}/{item.year}</td>
-              <td className="border-b border-r px-2 py-2">{item.employeeName}</td>
-              <td className="border-b border-r px-2 py-2">{item.category}</td>
-              <td className="border-b border-r px-2 py-2">{item.admissionDate || '-'}</td>
-              <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.salary)}</td>
-              <td className="border-b border-r px-2 py-2 text-right">{item.tripQuantity}</td>
-              <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.grossTotal)}</td>
-              <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.discountTotal)}</td>
-              <td className="border-b border-r px-2 py-2 text-right font-semibold">{formatMoney(item.netTotal)}</td>
-              <td className="border-b border-r px-2 py-2">{item.status}</td>
-              <td className="relative border-b px-2 py-2">
-                <button onClick={() => setActionOpen(actionOpen === item.id ? null : item.id)} className="grid h-6 w-8 place-items-center border border-zinc-300 bg-white"><MoreVertical size={15} /></button>
-                {actionOpen === item.id && (
-                  <div className="absolute right-2 top-8 z-20 w-40 border border-zinc-400 bg-white py-1 shadow-lg">
-                    <button onClick={() => openEdit(item)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
-                    <button onClick={() => openPayslip(item)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Contracheque</button>
-                    {!payslipMode && <button onClick={() => changeStatus(item.id, 'Fechado')} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Fechar folha</button>}
-                    {!payslipMode && <button onClick={() => changeStatus(item.id, 'Pago')} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Marcar pago</button>}
-                    {!payslipMode && <button onClick={() => changeStatus(item.id, 'Cancelado')} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>}
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-          {!loading && !rows.length && <tr><td colSpan={11} className="px-3 py-12 text-center text-zinc-500">{payslipMode ? 'Nenhum contracheque encontrado.' : 'Nenhum fechamento encontrado.'}</td></tr>}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="overflow-x-auto bg-white">
+        <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2"><span className="font-semibold">{payslipMode ? 'Contracheques gerados' : 'Fechamentos da folha'}</span><span className="ml-auto">{loading ? '' : `${rows.length} registros`}</span></div>
+        <table className="w-full min-w-[1180px] text-xs">
+          <thead><tr>{['Competencia', 'Funcionario', 'Categoria', 'Admissao', 'Salario', 'Qtde viagem', 'Proventos', 'Descontos', 'Liquido', 'Situacao', 'Acoes'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
+          <tbody>
+            {loading && <LoadingRow colSpan={11} label={payslipMode ? 'Carregando contracheques...' : 'Carregando fechamentos...'} />}
+            {!loading && rows.map((item, index) => (
+              <tr key={item.id} onDoubleClick={() => openEdit(item)} className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} hover:bg-sky-100`}>
+                <td className="border-b border-r px-2 py-2">{item.month}/{item.year}</td>
+                <td className="border-b border-r px-2 py-2">{item.employeeName}</td>
+                <td className="border-b border-r px-2 py-2">{item.category}</td>
+                <td className="border-b border-r px-2 py-2">{item.admissionDate || '-'}</td>
+                <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.salary)}</td>
+                <td className="border-b border-r px-2 py-2 text-right">{item.tripQuantity}</td>
+                <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.grossTotal)}</td>
+                <td className="border-b border-r px-2 py-2 text-right">{formatMoney(item.discountTotal)}</td>
+                <td className="border-b border-r px-2 py-2 text-right font-semibold">{formatMoney(item.netTotal)}</td>
+                <td className="border-b border-r px-2 py-2">{item.status}</td>
+                <td className="border-b px-2 py-2">
+                  <button onClick={(event) => toggleActionMenu(event, item.id)} className="grid h-6 w-8 place-items-center border border-zinc-300 bg-white"><MoreVertical size={15} /></button>
+                </td>
+              </tr>
+            ))}
+            {!loading && !rows.length && <tr><td colSpan={11} className="px-3 py-12 text-center text-zinc-500">{payslipMode ? 'Nenhum contracheque encontrado.' : 'Nenhum fechamento encontrado.'}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {selectedAction && menuPosition && (
+        <div className="fixed z-[90] w-40 border border-zinc-400 bg-white py-1 text-xs shadow-lg" style={{ top: menuPosition.top, left: menuPosition.left }}>
+          <button onClick={() => openEdit(selectedAction)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
+          <button onClick={() => openPayslip(selectedAction)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Contracheque</button>
+          {!payslipMode && <button onClick={() => changeStatus(selectedAction.id, 'Fechado')} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Fechar folha</button>}
+          {!payslipMode && <button onClick={() => changeStatus(selectedAction.id, 'Pago')} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Marcar pago</button>}
+          {!payslipMode && <button onClick={() => changeStatus(selectedAction.id, 'Cancelado')} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>}
+        </div>
+      )}
+    </>
   )
 }
 
