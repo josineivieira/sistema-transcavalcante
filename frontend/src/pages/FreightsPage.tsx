@@ -4,6 +4,7 @@ import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightI
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 import { LoadingState } from '../components/LoadingState'
+import { api } from '../services/api'
 
 const freightTabs = [
   'GERAIS',
@@ -122,6 +123,25 @@ type ExtraProduct = {
   product: string
   structuredCode: string
   createdAt: string
+}
+
+type LookupKind = 'customer' | 'driver' | 'tractor' | 'trailer' | 'product' | 'supplier'
+type LookupOption = {
+  id?: string
+  name?: string
+  document?: string
+  plate?: string
+  description?: string
+  value?: string
+  label?: string
+}
+type FreightFormOptionsResponse = {
+  customers: LookupOption[]
+  drivers: LookupOption[]
+  tractors: LookupOption[]
+  trailers: LookupOption[]
+  products: LookupOption[]
+  suppliers: LookupOption[]
 }
 
 type InvoiceImport = {
@@ -328,6 +348,26 @@ function Field({
   )
 }
 
+function LookupInput({
+  value,
+  onChange,
+  onLookup,
+  onClear,
+}: {
+  value: string
+  onChange: (value: string) => void
+  onLookup: () => void
+  onClear: () => void
+}) {
+  return (
+    <div className="flex">
+      <input value={value} onChange={(event) => onChange(event.target.value)} className={textInputClass()} />
+      <button type="button" onClick={onLookup} className="grid h-7 w-8 place-items-center bg-white text-black" title="Consultar"><Filter size={18} fill="currentColor" /></button>
+      <button type="button" onClick={onClear} className="grid h-7 w-7 place-items-center bg-white"><X size={18} /></button>
+    </div>
+  )
+}
+
 function EmptyGridMessage({ text }: { text: string }) {
   return (
     <div className="grid h-56 place-items-center bg-white text-xs text-zinc-700">
@@ -414,8 +454,6 @@ const freightTaskOptions = [
 
 export function FreightsPage() {
   const {
-    customers,
-    drivers,
     vehicles,
     freights,
     freightsLoading,
@@ -463,6 +501,17 @@ export function FreightsPage() {
   const [extraExpenseOpen, setExtraExpenseOpen] = useState(false)
   const [extraProductOpen, setExtraProductOpen] = useState(false)
   const [extraProductSearch, setExtraProductSearch] = useState('')
+  const [lookupOpen, setLookupOpen] = useState<LookupKind | null>(null)
+  const [lookupSearch, setLookupSearch] = useState('')
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [lookupOptions, setLookupOptions] = useState<FreightFormOptionsResponse>({
+    customers: [],
+    drivers: [],
+    tractors: [],
+    trailers: [],
+    products: [],
+    suppliers: [],
+  })
   const [editingExtraExpense, setEditingExtraExpense] = useState<ExtraExpense>(emptyExtraExpense)
   const [editingCiotId, setEditingCiotId] = useState<string | null>(null)
   const [form, setForm] = useState<FreightForm>({
@@ -477,13 +526,10 @@ export function FreightsPage() {
   const trailers = useMemo(() => vehicles.filter((vehicle) => vehicle.vehicleType === 'Carreta'), [vehicles])
   const selectedTractor = tractors.find((vehicle) => vehicle.id === form.tractorId)
   const selectedTrailer = trailers.find((vehicle) => vehicle.id === form.trailerId)
-  const productOptions = useMemo(() => {
-    const products = priceLists
-      .filter((price) => price.status !== 'Inativo' && price.product)
-      .map((price) => price.product)
-    return Array.from(new Set(products)).sort()
-  }, [priceLists])
-
+  const lookupTractor = lookupOptions.tractors.find((vehicle) => vehicle.id === form.tractorId)
+  const lookupTrailer = lookupOptions.trailers.find((vehicle) => vehicle.id === form.trailerId)
+  const tractorDescription = selectedTractor?.description || selectedTractor?.type || lookupTractor?.description || ''
+  const trailerDescription = selectedTrailer?.description || selectedTrailer?.type || lookupTrailer?.description || ''
   useEffect(() => {
     setForm((current) => ({
       ...current,
@@ -493,6 +539,24 @@ export function FreightsPage() {
       contractor: issuerName,
     }))
   }, [issuerDocument, issuerName])
+
+  useEffect(() => {
+    if (!lookupOpen) return
+    setLookupLoading(true)
+    const timeout = window.setTimeout(() => {
+      api.get<FreightFormOptionsResponse>('/operational-options/freight-form', {
+        params: { search: lookupSearch, limit: 80 },
+      }).then((response) => {
+        setLookupOptions(response.data)
+      }).catch(() => {
+        setLookupOptions({ customers: [], drivers: [], tractors: [], trailers: [], products: [], suppliers: [] })
+      }).finally(() => {
+        setLookupLoading(false)
+      })
+    }, 200)
+
+    return () => window.clearTimeout(timeout)
+  }, [lookupOpen, lookupSearch])
 
   const generalReady = Boolean(form.process && form.processType && form.customer && form.serviceTaker)
   const routeReady = Boolean(form.routeName && form.origin && form.destination)
@@ -658,6 +722,59 @@ export function FreightsPage() {
       }
       return next
     })
+  }
+
+  function openLookup(kind: LookupKind) {
+    setLookupOpen(kind)
+    setLookupSearch('')
+  }
+
+  function closeLookup() {
+    setLookupOpen(null)
+    setLookupSearch('')
+  }
+
+  function selectLookupOption(option: LookupOption) {
+    if (!lookupOpen) return
+    if (lookupOpen === 'customer') {
+      updateForm('customer', option.name || option.label || '')
+    }
+    if (lookupOpen === 'driver') {
+      updateForm('driver', option.name || option.label || '')
+    }
+    if (lookupOpen === 'tractor') {
+      updateForm('tractorId', option.id || option.plate || '')
+    }
+    if (lookupOpen === 'trailer') {
+      updateForm('trailerId', option.id || option.plate || '')
+    }
+    if (lookupOpen === 'product') {
+      updateForm('product', option.value || option.label || '')
+    }
+    if (lookupOpen === 'supplier') {
+      setFilters((current) => ({ ...current, supplier: option.label || option.name || option.value || '' }))
+    }
+    closeLookup()
+  }
+
+  function lookupRows() {
+    if (lookupOpen === 'customer') return lookupOptions.customers
+    if (lookupOpen === 'driver') return lookupOptions.drivers
+    if (lookupOpen === 'tractor') return lookupOptions.tractors
+    if (lookupOpen === 'trailer') return lookupOptions.trailers
+    if (lookupOpen === 'product') return lookupOptions.products
+    if (lookupOpen === 'supplier') return lookupOptions.suppliers
+    return []
+  }
+
+  function lookupTitle() {
+    if (lookupOpen === 'customer') return 'Cliente'
+    if (lookupOpen === 'driver') return 'Motorista'
+    if (lookupOpen === 'tractor') return 'Cavalo mecanico'
+    if (lookupOpen === 'trailer') return 'Carreta'
+    if (lookupOpen === 'product') return 'Produto'
+    if (lookupOpen === 'supplier') return 'Fornecedor'
+    return 'Consulta'
   }
 
   function persistFreightForm(snapshot: FreightForm) {
@@ -856,6 +973,8 @@ export function FreightsPage() {
     const value = rawValue > 0 ? rawValue : parseBrazilianNumber(matchedPrice)
     const tractor = tractors.find((item) => item.id === formSnapshot.tractorId)
     const trailer = trailers.find((item) => item.id === formSnapshot.trailerId)
+    const tractorOption = lookupOptions.tractors.find((item) => item.id === formSnapshot.tractorId || item.plate === formSnapshot.tractorId)
+    const trailerOption = lookupOptions.trailers.find((item) => item.id === formSnapshot.trailerId || item.plate === formSnapshot.trailerId)
     const createdNumber = `FRT-${String(freights.length + 1).padStart(6, '0')}`
     return {
       ...formSnapshot,
@@ -875,8 +994,8 @@ export function FreightsPage() {
       recipient: formSnapshot.recipient,
       container: formSnapshot.container,
       driver: formSnapshot.driver,
-      tractorPlate: tractor?.tractorPlate ?? existing?.tractorPlate ?? '',
-      trailerPlate: trailer?.trailerPlate ?? existing?.trailerPlate ?? '',
+      tractorPlate: tractor?.tractorPlate ?? tractorOption?.plate ?? existing?.tractorPlate ?? formSnapshot.tractorId,
+      trailerPlate: trailer?.trailerPlate ?? trailerOption?.plate ?? existing?.trailerPlate ?? formSnapshot.trailerId,
       origin: formSnapshot.origin,
       destination: formSnapshot.destination,
       value,
@@ -1548,7 +1667,7 @@ export function FreightsPage() {
           <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONDUTORES</div>
-              <Field label="Motorista" required><select value={form.driver} onChange={(event) => updateForm('driver', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{drivers.map((driver) => <option key={driver.id}>{driver.name}</option>)}</select></Field>
+              <Field label="Motorista" required><LookupInput value={form.driver} onChange={(value) => updateForm('driver', value.toUpperCase())} onLookup={() => openLookup('driver')} onClear={() => updateForm('driver', '')} /></Field>
               <Field label="Ajudante"><input value={form.helper} onChange={(event) => updateForm('helper', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
             </div>
             <div className="grid gap-1">
@@ -1558,13 +1677,13 @@ export function FreightsPage() {
           <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">FROTAS</div>
-              <Field label="Placa" required><select value={form.tractorId} onChange={(event) => updateForm('tractorId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{tractors.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.tractorPlate}</option>)}</select></Field>
-              <Field label="Veiculo trator"><input value={selectedTractor?.description || selectedTractor?.type || ''} className={textInputClass(true)} disabled /></Field>
+              <Field label="Placa" required><LookupInput value={selectedTractor?.tractorPlate || lookupTractor?.plate || form.tractorId} onChange={(value) => updateForm('tractorId', value.toUpperCase())} onLookup={() => openLookup('tractor')} onClear={() => updateForm('tractorId', '')} /></Field>
+              <Field label="Veiculo trator"><input value={tractorDescription} className={textInputClass(true)} disabled /></Field>
               <Field label="Tag de pedagio"><input value={form.tollTag} onChange={(event) => updateForm('tollTag', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
             </div>
             <div className="grid gap-1">
-              <Field label="Placa"><select value={form.trailerId} onChange={(event) => updateForm('trailerId', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{trailers.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.trailerPlate}</option>)}</select></Field>
-              <Field label="Veiculo reboque"><input value={selectedTrailer?.description || selectedTrailer?.type || ''} className={textInputClass(true)} disabled /></Field>
+              <Field label="Placa"><LookupInput value={selectedTrailer?.trailerPlate || lookupTrailer?.plate || form.trailerId} onChange={(value) => updateForm('trailerId', value.toUpperCase())} onLookup={() => openLookup('trailer')} onClear={() => updateForm('trailerId', '')} /></Field>
+              <Field label="Veiculo reboque"><input value={trailerDescription} className={textInputClass(true)} disabled /></Field>
               <Field label="Placa"><input value={form.auxiliaryPlate} onChange={(event) => updateForm('auxiliaryPlate', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
             </div>
           </div>
@@ -1895,10 +2014,10 @@ export function FreightsPage() {
                     <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
                     <div className="mt-2 border border-zinc-400">
                       <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Filter size={18} fill="currentColor" /><X size={18} /></div></div>
-                      <select value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} className="h-7 w-full border-t border-zinc-300 bg-white px-2 text-xs">
-                        <option value="">Selecione...</option>
-                        {customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}
-                      </select>
+                      <div className="flex border-t border-zinc-300">
+                        <input value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value.toUpperCase() })} className="h-7 min-w-0 flex-1 bg-white px-2 text-xs outline-none" placeholder="Selecione..." />
+                        <button onClick={() => openLookup('supplier')} className="grid h-7 w-8 place-items-center bg-white" title="Consultar fornecedor"><Filter size={18} fill="currentColor" /></button>
+                      </div>
                     </div>
                     <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
@@ -2015,14 +2134,8 @@ export function FreightsPage() {
                 <div className="grid gap-1">
                   <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option value="">Selecione...</option><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
                   <Field label="Identificacao do cliente"><input value={form.customerIdentification} onChange={(event) => updateForm('customerIdentification', event.target.value)} className={textInputClass()} /></Field>
-                  <Field label="Cliente" required><select value={form.customer} onChange={(event) => updateForm('customer', event.target.value)} className={textInputClass()}><option value="">Selecione...</option>{customers.map((customer) => <option key={customer.id}>{customer.name}</option>)}</select></Field>
-                  <Field label="Produto">
-                    <select value={form.product} onChange={(event) => updateForm('product', event.target.value)} className={textInputClass()}>
-                      <option value="">Selecione...</option>
-                      {productOptions.map((product) => <option key={product} value={product}>{product}</option>)}
-                      {form.product && !productOptions.includes(form.product) && <option value={form.product}>{form.product}</option>}
-                    </select>
-                  </Field>
+                  <Field label="Cliente" required><LookupInput value={form.customer} onChange={(value) => updateForm('customer', value.toUpperCase())} onLookup={() => openLookup('customer')} onClear={() => updateForm('customer', '')} /></Field>
+                  <Field label="Produto"><LookupInput value={form.product} onChange={(value) => updateForm('product', value.toUpperCase())} onLookup={() => openLookup('product')} onClear={() => updateForm('product', '')} /></Field>
                   <Field label="CNPJ/CPF"><input value={form.recipientDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Destinatario"><input value={form.recipient} className={textInputClass(true)} disabled /></Field>
                 </div>
@@ -2263,6 +2376,64 @@ export function FreightsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lookupOpen && (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center bg-zinc-950/30 px-4 py-10">
+          <div className="max-h-[calc(100vh-80px)] w-full max-w-5xl overflow-hidden border-4 border-red-700 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-3 py-2">
+              <h3 className="text-lg font-normal text-red-600">{lookupTitle()}</h3>
+              <button onClick={closeLookup} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
+            </div>
+            <div className="flex h-8 items-center bg-zinc-400 px-2 text-xs">
+              <div className="ml-auto">{lookupLoading ? 'Consultando...' : `${lookupRows().length} registros`}</div>
+              <input value={lookupSearch} onChange={(event) => setLookupSearch(event.target.value)} className="ml-2 h-6 w-44 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
+              <div className="flex items-center gap-2 pl-3"><Settings size={18} /><span>1:1</span><Filter size={18} fill="currentColor" /><span>|||</span></div>
+            </div>
+            <div className="max-h-[calc(100vh-170px)] overflow-auto">
+              <table className="w-full min-w-[860px] text-xs">
+                <thead>
+                  <tr>
+                    {(lookupOpen === 'tractor' || lookupOpen === 'trailer'
+                      ? ['Placa', 'Descricao']
+                      : lookupOpen === 'product' || lookupOpen === 'supplier'
+                        ? ['Descricao']
+                        : ['Nome', 'CNPJ/CPF']).map((heading) => (
+                      <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lookupRows().map((option, index) => (
+                    <tr
+                      key={`${lookupOpen}-${option.id || option.value || option.plate || option.name || option.label}-${index}`}
+                      onDoubleClick={() => selectLookupOption(option)}
+                      onClick={() => selectLookupOption(option)}
+                      className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-200`}
+                    >
+                      {lookupOpen === 'tractor' || lookupOpen === 'trailer' ? (
+                        <>
+                          <td className="border-b border-r border-zinc-200 px-2 py-2">{option.plate}</td>
+                          <td className="border-b border-zinc-200 px-2 py-2">{option.description}</td>
+                        </>
+                      ) : lookupOpen === 'product' || lookupOpen === 'supplier' ? (
+                        <td className="border-b border-zinc-200 px-2 py-2">{option.label || option.value}</td>
+                      ) : (
+                        <>
+                          <td className="border-b border-r border-zinc-200 px-2 py-2">{option.name}</td>
+                          <td className="border-b border-zinc-200 px-2 py-2">{option.document}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                  {!lookupLoading && !lookupRows().length && (
+                    <tr><td colSpan={2} className="px-3 py-12 text-center text-zinc-500">Nenhum registro encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
