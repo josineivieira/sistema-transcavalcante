@@ -15,7 +15,6 @@ const freightTabs = [
   'DESPESAS EXTRAS',
   'NOTAS FISCAIS',
   'CIOT',
-  'PROTOCOLO',
 ] as const
 
 type FreightTab = typeof freightTabs[number]
@@ -423,7 +422,7 @@ const freightGridColumns = [
   { key: 'sender', label: 'Remetente', width: 210, minWidth: 130 },
   { key: 'recipient', label: 'Destinatario', width: 210, minWidth: 130 },
   { key: 'contractor', label: 'Contratado', width: 190, minWidth: 120 },
-  { key: 'type', label: 'Tipo', width: 74, minWidth: 56 },
+  { key: 'container', label: 'Container', width: 132, minWidth: 100 },
   { key: 'driver', label: 'Motorista', width: 190, minWidth: 120 },
   { key: 'tractor', label: 'Tracao', width: 96, minWidth: 76 },
   { key: 'trailer', label: 'Reboque', width: 96, minWidth: 76 },
@@ -489,6 +488,7 @@ export function FreightsPage() {
   const [editingFreightId, setEditingFreightId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
+  const [plannedExpenseEdit, setPlannedExpenseEdit] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({
     processNumber: '',
@@ -581,8 +581,6 @@ export function FreightsPage() {
   const hasNotasRecebidas = form.taskHistory.some((task) => task.name === 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20')
   const containerRows = legacyContainerRows(form)
   const containerReady = Boolean(serviceReady && containerRows.length)
-  const datesReady = Boolean(containerReady && form.deliveryForecast && form.destinationScheduleDate)
-  const fiscalReady = Boolean(containerReady && form.invoiceNumber)
   const availableTaskOptions = freightTaskOptions.filter((task) => (
     showPreviousTasks || !form.taskHistory.some((history) => history.name === task)
   ))
@@ -616,7 +614,6 @@ export function FreightsPage() {
     'DESPESAS EXTRAS': hasAbastecido,
     'NOTAS FISCAIS': hasNotasRecebidas,
     CIOT: hasNotasRecebidas,
-    PROTOCOLO: hasNotasRecebidas || fiscalReady || datesReady,
   }
 
   useEffect(() => {
@@ -1126,6 +1123,7 @@ export function FreightsPage() {
     const formSnapshot = materializeCiotDraft(materializeContainerDraft({ ...form, process }))
     setForm(formSnapshot)
     setEditingCiotId(null)
+    setPlannedExpenseEdit(null)
 
     if (activeFreightId) {
       const currentFreight = freights.find((freight) => freight.id === activeFreightId)
@@ -1721,7 +1719,7 @@ export function FreightsPage() {
       sender: freight.sender || '-',
       recipient: freight.recipient || '-',
       contractor: freight.contractor || freight.serviceTaker || 'TRANS CAVALCANTE',
-      type: 'ETC',
+      container: freight.containerEntries?.length ? freight.containerEntries.map((entry) => entry.number).join(', ') : freight.container || '-',
       driver: freight.driver || '-',
       tractor: freight.tractorPlate || '-',
       trailer: freight.trailerPlate || '-',
@@ -1923,6 +1921,8 @@ export function FreightsPage() {
       const listPrice = priceValueForProcess(form.product, form.origin, form.destination)
       const freightCost = form.plannedFreightCost || listPrice || '0'
       const total = parseBrazilianNumber(freightCost) + parseBrazilianNumber(form.plannedTollCost)
+      const freightExpenseLocked = plannedExpenseEdit !== 'freight'
+      const tollExpenseLocked = plannedExpenseEdit !== 'toll'
       return (
         <div className="p-3">
           <div className="overflow-x-auto border border-zinc-300 bg-white">
@@ -1930,8 +1930,8 @@ export function FreightsPage() {
             <table className="w-full min-w-[900px] text-xs">
               <thead><tr>{['Referencia', 'Produto', 'Fornecedor', 'Quantidade total', 'U.M.', 'Vlr. despesa'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
               <tbody>
-                <tr><td className="border-b border-r px-2 py-2">TRA010</td><td className="border-b border-r px-2 py-2">{form.product || 'CUSTO FRETE ROD. DESTINO'}</td><td className="border-b border-r px-2 py-2">{form.contractor || '-'}</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={freightCost} onChange={(event) => { updateForm('plannedFreightCost', event.target.value); updateForm('value', event.target.value) }} className={textInputClass()} /></td></tr>
-                <tr><td className="border-b border-r px-2 py-2">TRA014</td><td className="border-b border-r px-2 py-2">PEDAGIO</td><td className="border-b border-r px-2 py-2">-</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={form.plannedTollCost} onChange={(event) => updateForm('plannedTollCost', event.target.value)} className={textInputClass()} /></td></tr>
+                <tr onDoubleClick={() => setPlannedExpenseEdit('freight')} title="Dois cliques para editar"><td className="border-b border-r px-2 py-2">TRA010</td><td className="border-b border-r px-2 py-2">{form.product || 'CUSTO FRETE ROD. DESTINO'}</td><td className="border-b border-r px-2 py-2">{form.contractor || '-'}</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={freightCost} onChange={(event) => { updateForm('plannedFreightCost', event.target.value); updateForm('value', event.target.value) }} className={textInputClass(freightExpenseLocked)} disabled={freightExpenseLocked} /></td></tr>
+                <tr onDoubleClick={() => setPlannedExpenseEdit('toll')} title="Dois cliques para editar"><td className="border-b border-r px-2 py-2">TRA014</td><td className="border-b border-r px-2 py-2">PEDAGIO</td><td className="border-b border-r px-2 py-2">-</td><td className="border-b border-r px-2 py-2 text-right">1,0000</td><td className="border-b border-r px-2 py-2">UN</td><td className="border-b px-2 py-2"><input value={form.plannedTollCost} onChange={(event) => updateForm('plannedTollCost', event.target.value)} className={textInputClass(tollExpenseLocked)} disabled={tollExpenseLocked} /></td></tr>
               </tbody>
             </table>
             <div className="border-t border-emerald-500 bg-emerald-50 px-8 py-2 text-right text-xs">Total = {formatMoney(total)}</div>
@@ -2082,23 +2082,6 @@ export function FreightsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
-      )
-    }
-
-    if (activeTab === 'PROTOCOLO') {
-      const field = 'protocolStatus'
-      const label = 'Situacao'
-      return (
-        <div className="p-3">
-          <Field label={label}><input value={String(form[field as keyof FreightForm])} onChange={(event) => updateForm(field as keyof FreightForm, event.target.value)} className={`${textInputClass()} max-w-md`} /></Field>
-          <div className="mt-3 overflow-x-auto border border-zinc-300 bg-white">
-            <div className="flex h-8 items-center justify-between bg-zinc-400 px-3 text-xs"><span>{activeTab}</span><Settings size={16} /></div>
-            <table className="w-full min-w-[760px] text-xs">
-              <thead><tr>{['Descricao usuario', 'Qtd documento', 'Classificacao', 'Situacao'].map((heading) => <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium">{heading}</th>)}</tr></thead>
-              <tbody><tr><td className="border-b border-r px-2 py-2">{activeTab}</td><td className="border-b border-r px-2 py-2">1</td><td className="border-b border-r px-2 py-2">Copia [C]</td><td className="border-b px-2 py-2">{form.protocolStatus}</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2296,7 +2279,6 @@ export function FreightsPage() {
                     </button>
                   )
                 })}
-                <span className="px-2.5 py-1 text-zinc-400">ORIENTACAO INTERNA</span>
               </div>
               <div className="min-h-[calc(100vh-420px)] bg-zinc-100">{renderActiveTab()}</div>
             </div>
