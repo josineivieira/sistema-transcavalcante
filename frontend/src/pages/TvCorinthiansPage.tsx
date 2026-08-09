@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../services/api'
 
-const streamUrl = `${api.defaults.baseURL}/tvcorinthians/stream.m3u8`
+const streamUrl = 'https://1.tvlibre.pe/premiere2/mono.m3u8?token=1974db3b1caba098d00d05ad127056cbf7aadb6f-b4-1786327215-1786309215'
 
 type HlsPlayer = {
   loadSource: (url: string) => void
@@ -17,6 +16,7 @@ declare global {
       new(config?: Record<string, unknown>): HlsPlayer
       Events: {
         ERROR: string
+        MANIFEST_PARSED: string
       }
     }
   }
@@ -49,6 +49,7 @@ function loadHlsScript() {
 export function TvCorinthiansPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [status, setStatus] = useState('Carregando transmissao...')
+  const [showOpenLink, setShowOpenLink] = useState(false)
 
   useEffect(() => {
     const video = videoRef.current
@@ -63,6 +64,7 @@ export function TvCorinthiansPage() {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = streamUrl
         setStatus('Ao vivo')
+        void video.play().catch(() => setStatus('Toque no play para assistir'))
         return
       }
 
@@ -79,10 +81,20 @@ export function TvCorinthiansPage() {
         })
         hlsInstance.loadSource(streamUrl)
         hlsInstance.attachMedia(video)
-        window.Hls && hlsInstance.on(window.Hls.Events.ERROR, () => setStatus('Reconectando transmissao...'))
+        if (window.Hls) {
+          hlsInstance.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            setStatus('Ao vivo')
+            void video.play().catch(() => setStatus('Toque no play para assistir'))
+          })
+          hlsInstance.on(window.Hls.Events.ERROR, () => {
+            setStatus('Reconectando transmissao...')
+            setShowOpenLink(true)
+          })
+        }
         setStatus('Ao vivo')
       } catch {
         setStatus('Nao foi possivel carregar o player da transmissao.')
+        setShowOpenLink(true)
       }
     }
 
@@ -118,6 +130,12 @@ export function TvCorinthiansPage() {
             muted
           />
         </div>
+        {showOpenLink && (
+          <div className="tv-help">
+            <span>Se o video nao iniciar neste navegador, abra a transmissao diretamente.</span>
+            <a href={streamUrl} target="_blank" rel="noreferrer">Abrir transmissao</a>
+          </div>
+        )}
       </section>
     </main>
   )
