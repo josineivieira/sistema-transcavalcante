@@ -1,23 +1,37 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
-import { formatMoney, nextId } from '../services/localStore'
+import { formatMoney, nextId, type Freight } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
 import { LoadingRow } from '../components/LoadingState'
+import { api } from '../services/api'
 
 const steps = [
   ['1', 'Selecao', 'Cliente e periodo'],
-  ['2', 'Fretes', 'Elegiveis para faturamento'],
+  ['2', 'Fretes', 'Entrega concluida'],
   ['3', 'Conferencia', 'Duplo cheque antes de fechar'],
   ['4', 'Fiscal', 'Documento e pre-validacao'],
   ['5', 'Aprovacao', 'Conferencia formal'],
   ['6', 'Emissao', 'Fila e acompanhamento'],
 ]
 
+type OperationalFreightsResponse = {
+  items: Freight[]
+}
+
+const CLOSING_ELIGIBLE_STATUS = 'ENTREGA CONCLUIDA 50'
+const CLOSING_LINKED_STATUS = 'Incluido em fechamento'
+
+function isClosingEligible(freight: Freight) {
+  return freight.operationalStatus === CLOSING_ELIGIBLE_STATUS && !freight.closing
+}
+
 export function ClosingsPage() {
   const data = useLocalData()
   const { freights, closings } = data
   const canEditPage = canEdit('closings')
+  const [eligibleFreights, setEligibleFreights] = useState<Freight[]>([])
+  const [eligibleLoading, setEligibleLoading] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [period, setPeriod] = useState('Semana atual')
@@ -25,10 +39,22 @@ export function ClosingsPage() {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [viewingClosingNumber, setViewingClosingNumber] = useState<string | null>(null)
 
-  const eligibleFreights = useMemo(
-    () => freights.filter((freight) => freight.operationalStatus === 'Aprovado para faturamento' && !freight.closing),
-    [freights],
-  )
+  function loadEligibleFreights() {
+    setEligibleLoading(true)
+    return api.get<OperationalFreightsResponse>('/operational-freights', {
+      params: { status: CLOSING_ELIGIBLE_STATUS, limit: 1000 },
+    }).then((response) => {
+      setEligibleFreights((response.data.items || []).filter(isClosingEligible))
+    }).catch(() => {
+      setEligibleFreights([])
+    }).finally(() => {
+      setEligibleLoading(false)
+    })
+  }
+
+  useEffect(() => {
+    void loadEligibleFreights()
+  }, [])
 
   const customers = useMemo(
     () => Array.from(new Set(eligibleFreights.map((freight) => freight.customer))),
@@ -54,8 +80,11 @@ export function ClosingsPage() {
       denyNoPrivilege()
       return
     }
+    if (eligibleLoading) {
+      return
+    }
     if (!eligibleFreights.length) {
-      window.alert('Nao ha fretes aprovados disponiveis para fechamento.')
+      window.alert('Nao ha fretes com entrega concluida disponiveis para fechamento.')
       return
     }
 
@@ -90,7 +119,7 @@ export function ClosingsPage() {
     setSelectedFreightIds(checked ? previewRows.map((freight) => freight.id) : [])
   }
 
-  function confirmClosing() {
+  async function confirmClosing() {
     if (!canEditPage) {
       denyNoPrivilege()
       return
@@ -101,32 +130,29 @@ export function ClosingsPage() {
     }
 
     const number = `FEC-${String(closings.length + 1).padStart(6, '0')}`
+    const closing = {
+      id: nextId('fec'),
+      number,
+      customer: selectedCustomer,
+      period,
+      freights: selectedFreights.length,
+      subtotal,
+      retentions: 0,
+      netTotal: subtotal,
+      status: 'Aguardando aprovacao',
+    }
 
-    data.update({
-      ...data,
-      freights: freights.map((freight) =>
-        selectedFreightIds.includes(freight.id)
-          ? { ...freight, closing: number, operationalStatus: 'Incluido em fechamento' }
-          : freight,
-      ),
-      closings: [
-        ...closings,
-        {
-          id: nextId('fec'),
-          number,
-          customer: selectedCustomer,
-          period,
-          freights: selectedFreights.length,
-          subtotal,
-          retentions: 0,
-          netTotal: subtotal,
-          status: 'Aguardando aprovacao',
-        },
-      ],
-    })
-
-    setShowPreview(false)
-    setSelectedFreightIds([])
+    try {
+      await Promise.all(selectedFreights.map((freight) =>
+        data.saveFreightRecord({ ...freight, closing: number, operationalStatus: CLOSING_LINKED_STATUS }),
+      ))
+      data.setClosings([...closings, closing])
+      setEligibleFreights((current) => current.filter((freight) => !selectedFreightIds.includes(freight.id)))
+      setShowPreview(false)
+      setSelectedFreightIds([])
+    } catch {
+      window.alert('Nao foi possivel salvar o fechamento no banco. Tente novamente.')
+    }
   }
 
   function approveClosing(id: string) {
@@ -141,7 +167,7 @@ export function ClosingsPage() {
     setOpenActionId(null)
   }
 
-  function cancelClosing(id: string) {
+  async function cancelClosing(id: string) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
@@ -149,18 +175,27 @@ export function ClosingsPage() {
     const closing = closings.find((item) => item.id === id)
     if (!closing) return
 
-    data.update({
-      ...data,
-      closings: closings.map((item) => item.id === id ? { ...item, status: 'Cancelado' } : item),
-      freights: freights.map((freight) =>
-        freight.closing === closing.number
-          ? { ...freight, closing: undefined, operationalStatus: 'Aprovado para faturamento' }
-          : freight,
-      ),
-    })
-    setOpenActionId(null)
-    if (viewingClosingNumber === closing.number) {
-      setViewingClosingNumber(null)
+    try {
+      const response = await api.get<OperationalFreightsResponse>('/operational-freights', {
+        params: { limit: 1000 },
+      })
+      const restoredFreights = (response.data.items || [])
+        .filter((freight) => freight.closing === closing.number)
+        .map((freight) => ({ ...freight, closing: undefined, operationalStatus: CLOSING_ELIGIBLE_STATUS }))
+
+      await Promise.all(restoredFreights.map((freight) => data.saveFreightRecord(freight)))
+      data.setClosings(closings.map((item) => item.id === id ? { ...item, status: 'Cancelado' } : item))
+      setEligibleFreights((current) => {
+        const byId = new Map<string, Freight>()
+        ;[...restoredFreights, ...current].filter(isClosingEligible).forEach((freight) => byId.set(freight.id, freight))
+        return [...byId.values()]
+      })
+      setOpenActionId(null)
+      if (viewingClosingNumber === closing.number) {
+        setViewingClosingNumber(null)
+      }
+    } catch {
+      window.alert('Nao foi possivel cancelar o fechamento no banco. Tente novamente.')
     }
   }
 
