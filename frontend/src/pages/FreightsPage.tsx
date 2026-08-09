@@ -456,7 +456,6 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 }, {})
 
 const freightTaskOptions = [
-  'AGENDAMENTO E CARREGAMENTO 15',
   'ABASTECIDO 17',
   'NOTA(S) FISCAL(IS) RECEBIDA(S) 20',
   'ENTREGA CONCLUIDA 50',
