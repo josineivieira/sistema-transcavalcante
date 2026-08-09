@@ -72,6 +72,7 @@ export function useLocalData() {
         let nextData: AppData
         if (response.data.data) {
           nextData = normalizeData(response.data.data)
+          deletedFreightIdsRef.current = new Set(nextData.deletedFreightIds)
         } else {
           const initialData = loadData()
           await api.put('/operational-data', { data: { ...initialData, freights: [] } })
@@ -113,7 +114,7 @@ export function useLocalData() {
   function update(nextData: AppData) {
     const normalized = normalizeData(nextData)
     setData(normalized)
-    api.put('/operational-data', { data: { ...normalized, freights: [] } }).then(() => {
+    api.put('/operational-data', { data: { ...normalized, freights: [], deletedFreightIds: [...deletedFreightIdsRef.current] } }).then(() => {
       setError('')
     }).catch(() => {
       setError('Nao foi possivel salvar no banco de dados.')
@@ -170,8 +171,10 @@ export function useLocalData() {
     const previousFreights = data.freights
     const deleteIds = Array.from(new Set([id, ...extraIds].filter(Boolean)))
     deleteIds.forEach((deleteId) => deletedFreightIdsRef.current.add(deleteId))
+    const nextDeletedFreightIds = [...deletedFreightIdsRef.current]
     setData((current) => normalizeData({
       ...current,
+      deletedFreightIds: nextDeletedFreightIds,
       freights: current.freights.filter((freight) => !deleteIds.includes(freight.id) && !deleteIds.includes(freight.process) && !deleteIds.includes(freight.number)),
     }))
     setFreightsTotal((current) => Math.max(0, current - 1))
@@ -180,7 +183,7 @@ export function useLocalData() {
       setError('')
     }).catch((reason) => {
       deleteIds.forEach((deleteId) => deletedFreightIdsRef.current.delete(deleteId))
-      setData((current) => normalizeData({ ...current, freights: previousFreights }))
+      setData((current) => normalizeData({ ...current, deletedFreightIds: [...deletedFreightIdsRef.current], freights: previousFreights }))
       setFreightsTotal(previousFreights.length)
       setError('Nao foi possivel excluir frete no banco de dados.')
       throw reason

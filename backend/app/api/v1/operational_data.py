@@ -40,6 +40,7 @@ def _default_snapshot_data() -> dict:
         "vehicles": [],
         "containers": [],
         "freights": [],
+        "deletedFreightIds": [],
         "closings": [],
         "fiscalDocuments": [],
         "receivables": [],
@@ -163,6 +164,10 @@ def _sanitize_data(data: dict) -> dict:
 
 def _prepare_data_for_storage(incoming: dict, current: dict | None = None) -> dict:
     data = deepcopy(incoming)
+    current_deleted_freights = set((current or {}).get("deletedFreightIds") or [])
+    incoming_deleted_freights = set(data.get("deletedFreightIds") or [])
+    data["deletedFreightIds"] = sorted(current_deleted_freights | incoming_deleted_freights)
+
     current_users = {
         str(user.get("id")): user
         for user in (current or {}).get("users", [])

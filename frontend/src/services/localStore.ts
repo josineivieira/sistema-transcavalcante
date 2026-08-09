@@ -444,6 +444,7 @@ export type AppData = {
   vehicles: Vehicle[]
   containers: ContainerRecord[]
   freights: Freight[]
+  deletedFreightIds: string[]
   closings: Closing[]
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
@@ -538,6 +539,7 @@ export const seedData: AppData = {
       fiscalStatus: 'Pendente',
     },
   ],
+  deletedFreightIds: [],
   closings: [],
   fiscalDocuments: [],
   receivables: [],
@@ -748,6 +750,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
     })),
     vehicles: normalizedVehicles,
     containers: data.containers ?? [],
+    deletedFreightIds: [...new Set((data.deletedFreightIds ?? []).map((id) => String(id)).filter(Boolean))],
     freights: (data.freights ?? []).map((freight) => {
       const legacyFreight = freight as Partial<Freight>
       return {
@@ -864,6 +867,7 @@ export function loadData(): AppData {
     vehicles: [],
     containers: [],
     freights: [],
+    deletedFreightIds: [],
     closings: [],
     fiscalDocuments: [],
     receivables: [],

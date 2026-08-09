@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.operational_data import _find_user, _get_or_create_snapshot, _require_operational_auth
@@ -396,5 +397,12 @@ def delete_operational_freight(
 
     identifiers = [freight.external_id or "", freight.process_number or "", freight.internal_number or "", external_id]
     _remember_deleted_freight(db, identifiers)
-    db.commit()
+    try:
+        db.query(FreightTask).filter(FreightTask.freight_id == freight.id).delete(synchronize_session=False)
+        db.delete(freight)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        _remember_deleted_freight(db, identifiers)
+        db.commit()
     return None
