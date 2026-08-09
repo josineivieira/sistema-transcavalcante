@@ -1,4 +1,3 @@
-import math
 import re
 
 import httpx
@@ -53,18 +52,6 @@ def _parse_coordinate(value: str) -> float:
 
 def _format_km(value: float) -> str:
     return f"{value:.4f}".replace(".", ",")
-
-
-def _haversine_km(origin_latitude: float, origin_longitude: float, destination_latitude: float, destination_longitude: float) -> float:
-    earth_radius_km = 6371.0
-    lat1 = math.radians(origin_latitude)
-    lon1 = math.radians(origin_longitude)
-    lat2 = math.radians(destination_latitude)
-    lon2 = math.radians(destination_longitude)
-    delta_lat = lat2 - lat1
-    delta_lon = lon2 - lon1
-    value = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
-    return earth_radius_km * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
 def _lookup_driving_distance_km(origin_latitude: float, origin_longitude: float, destination_latitude: float, destination_longitude: float) -> float | None:
@@ -190,8 +177,7 @@ def resolve_route_distance(
     if driving_distance is not None and driving_distance > 0:
         return {"distanceKm": _format_km(driving_distance), "source": "route"}
 
-    straight_distance = _haversine_km(origin_latitude, origin_longitude, destination_latitude, destination_longitude)
-    return {"distanceKm": _format_km(straight_distance), "source": "estimated"}
+    return {"distanceKm": "", "source": "unavailable"}
 
 
 @router.get("/freight-form")
