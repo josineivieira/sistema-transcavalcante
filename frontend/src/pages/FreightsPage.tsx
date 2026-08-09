@@ -2267,10 +2267,10 @@ export function FreightsPage() {
               <h3 className="text-lg font-normal text-red-600">Transporte rodoviario de container</h3>
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <button onClick={() => saveFreight(false)} disabled={Boolean(savingFreightMode)} className="inline-flex items-center gap-1 disabled:opacity-70">
-                  {savingFreightMode === 'save' ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-950" /> : <Save size={15} />} SALVAR
+                  <Save size={15} /> SALVAR
                 </button>
                 <button onClick={() => saveFreight(true)} disabled={Boolean(savingFreightMode)} className="inline-flex items-center gap-1 disabled:opacity-70">
-                  {savingFreightMode === 'save-close' ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-950" /> : <Save size={15} />} SALVAR E SAIR
+                  <Save size={15} /> SALVAR E SAIR
                 </button>
                 <button onClick={requestDeleteFreight} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
                 <button className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
@@ -2319,6 +2319,12 @@ export function FreightsPage() {
               <div className="min-h-[calc(100vh-420px)] bg-zinc-100">{renderActiveTab()}</div>
             </div>
           </div>
+        </div>
+      )}
+
+      {showForm && savingFreightMode && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-zinc-950/15">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-zinc-300 border-t-blue-900" />
         </div>
       )}
 
