@@ -191,11 +191,14 @@ type RouteDistanceResponse = {
   distanceKm: string
 }
 
+const initialFreightStatus = 'AGENDAMENTO E CARREGAMENTO 15'
+const invoiceReceivedStatus = 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20'
+
 const emptyForm: FreightForm = {
   customer: '',
   process: '',
   processType: '',
-  status: 'AGENDAMENTO E CARREGAMENTO 15',
+  status: initialFreightStatus,
   customerIdentification: '',
   serviceTakerDocument: '',
   serviceTaker: '',
@@ -483,8 +486,7 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 }, {})
 
 const freightTaskOptions = [
-  'ABASTECIDO 17',
-  'NOTA(S) FISCAL(IS) RECEBIDA(S) 20',
+  invoiceReceivedStatus,
   'ENTREGA CONCLUIDA 50',
   'OPERACAO ENCERRADA 55',
   'PROCESSO INTERROMPIDO 60',
@@ -604,12 +606,13 @@ export function FreightsPage() {
   const generalReady = Boolean(form.process && form.processType && form.customer && form.serviceTaker)
   const routeReady = Boolean(form.routeName && form.origin && form.destination)
   const serviceReady = Boolean(generalReady && routeReady && form.driver && form.tractorId)
-  const hasAbastecido = form.taskHistory.some((task) => task.name === 'ABASTECIDO 17')
-  const hasNotasRecebidas = form.taskHistory.some((task) => task.name === 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20')
+  const hasNotasRecebidas = form.status === invoiceReceivedStatus
+    || form.taskHistory.some((task) => task.name === invoiceReceivedStatus)
+    || freightMinimumReady(form)
   const containerRows = legacyContainerRows(form)
   const containerReady = Boolean(serviceReady && containerRows.length)
   const availableTaskOptions = freightTaskOptions.filter((task) => (
-    showPreviousTasks || !form.taskHistory.some((history) => history.name === task)
+    showPreviousTasks || (form.status !== task && !form.taskHistory.some((history) => history.name === task))
   ))
   const filteredExtraProducts = useMemo(() => {
     const term = extraProductSearch.toLowerCase()
@@ -648,8 +651,8 @@ export function FreightsPage() {
     ROTA: true,
     CONTAINERS: true,
     'CONTROLE DE DATAS': true,
-    'DESPESAS PREVISTAS': hasAbastecido,
-    'DESPESAS EXTRAS': hasAbastecido,
+    'DESPESAS PREVISTAS': hasNotasRecebidas,
+    'DESPESAS EXTRAS': hasNotasRecebidas,
     'NOTAS FISCAIS': hasNotasRecebidas,
     CIOT: hasNotasRecebidas,
   }
@@ -772,6 +775,27 @@ export function FreightsPage() {
     return `TR${String(maxNumber + 1).padStart(2, '0')}`
   }
 
+  function freightMinimumReady(snapshot: FreightForm) {
+    return Boolean(
+      snapshot.process
+      && snapshot.processType
+      && snapshot.customer
+      && snapshot.serviceTaker
+      && snapshot.sender
+      && snapshot.recipient
+      && snapshot.driver
+      && snapshot.tractorId
+      && snapshot.trailerId
+      && legacyContainerRows(snapshot).length,
+    )
+  }
+
+  function applyAutomaticFreightStatus(snapshot: FreightForm): FreightForm {
+    if (!freightMinimumReady(snapshot)) return snapshot
+    if (snapshot.status && snapshot.status !== initialFreightStatus) return snapshot
+    return { ...snapshot, status: invoiceReceivedStatus }
+  }
+
   function updateForm(field: keyof FreightForm, value: string | boolean) {
     setForm((current) => {
       const next = { ...current, [field]: value }
@@ -789,7 +813,7 @@ export function FreightsPage() {
           next.plannedFreightCost = price
         }
       }
-      return next
+      return applyAutomaticFreightStatus(next)
     })
   }
 
@@ -850,7 +874,7 @@ export function FreightsPage() {
     if (!editingFreightId) return
     const currentFreight = freights.find((freight) => freight.id === editingFreightId)
     if (currentFreight) {
-      void saveFreightRecord(buildFreightRecord(snapshot, currentFreight))
+      void saveFreightRecord(buildFreightRecord(applyAutomaticFreightStatus(snapshot), currentFreight))
     }
   }
 
@@ -966,7 +990,7 @@ export function FreightsPage() {
     }
     const number = draftValue.trim()
     if (!number) return
-    const next = materializeContainerDraft({ ...form, containerDraft: number }, number)
+    const next = applyAutomaticFreightStatus(materializeContainerDraft({ ...form, containerDraft: number }, number))
     setForm(next)
     persistFreightForm(next)
   }
@@ -977,11 +1001,11 @@ export function FreightsPage() {
       return
     }
     const containerEntries = legacyContainerRows(form).filter((entry) => entry.id !== id)
-    const next = {
+    const next = applyAutomaticFreightStatus({
       ...form,
       container: containerEntries[0]?.number ?? '',
       containerEntries,
-    }
+    })
     setForm(next)
     persistFreightForm(next)
   }
@@ -1108,13 +1132,14 @@ export function FreightsPage() {
         status: taskName,
         taskHistory: [task, ...(current.taskHistory ?? [])],
       }
+      const automaticNext = applyAutomaticFreightStatus(next)
       if (editingFreightId) {
         const currentFreight = freights.find((freight) => freight.id === editingFreightId)
         if (currentFreight) {
-          void saveFreightRecord(buildFreightRecord(next, currentFreight))
+          void saveFreightRecord(buildFreightRecord(automaticNext, currentFreight))
         }
       }
-      return next
+      return automaticNext
     })
     setTaskPickerOpen(false)
   }
@@ -1154,7 +1179,7 @@ export function FreightsPage() {
       destination: formSnapshot.destination,
       documentReleaseDate: formSnapshot.documentReleaseDate || createdDate,
       value,
-      operationalStatus: formSnapshot.status || existing?.operationalStatus || 'AGENDAMENTO E CARREGAMENTO 15',
+      operationalStatus: formSnapshot.status || existing?.operationalStatus || initialFreightStatus,
       fiscalStatus: existing?.fiscalStatus ?? 'Pendente',
       closing: existing?.closing,
     }
@@ -1182,7 +1207,7 @@ export function FreightsPage() {
       return
     }
 
-    const formSnapshot = materializeCiotDraft(materializeContainerDraft({ ...form, process }))
+    const formSnapshot = applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...form, process })))
     setForm(formSnapshot)
     setEditingCiotId(null)
     setPlannedExpenseEdit(null)
