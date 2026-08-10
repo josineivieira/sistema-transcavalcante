@@ -3,7 +3,7 @@ import { MoreVertical } from 'lucide-react'
 import { formatMoney, nextId, type Freight } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
-import { LoadingRow } from '../components/LoadingState'
+import { LoadingRow, LoadingState } from '../components/LoadingState'
 import { api } from '../services/api'
 
 const steps = [
@@ -26,9 +26,30 @@ function isClosingEligible(freight: Freight) {
   return freight.operationalStatus === CLOSING_ELIGIBLE_STATUS && !freight.closing
 }
 
+function freightScheduleDate(freight: Freight) {
+  return freight.destinationScheduleDate || freight.date || '-'
+}
+
+function freightCiot(freight: Freight) {
+  return freight.ciotEntries?.find((entry) => entry.number)?.number || freight.ciotNumber || '-'
+}
+
+function freightInvoiceLabel(freight: Freight) {
+  const entries = freight.invoiceEntries?.filter((entry) => entry.invoiceNumber) || []
+  if (entries.length) {
+    return entries.map((entry) => (
+      entry.invoiceSeries ? `${entry.invoiceNumber}/${entry.invoiceSeries}` : entry.invoiceNumber
+    )).join(', ')
+  }
+  if (freight.invoiceNumber) {
+    return freight.invoiceSeries ? `${freight.invoiceNumber}/${freight.invoiceSeries}` : freight.invoiceNumber
+  }
+  return '-'
+}
+
 export function ClosingsPage() {
   const data = useLocalData()
-  const { freights, closings } = data
+  const { closings } = data
   const canEditPage = canEdit('closings')
   const [eligibleFreights, setEligibleFreights] = useState<Freight[]>([])
   const [eligibleLoading, setEligibleLoading] = useState(true)
@@ -38,11 +59,14 @@ export function ClosingsPage() {
   const [selectedFreightIds, setSelectedFreightIds] = useState<string[]>([])
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [viewingClosingNumber, setViewingClosingNumber] = useState<string | null>(null)
+  const [viewingFreights, setViewingFreights] = useState<Freight[]>([])
+  const [viewingLoading, setViewingLoading] = useState(false)
+  const [savingLabel, setSavingLabel] = useState('')
 
   function loadEligibleFreights() {
     setEligibleLoading(true)
     return api.get<OperationalFreightsResponse>('/operational-freights', {
-      params: { status: CLOSING_ELIGIBLE_STATUS, limit: 1000 },
+      params: { status: CLOSING_ELIGIBLE_STATUS, unclosed: true, limit: 1000 },
     }).then((response) => {
       setEligibleFreights((response.data.items || []).filter(isClosingEligible))
     }).catch(() => {
@@ -73,7 +97,6 @@ export function ClosingsPage() {
 
   const subtotal = selectedFreights.reduce((sum, freight) => sum + freight.value, 0)
   const viewingClosing = closings.find((closing) => closing.number === viewingClosingNumber)
-  const viewingFreights = freights.filter((freight) => freight.closing === viewingClosingNumber)
 
   function openPreview() {
     if (!canEditPage) {
@@ -143,6 +166,7 @@ export function ClosingsPage() {
     }
 
     try {
+      setSavingLabel('Confirmando fechamento...')
       await Promise.all(selectedFreights.map((freight) =>
         data.saveFreightRecord({ ...freight, closing: number, operationalStatus: CLOSING_LINKED_STATUS }),
       ))
@@ -152,19 +176,26 @@ export function ClosingsPage() {
       setSelectedFreightIds([])
     } catch {
       window.alert('Nao foi possivel salvar o fechamento no banco. Tente novamente.')
+    } finally {
+      setSavingLabel('')
     }
   }
 
-  function approveClosing(id: string) {
+  async function approveClosing(id: string) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
     }
-    data.update({
-      ...data,
-      closings: closings.map((closing) => closing.id === id ? { ...closing, status: 'Aprovado' } : closing),
-    })
-    setOpenActionId(null)
+    setSavingLabel('Aprovando fechamento...')
+    try {
+      await data.update({
+        ...data,
+        closings: closings.map((closing) => closing.id === id ? { ...closing, status: 'Aprovado' } : closing),
+      })
+      setOpenActionId(null)
+    } finally {
+      setSavingLabel('')
+    }
   }
 
   async function cancelClosing(id: string) {
@@ -176,11 +207,11 @@ export function ClosingsPage() {
     if (!closing) return
 
     try {
+      setSavingLabel('Cancelando fechamento...')
       const response = await api.get<OperationalFreightsResponse>('/operational-freights', {
-        params: { limit: 1000 },
+        params: { closing: closing.number, limit: 1000 },
       })
       const restoredFreights = (response.data.items || [])
-        .filter((freight) => freight.closing === closing.number)
         .map((freight) => ({ ...freight, closing: undefined, operationalStatus: CLOSING_ELIGIBLE_STATUS }))
 
       await Promise.all(restoredFreights.map((freight) => data.saveFreightRecord(freight)))
@@ -196,12 +227,26 @@ export function ClosingsPage() {
       }
     } catch {
       window.alert('Nao foi possivel cancelar o fechamento no banco. Tente novamente.')
+    } finally {
+      setSavingLabel('')
     }
   }
 
-  function viewClosing(number: string) {
+  async function viewClosing(number: string) {
     setViewingClosingNumber(number)
     setOpenActionId(null)
+    setViewingLoading(true)
+    setViewingFreights([])
+    try {
+      const response = await api.get<OperationalFreightsResponse>('/operational-freights', {
+        params: { closing: number, limit: 1000 },
+      })
+      setViewingFreights(response.data.items || [])
+    } catch {
+      setViewingFreights([])
+    } finally {
+      setViewingLoading(false)
+    }
   }
 
   return (
@@ -280,7 +325,7 @@ export function ClosingsPage() {
                       onChange={(event) => toggleAll(event.target.checked)}
                     />
                   </th>
-                  {['Numero', 'Data', 'Processo', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor'].map((heading) => (
+                  {['Processo', 'Dt. agendamento entrega', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'CIOT', 'Nr. nfe/serie', 'Origem', 'Destino', 'Valor'].map((heading) => (
                     <th key={heading} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">
                       {heading}
                     </th>
@@ -293,13 +338,14 @@ export function ClosingsPage() {
                     <td className="border-b border-zinc-200 px-3 py-2">
                       <input type="checkbox" checked={selectedFreightIds.includes(freight.id)} onChange={() => toggleFreight(freight.id)} />
                     </td>
-                    <td className="border-b border-zinc-200 px-3 py-2">{freight.number}</td>
-                    <td className="border-b border-zinc-200 px-3 py-2">{freight.date}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.process}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightScheduleDate(freight)}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.container || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.driver || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.tractorPlate || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.trailerPlate || '-'}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightCiot(freight)}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightInvoiceLabel(freight)}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.origin || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.destination || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{formatMoney(freight.value)}</td>
@@ -349,13 +395,13 @@ export function ClosingsPage() {
 
                   {openActionId === closing.id && (
                     <div className="absolute right-3 top-9 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
-                      <button onClick={() => viewClosing(closing.number)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
+                      <button onClick={() => void viewClosing(closing.number)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
                         Visualizar
                       </button>
-                      <button onClick={() => approveClosing(closing.id)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
+                      <button onClick={() => void approveClosing(closing.id)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
                         Aprovar
                       </button>
-                      <button onClick={() => cancelClosing(closing.id)} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">
+                      <button onClick={() => void cancelClosing(closing.id)} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">
                         Cancelar
                       </button>
                     </div>
@@ -410,7 +456,7 @@ export function ClosingsPage() {
             <table className="system-grid w-full min-w-[1120px] text-xs">
               <thead className="bg-zinc-50">
                 <tr>
-                  {['Numero', 'Data', 'Processo', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'Origem', 'Destino', 'Valor', 'Fiscal'].map((heading) => (
+                  {['Processo', 'Dt. agendamento entrega', 'Conteiner', 'Motorista', 'Cavalo', 'Carreta', 'CIOT', 'Nr. nfe/serie', 'Origem', 'Destino', 'Valor'].map((heading) => (
                     <th key={heading} className="border-b border-zinc-300 px-3 py-2 text-left text-xs font-medium text-zinc-600">
                       {heading}
                     </th>
@@ -418,22 +464,23 @@ export function ClosingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {viewingFreights.map((freight) => (
+                {viewingLoading && <LoadingRow colSpan={11} label="Carregando fretes do fechamento..." />}
+                {!viewingLoading && viewingFreights.map((freight) => (
                   <tr key={freight.id}>
-                    <td className="border-b border-zinc-200 px-3 py-2">{freight.number}</td>
-                    <td className="border-b border-zinc-200 px-3 py-2">{freight.date}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.process}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightScheduleDate(freight)}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.container || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.driver || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.tractorPlate || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.trailerPlate || '-'}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightCiot(freight)}</td>
+                    <td className="border-b border-zinc-200 px-3 py-2">{freightInvoiceLabel(freight)}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.origin || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{freight.destination || '-'}</td>
                     <td className="border-b border-zinc-200 px-3 py-2">{formatMoney(freight.value)}</td>
-                    <td className="border-b border-zinc-200 px-3 py-2">{freight.fiscalStatus}</td>
                   </tr>
                 ))}
-                {!viewingFreights.length && (
+                {!viewingLoading && !viewingFreights.length && (
                   <tr>
                     <td colSpan={11} className="px-3 py-8 text-center text-zinc-500">
                       Nenhum frete vinculado a este fechamento.
@@ -444,6 +491,13 @@ export function ClosingsPage() {
             </table>
           </div>
         </section>
+      )}
+      {savingLabel && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/20">
+          <div className="border border-zinc-400 bg-white shadow-xl">
+            <LoadingState label={savingLabel} />
+          </div>
+        </div>
       )}
     </div>
   )

@@ -27,6 +27,7 @@ class Freight(Base, UUIDMixin, TimestampMixin):
     fiscal_status: Mapped[str] = mapped_column(String(30), default="pending")
     approved_for_billing: Mapped[bool] = mapped_column(Boolean, default=False)
     external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    closing_number: Mapped[str | None] = mapped_column(String(80), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sender_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sender_document: Mapped[str | None] = mapped_column(String(30), nullable=True)

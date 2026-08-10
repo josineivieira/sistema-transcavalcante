@@ -32,6 +32,7 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         "ALTER TABLE freights ALTER COLUMN operational_status TYPE VARCHAR(255)",
         "ALTER TABLE freights ALTER COLUMN container_number TYPE VARCHAR(120)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS external_id VARCHAR(120)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS closing_number VARCHAR(80)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS sender_document VARCHAR(30)",
@@ -62,6 +63,7 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         )
         """,
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_freights_company_external_id ON freights (company_id, external_id)",
+        "CREATE INDEX IF NOT EXISTS ix_freights_company_closing_number ON freights (company_id, closing_number)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_freight_tasks_freight_external ON freight_tasks (freight_id, external_id)",
     ]
     for statement in statements:
@@ -190,6 +192,7 @@ def _freight_to_dict(freight: Freight, tasks: list[FreightTask]) -> dict:
         "value": float(freight.total_value),
         "operationalStatus": freight.operational_status,
         "fiscalStatus": freight.fiscal_status,
+        "closing": freight.closing_number or payload.get("closing"),
         "sender": freight.sender_name or payload.get("sender", ""),
         "senderDocument": freight.sender_document or payload.get("senderDocument", ""),
         "recipient": freight.recipient_name or payload.get("recipient", ""),
@@ -279,6 +282,7 @@ def _upsert_freight_data(db: Session, data: dict) -> Freight:
     freight.total_value = _decimal(data.get("value"))
     freight.operational_status = str(data.get("operationalStatus") or data.get("status") or "Em digitacao")
     freight.fiscal_status = str(data.get("fiscalStatus") or "Pendente")
+    freight.closing_number = str(data.get("closing") or "") or None
     freight.approved_for_billing = freight.operational_status == "Aprovado para faturamento"
     freight.customer_name = str(data.get("customer") or "")
     freight.sender_name = str(data.get("sender") or "")
@@ -335,6 +339,8 @@ def list_operational_freights(
     container: str = "",
     origin_date_start: str = "",
     origin_date_end: str = "",
+    closing: str = "",
+    unclosed: bool = False,
     limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     email: str = Depends(_require_operational_auth),
@@ -388,6 +394,10 @@ def list_operational_freights(
         query = query.filter(Freight.service_type.ilike(f"%{process_type}%"))
     if container:
         query = query.filter(Freight.container_number.ilike(f"%{container}%"))
+    if closing:
+        query = query.filter(Freight.closing_number == closing)
+    if unclosed:
+        query = query.filter(Freight.closing_number.is_(None))
 
     parsed_date_start = _date_from_payload(date_start, None) if date_start else None
     parsed_date_end = _date_from_payload(date_end, None) if date_end else None
