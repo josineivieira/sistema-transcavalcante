@@ -193,6 +193,7 @@ type RouteDistanceResponse = {
 
 const initialFreightStatus = 'AGENDAMENTO E CARREGAMENTO 15'
 const invoiceReceivedStatus = 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20'
+const deliveryCompletedStatus = 'ENTREGA CONCLUIDA 50'
 
 const emptyForm: FreightForm = {
   customer: '',
@@ -487,7 +488,7 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 
 const freightTaskOptions = [
   invoiceReceivedStatus,
-  'ENTREGA CONCLUIDA 50',
+  deliveryCompletedStatus,
   'OPERACAO ENCERRADA 55',
   'PROCESSO INTERROMPIDO 60',
   'AUDITORIA INICIADA 65',
@@ -790,7 +791,19 @@ export function FreightsPage() {
     )
   }
 
+  function freightStatusCode(status: string) {
+    const match = status.match(/(\d+)\s*$/)
+    return match ? Number(match[1]) : 0
+  }
+
+  function freightDeliveryCompleted(snapshot: FreightForm) {
+    return Boolean(snapshot.destinationArrivalDate && snapshot.destinationDepartureDate)
+  }
+
   function applyAutomaticFreightStatus(snapshot: FreightForm): FreightForm {
+    if (freightDeliveryCompleted(snapshot) && freightStatusCode(snapshot.status) < 50) {
+      return { ...snapshot, status: deliveryCompletedStatus }
+    }
     if (!freightMinimumReady(snapshot)) return snapshot
     if (snapshot.status && snapshot.status !== initialFreightStatus) return snapshot
     return { ...snapshot, status: invoiceReceivedStatus }
