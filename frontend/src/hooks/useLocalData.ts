@@ -85,20 +85,27 @@ export function useLocalData() {
           nextData = initialData
         }
 
-        const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
-          params: { limit: 500 },
-        })
-        const freights = (freightsResponse.data.items || []).filter((freight) => (
-          !deletedFreightIdsRef.current.has(freight.id)
-          && !deletedFreightIdsRef.current.has(freight.process)
-          && !deletedFreightIdsRef.current.has(freight.number)
-        ))
-        nextData = normalizeData({ ...nextData, freights })
+        try {
+          const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
+            params: { limit: 500 },
+          })
+          const freights = (freightsResponse.data.items || []).filter((freight) => (
+            !deletedFreightIdsRef.current.has(freight.id)
+            && !deletedFreightIdsRef.current.has(freight.process)
+            && !deletedFreightIdsRef.current.has(freight.number)
+          ))
+          nextData = normalizeData({ ...nextData, freights })
+          if (active) {
+            setFreightsTotal(freightsResponse.data.total ?? nextData.freights.length)
+          }
+        } catch {
+          if (active) {
+            setError('Nao foi possivel carregar fretes.')
+          }
+        }
 
         if (active) {
           setData(nextData)
-          setFreightsTotal(freightsResponse.data.total ?? nextData.freights.length)
-          setError('')
         }
       })
       .catch(() => {

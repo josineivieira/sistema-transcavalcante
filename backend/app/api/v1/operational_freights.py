@@ -33,6 +33,7 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         "ALTER TABLE freights ALTER COLUMN container_number TYPE VARCHAR(120)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS external_id VARCHAR(120)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS closing_number VARCHAR(80)",
+        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS payload JSONB",
         """
         UPDATE freights
         SET closing_number = payload->>'closing'
@@ -49,7 +50,6 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS tractor_plate VARCHAR(20)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS trailer_plate VARCHAR(20)",
-        "ALTER TABLE freights ADD COLUMN IF NOT EXISTS payload JSONB",
         """
         CREATE TABLE IF NOT EXISTS freight_tasks (
             id UUID PRIMARY KEY,
