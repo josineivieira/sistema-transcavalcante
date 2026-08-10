@@ -24,6 +24,7 @@ import {
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { canView, clearAuthSession, getAuthUser } from '../services/authSession'
+import { api } from '../services/api'
 
 const groups = [
   {
@@ -95,10 +96,14 @@ export function AppLayout() {
     setCollapsed(!collapsed)
   }
 
-  function logout() {
-    clearAuthSession()
-    setProfileOpen(false)
-    navigate('/login')
+  async function logout() {
+    try {
+      await api.post('/operational-data/logout')
+    } finally {
+      clearAuthSession()
+      setProfileOpen(false)
+      navigate('/login')
+    }
   }
 
   return (

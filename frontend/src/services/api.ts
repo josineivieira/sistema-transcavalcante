@@ -1,11 +1,9 @@
 import axios from 'axios'
 import {
   clearAuthSession,
-  getAuthToken,
-  getRefreshToken,
   isSessionIdleExpired,
   markSessionExpired,
-  replaceAuthTokens,
+  refreshAuthSession,
 } from './authSession'
 
 function resolveApiUrl() {
@@ -25,18 +23,36 @@ function resolveApiUrl() {
 
 export const api = axios.create({
   baseURL: resolveApiUrl(),
+  withCredentials: true,
 })
 
+function getCookie(name: string) {
+  return document.cookie
+    .split('; ')
+    .find((cookie) => cookie.startsWith(`${name}=`))
+    ?.split('=')
+    .slice(1)
+    .join('=')
+}
+
+function isUnsafeMethod(method?: string) {
+  return ['post', 'put', 'patch', 'delete'].includes(String(method || 'get').toLowerCase())
+}
+
 api.interceptors.request.use((config) => {
-  const token = getAuthToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (isUnsafeMethod(config.method)) {
+    const csrfToken = getCookie('tc_csrf_token')
+    if (csrfToken) {
+      config.headers = config.headers ?? {}
+      config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken)
+    }
   }
+
   return config
 })
 
 let redirectingToLogin = false
-let refreshPromise: Promise<string> | null = null
+let refreshPromise: Promise<void> | null = null
 
 function redirectToExpiredLogin() {
   clearAuthSession()
@@ -49,28 +65,17 @@ function redirectToExpiredLogin() {
 }
 
 async function refreshActiveSession() {
-  const refreshToken = getRefreshToken()
-
-  if (!refreshToken || isSessionIdleExpired()) {
+  if (isSessionIdleExpired()) {
     throw new Error('Session expired')
   }
 
   if (!refreshPromise) {
     refreshPromise = axios
       .post<{
-        access_token: string,
-        refresh_token: string,
         session_idle_timeout_minutes?: number,
-      }>(`${resolveApiUrl()}/operational-data/refresh`, {
-        refresh_token: refreshToken,
-      })
+      }>(`${resolveApiUrl()}/operational-data/refresh`, {}, { withCredentials: true })
       .then((response) => {
-        replaceAuthTokens(
-          response.data.access_token,
-          response.data.refresh_token,
-          response.data.session_idle_timeout_minutes,
-        )
-        return response.data.access_token
+        refreshAuthSession(response.data.session_idle_timeout_minutes)
       })
       .finally(() => {
         refreshPromise = null
@@ -92,9 +97,7 @@ api.interceptors.response.use(
         originalRequest._sessionRetry = true
 
         try {
-          const accessToken = await refreshActiveSession()
-          originalRequest.headers = originalRequest.headers ?? {}
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          await refreshActiveSession()
           return api(originalRequest)
         } catch {
           redirectToExpiredLogin()

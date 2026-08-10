@@ -10,8 +10,6 @@ export type AuthUser = {
 }
 
 let currentUser: AuthUser | null = null
-let currentToken = ''
-let currentRefreshToken = ''
 let lastActivityAt = Date.now()
 const expiredSessionMessageKey = 'transcavalcante.session-expired-message'
 const authSessionKey = 'transcavalcante.auth-session'
@@ -21,8 +19,6 @@ let lastActivityPersistedAt = 0
 
 type StoredAuthSession = {
   user: AuthUser
-  accessToken: string
-  refreshToken: string
   idleTimeoutMinutes: number
   lastActivityAt: number
 }
@@ -93,7 +89,7 @@ function removeStoredSession() {
 }
 
 function writeStoredSession() {
-  if (typeof window === 'undefined' || !currentUser || !currentToken) {
+  if (typeof window === 'undefined' || !currentUser) {
     return
   }
 
@@ -103,8 +99,6 @@ function writeStoredSession() {
 
   const payload: StoredAuthSession = {
     user: currentUser,
-    accessToken: currentToken,
-    refreshToken: currentRefreshToken,
     idleTimeoutMinutes: Math.max(1, Math.round(sessionIdleTimeoutMs / 60000)),
     lastActivityAt,
   }
@@ -122,8 +116,6 @@ function restoreStoredSession() {
   }
 
   currentUser = stored.user
-  currentToken = stored.accessToken
-  currentRefreshToken = stored.refreshToken
   sessionIdleTimeoutMs = Math.max(1, stored.idleTimeoutMinutes || 30) * 60 * 1000
   lastActivityAt = stored.lastActivityAt || Date.now()
 
@@ -132,10 +124,8 @@ function restoreStoredSession() {
   }
 }
 
-export function setAuthSession(user: AuthUser, accessToken: string, refreshToken = '', idleTimeoutMinutes = 30) {
+export function setAuthSession(user: AuthUser, idleTimeoutMinutes = 30) {
   currentUser = user
-  currentToken = accessToken
-  currentRefreshToken = refreshToken
   sessionIdleTimeoutMs = Math.max(1, idleTimeoutMinutes) * 60 * 1000
   lastActivityAt = Date.now()
   writeStoredSession()
@@ -144,15 +134,11 @@ export function setAuthSession(user: AuthUser, accessToken: string, refreshToken
 
 export function clearAuthSession() {
   currentUser = null
-  currentToken = ''
-  currentRefreshToken = ''
   removeStoredSession()
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
 
-export function replaceAuthTokens(accessToken: string, refreshToken: string, idleTimeoutMinutes?: number) {
-  currentToken = accessToken
-  currentRefreshToken = refreshToken
+export function refreshAuthSession(idleTimeoutMinutes?: number) {
   if (idleTimeoutMinutes) {
     sessionIdleTimeoutMs = Math.max(1, idleTimeoutMinutes) * 60 * 1000
   }
@@ -179,11 +165,11 @@ export function getAuthUser() {
 }
 
 export function getAuthToken() {
-  return currentToken
+  return ''
 }
 
 export function getRefreshToken() {
-  return currentRefreshToken
+  return ''
 }
 
 export function markAuthActivity() {

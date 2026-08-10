@@ -1,7 +1,8 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from secrets import token_urlsafe
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -15,6 +16,11 @@ router = APIRouter()
 
 DEFAULT_COMPANY_KEY = "transcavalcante"
 LOGIN_TOKEN_PREFIX = "operational:"
+ACCESS_COOKIE_NAME = "tc_access_token"
+REFRESH_COOKIE_NAME = "tc_refresh_token"
+CSRF_COOKIE_NAME = "tc_csrf_token"
+REMEMBER_COOKIE_NAME = "tc_remember_session"
+CSRF_HEADER_NAME = "x-csrf-token"
 
 _login_attempts: dict[str, dict[str, datetime | int]] = {}
 
@@ -26,17 +32,12 @@ class OperationalDataPayload(BaseModel):
 class OperationalLoginPayload(BaseModel):
     email: str
     password: str
+    remember: bool = False
 
 
 class OperationalLoginResponse(BaseModel):
-    access_token: str
-    refresh_token: str
     session_idle_timeout_minutes: int
     user: dict
-
-
-class OperationalRefreshPayload(BaseModel):
-    refresh_token: str
 
 
 def _default_snapshot_data() -> dict:
@@ -208,11 +209,74 @@ def _prepare_data_for_storage(incoming: dict, current: dict | None = None) -> di
     return data
 
 
-def _require_operational_auth(authorization: str | None = Header(default=None)) -> str:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticacao obrigatoria")
+def _request_is_https(request: Request | None) -> bool:
+    if request is None:
+        return False
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    return forwarded_proto == "https" or request.url.scheme == "https"
 
-    token = authorization.split(" ", 1)[1].strip()
+
+def _cookie_secure(request: Request | None = None) -> bool:
+    return settings.app_env != "development" or _request_is_https(request)
+
+
+def _cookie_samesite(request: Request | None = None) -> str:
+    return "none" if _cookie_secure(request) else "lax"
+
+
+def _set_auth_cookies(response: Response, email: str, remember: bool, request: Request) -> None:
+    access_token = create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}")
+    refresh_token = create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}")
+    csrf_token = token_urlsafe(32)
+    secure = _cookie_secure(request)
+    samesite = _cookie_samesite(request)
+
+    response.set_cookie(
+        ACCESS_COOKIE_NAME,
+        access_token,
+        max_age=settings.access_token_expire_minutes * 60,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+        path="/",
+    )
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        refresh_token,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60 if remember else None,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+        path="/",
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        csrf_token,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60 if remember else None,
+        httponly=False,
+        secure=secure,
+        samesite=samesite,
+        path="/",
+    )
+    response.set_cookie(
+        REMEMBER_COOKIE_NAME,
+        "true" if remember else "false",
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60 if remember else None,
+        httponly=False,
+        secure=secure,
+        samesite=samesite,
+        path="/",
+    )
+
+
+def _clear_auth_cookies(response: Response, request: Request | None = None) -> None:
+    secure = _cookie_secure(request)
+    samesite = _cookie_samesite(request)
+    for cookie_name in (ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, CSRF_COOKIE_NAME, REMEMBER_COOKIE_NAME):
+        response.delete_cookie(cookie_name, path="/", secure=secure, samesite=samesite)
+
+
+def _decode_operational_access_token(token: str) -> str:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except JWTError as exc:
@@ -224,6 +288,33 @@ def _require_operational_auth(authorization: str | None = Header(default=None)) 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido")
 
     return subject.removeprefix(LOGIN_TOKEN_PREFIX)
+
+
+def _validate_csrf(request: Request, x_csrf_token: str | None) -> None:
+    if request.method.upper() in {"GET", "HEAD", "OPTIONS"}:
+        return
+
+    csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
+    if not csrf_cookie or not x_csrf_token or csrf_cookie != x_csrf_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requisicao nao autorizada")
+
+
+def _require_operational_auth(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_csrf_token: str | None = Header(default=None, alias=CSRF_HEADER_NAME),
+) -> str:
+    access_cookie = request.cookies.get(ACCESS_COOKIE_NAME)
+
+    if access_cookie:
+        _validate_csrf(request, x_csrf_token)
+        return _decode_operational_access_token(access_cookie)
+
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticacao obrigatoria")
+
+    token = authorization.split(" ", 1)[1].strip()
+    return _decode_operational_access_token(token)
 
 
 def _decode_operational_refresh_token(refresh_token: str) -> str:
@@ -241,7 +332,7 @@ def _decode_operational_refresh_token(refresh_token: str) -> str:
 
 
 @router.post("/login", response_model=OperationalLoginResponse)
-def login_operational(payload: OperationalLoginPayload, request: Request, db: Session = Depends(get_db)):
+def login_operational(payload: OperationalLoginPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip()
     key = _client_key(request, email)
     _check_rate_limit(key)
@@ -260,17 +351,20 @@ def login_operational(payload: OperationalLoginPayload, request: Request, db: Se
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario ou senha invalido.")
 
     _clear_failed_logins(key)
+    _set_auth_cookies(response, email, payload.remember, request)
     return {
-        "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
-        "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
         "session_idle_timeout_minutes": settings.session_idle_timeout_minutes,
         "user": _sanitize_user(user),
     }
 
 
 @router.post("/refresh", response_model=OperationalLoginResponse)
-def refresh_operational(payload: OperationalRefreshPayload, db: Session = Depends(get_db)):
-    email = _decode_operational_refresh_token(payload.refresh_token)
+def refresh_operational(request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessao expirada")
+
+    email = _decode_operational_refresh_token(refresh_token)
     snapshot = _get_or_create_snapshot(db)
     data = _prepare_data_for_storage(snapshot.data, snapshot.data)
     if data != snapshot.data:
@@ -282,12 +376,17 @@ def refresh_operational(payload: OperationalRefreshPayload, db: Session = Depend
     if not user or user.get("status") != "Ativo":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessao expirada")
 
+    _set_auth_cookies(response, email, request.cookies.get(REMEMBER_COOKIE_NAME) == "true", request)
     return {
-        "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
-        "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
         "session_idle_timeout_minutes": settings.session_idle_timeout_minutes,
         "user": _sanitize_user(user),
     }
+
+
+@router.post("/logout")
+def logout_operational(request: Request, response: Response):
+    _clear_auth_cookies(response, request)
+    return {"status": "ok"}
 
 
 @router.get("")
