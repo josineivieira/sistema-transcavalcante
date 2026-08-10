@@ -39,7 +39,6 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         SET closing_number = payload->>'closing'
         WHERE closing_number IS NULL
           AND payload IS NOT NULL
-          AND payload ? 'closing'
           AND COALESCE(payload->>'closing', '') <> ''
         """,
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)",

@@ -19,7 +19,6 @@ def upgrade() -> None:
         SET closing_number = payload->>'closing'
         WHERE closing_number IS NULL
           AND payload IS NOT NULL
-          AND payload ? 'closing'
           AND COALESCE(payload->>'closing', '') <> ''
         """
     )
