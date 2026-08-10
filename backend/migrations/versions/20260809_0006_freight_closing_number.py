@@ -13,6 +13,16 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("ALTER TABLE freights ADD COLUMN IF NOT EXISTS closing_number VARCHAR(80)")
+    op.execute(
+        """
+        UPDATE freights
+        SET closing_number = payload->>'closing'
+        WHERE closing_number IS NULL
+          AND payload IS NOT NULL
+          AND payload ? 'closing'
+          AND COALESCE(payload->>'closing', '') <> ''
+        """
+    )
     op.execute("CREATE INDEX IF NOT EXISTS ix_freights_company_closing_number ON freights (company_id, closing_number)")
 
 

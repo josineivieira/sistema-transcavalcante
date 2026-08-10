@@ -20,7 +20,13 @@ type OperationalFreightsResponse = {
 }
 
 const CLOSING_ELIGIBLE_STATUS = 'ENTREGA CONCLUIDA 50'
-const CLOSING_LINKED_STATUS = 'Incluido em fechamento'
+const CLOSING_LINKED_STATUS = 'INCLUIDO EM FECHAMENTO'
+
+type Notice = {
+  title: string
+  message: string
+  tone?: 'info' | 'danger'
+}
 
 function isClosingEligible(freight: Freight) {
   return freight.operationalStatus === CLOSING_ELIGIBLE_STATUS && !freight.closing
@@ -49,7 +55,7 @@ function freightInvoiceLabel(freight: Freight) {
 
 export function ClosingsPage() {
   const data = useLocalData()
-  const { closings } = data
+  const { closings, fiscalDocuments } = data
   const canEditPage = canEdit('closings')
   const [eligibleFreights, setEligibleFreights] = useState<Freight[]>([])
   const [eligibleLoading, setEligibleLoading] = useState(true)
@@ -62,6 +68,7 @@ export function ClosingsPage() {
   const [viewingFreights, setViewingFreights] = useState<Freight[]>([])
   const [viewingLoading, setViewingLoading] = useState(false)
   const [savingLabel, setSavingLabel] = useState('')
+  const [notice, setNotice] = useState<Notice | null>(null)
 
   function loadEligibleFreights() {
     setEligibleLoading(true)
@@ -107,7 +114,10 @@ export function ClosingsPage() {
       return
     }
     if (!eligibleFreights.length) {
-      window.alert('Nao ha fretes com entrega concluida disponiveis para fechamento.')
+      setNotice({
+        title: 'Fechamento indisponivel',
+        message: 'Nao ha fretes com entrega concluida disponiveis para fechamento.',
+      })
       return
     }
 
@@ -148,7 +158,10 @@ export function ClosingsPage() {
       return
     }
     if (!selectedFreights.length) {
-      window.alert('Selecione pelo menos um frete para fechar.')
+      setNotice({
+        title: 'Selecao obrigatoria',
+        message: 'Selecione pelo menos um frete para fechar.',
+      })
       return
     }
 
@@ -175,7 +188,11 @@ export function ClosingsPage() {
       setShowPreview(false)
       setSelectedFreightIds([])
     } catch {
-      window.alert('Nao foi possivel salvar o fechamento no banco. Tente novamente.')
+      setNotice({
+        title: 'Falha ao confirmar',
+        message: 'Nao foi possivel salvar o fechamento no banco. Tente novamente.',
+        tone: 'danger',
+      })
     } finally {
       setSavingLabel('')
     }
@@ -205,6 +222,17 @@ export function ClosingsPage() {
     }
     const closing = closings.find((item) => item.id === id)
     if (!closing) return
+    const hasIssuedDocument = closing.status === 'Emitido'
+      || fiscalDocuments.some((document) => document.closing === closing.number)
+    if (hasIssuedDocument) {
+      setNotice({
+        title: 'Cancelamento bloqueado',
+        message: 'Este fechamento ja tem documento fiscal emitido e nao pode ser cancelado.',
+        tone: 'danger',
+      })
+      setOpenActionId(null)
+      return
+    }
 
     try {
       setSavingLabel('Cancelando fechamento...')
@@ -226,7 +254,11 @@ export function ClosingsPage() {
         setViewingClosingNumber(null)
       }
     } catch {
-      window.alert('Nao foi possivel cancelar o fechamento no banco. Tente novamente.')
+      setNotice({
+        title: 'Falha ao cancelar',
+        message: 'Nao foi possivel cancelar o fechamento no banco. Tente novamente.',
+        tone: 'danger',
+      })
     } finally {
       setSavingLabel('')
     }
@@ -496,6 +528,22 @@ export function ClosingsPage() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/20">
           <div className="border border-zinc-400 bg-white shadow-xl">
             <LoadingState label={savingLabel} />
+          </div>
+        </div>
+      )}
+      {notice && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
+          <div className="w-[420px] max-w-[calc(100vw-32px)] border border-zinc-500 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 px-4 py-2">
+              <h3 className={`text-lg ${notice.tone === 'danger' ? 'text-red-700' : 'text-red-600'}`}>{notice.title}</h3>
+              <button onClick={() => setNotice(null)} className="grid h-7 w-7 place-items-center bg-black text-white">X</button>
+            </div>
+            <div className="px-5 py-6 text-sm leading-6">{notice.message}</div>
+            <div className="flex justify-end border-t border-zinc-300 bg-zinc-50 px-4 py-3">
+              <button onClick={() => setNotice(null)} className="border border-zinc-900 bg-zinc-900 px-5 py-1.5 text-xs font-semibold text-white">
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
