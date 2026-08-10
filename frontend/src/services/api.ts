@@ -1,5 +1,12 @@
 import axios from 'axios'
-import { clearAuthSession, getAuthToken, markSessionExpired } from './authSession'
+import {
+  clearAuthSession,
+  getAuthToken,
+  getRefreshToken,
+  isSessionIdleExpired,
+  markSessionExpired,
+  replaceAuthTokens,
+} from './authSession'
 
 function resolveApiUrl() {
   if (
@@ -29,20 +36,63 @@ api.interceptors.request.use((config) => {
 })
 
 let redirectingToLogin = false
+let refreshPromise: Promise<string> | null = null
+
+function redirectToExpiredLogin() {
+  clearAuthSession()
+  markSessionExpired()
+
+  if (!redirectingToLogin) {
+    redirectingToLogin = true
+    window.location.assign('/login')
+  }
+}
+
+async function refreshActiveSession() {
+  const refreshToken = getRefreshToken()
+
+  if (!refreshToken || isSessionIdleExpired()) {
+    throw new Error('Session expired')
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post<{ access_token: string, refresh_token: string }>(`${resolveApiUrl()}/operational-data/refresh`, {
+        refresh_token: refreshToken,
+      })
+      .then((response) => {
+        replaceAuthTokens(response.data.access_token, response.data.refresh_token)
+        return response.data.access_token
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status
     const isLoginPage = window.location.pathname === '/login'
+    const originalRequest = error.config
 
     if (status === 401 && !isLoginPage) {
-      clearAuthSession()
-      markSessionExpired()
+      if (!originalRequest?._sessionRetry && !String(originalRequest?.url || '').includes('/operational-data/refresh')) {
+        originalRequest._sessionRetry = true
 
-      if (!redirectingToLogin) {
-        redirectingToLogin = true
-        window.location.assign('/login')
+        try {
+          const accessToken = await refreshActiveSession()
+          originalRequest.headers = originalRequest.headers ?? {}
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          return api(originalRequest)
+        } catch {
+          redirectToExpiredLogin()
+        }
+      } else {
+        redirectToExpiredLogin()
       }
     }
 

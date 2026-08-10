@@ -11,7 +11,10 @@ export type AuthUser = {
 
 let currentUser: AuthUser | null = null
 let currentToken = ''
+let currentRefreshToken = ''
+let lastActivityAt = Date.now()
 const expiredSessionMessageKey = 'transcavalcante.session-expired-message'
+const sessionIdleTimeoutMs = 30 * 60 * 1000
 
 export const noPrivilegeMessage = 'Você não tem privilégio para essa ação.'
 
@@ -47,16 +50,25 @@ export const moduleDefaultRoutes = [
   '/settings',
 ]
 
-export function setAuthSession(user: AuthUser, accessToken: string) {
+export function setAuthSession(user: AuthUser, accessToken: string, refreshToken = '') {
   currentUser = user
   currentToken = accessToken
+  currentRefreshToken = refreshToken
+  lastActivityAt = Date.now()
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
 
 export function clearAuthSession() {
   currentUser = null
   currentToken = ''
+  currentRefreshToken = ''
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
+}
+
+export function replaceAuthTokens(accessToken: string, refreshToken: string) {
+  currentToken = accessToken
+  currentRefreshToken = refreshToken
+  lastActivityAt = Date.now()
 }
 
 export function markSessionExpired() {
@@ -79,6 +91,20 @@ export function getAuthUser() {
 
 export function getAuthToken() {
   return currentToken
+}
+
+export function getRefreshToken() {
+  return currentRefreshToken
+}
+
+export function markAuthActivity() {
+  if (currentUser) {
+    lastActivityAt = Date.now()
+  }
+}
+
+export function isSessionIdleExpired() {
+  return Date.now() - lastActivityAt > sessionIdleTimeoutMs
 }
 
 export function getPermission(moduleKey: string) {
@@ -104,4 +130,12 @@ export function canAccessPath(path: string) {
 
 export function firstAllowedPath() {
   return moduleDefaultRoutes.find((path) => canAccessPath(path)) ?? '/login'
+}
+
+if (typeof window !== 'undefined') {
+  const activityEvents = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart']
+
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, markAuthActivity, { passive: true })
+  })
 }

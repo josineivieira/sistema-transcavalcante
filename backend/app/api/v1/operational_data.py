@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
 from app.database.session import get_db
 from app.models.operational_data import OperationalSnapshot
 
@@ -30,7 +30,12 @@ class OperationalLoginPayload(BaseModel):
 
 class OperationalLoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     user: dict
+
+
+class OperationalRefreshPayload(BaseModel):
+    refresh_token: str
 
 
 def _default_snapshot_data() -> dict:
@@ -220,6 +225,20 @@ def _require_operational_auth(authorization: str | None = Header(default=None)) 
     return subject.removeprefix(LOGIN_TOKEN_PREFIX)
 
 
+def _decode_operational_refresh_token(refresh_token: str) -> str:
+    try:
+        payload = jwt.decode(refresh_token, settings.jwt_secret, algorithms=["HS256"])
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessao expirada") from exc
+
+    subject = str(payload.get("sub") or "")
+    token_type = payload.get("type")
+    if token_type != "refresh" or not subject.startswith(LOGIN_TOKEN_PREFIX):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessao expirada")
+
+    return subject.removeprefix(LOGIN_TOKEN_PREFIX)
+
+
 @router.post("/login", response_model=OperationalLoginResponse)
 def login_operational(payload: OperationalLoginPayload, request: Request, db: Session = Depends(get_db)):
     email = payload.email.strip()
@@ -242,6 +261,28 @@ def login_operational(payload: OperationalLoginPayload, request: Request, db: Se
     _clear_failed_logins(key)
     return {
         "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
+        "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
+        "user": _sanitize_user(user),
+    }
+
+
+@router.post("/refresh", response_model=OperationalLoginResponse)
+def refresh_operational(payload: OperationalRefreshPayload, db: Session = Depends(get_db)):
+    email = _decode_operational_refresh_token(payload.refresh_token)
+    snapshot = _get_or_create_snapshot(db)
+    data = _prepare_data_for_storage(snapshot.data, snapshot.data)
+    if data != snapshot.data:
+        snapshot.data = data
+        db.commit()
+        db.refresh(snapshot)
+
+    user = _find_user(data, email)
+    if not user or user.get("status") != "Ativo":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessao expirada")
+
+    return {
+        "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
+        "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
         "user": _sanitize_user(user),
     }
 
