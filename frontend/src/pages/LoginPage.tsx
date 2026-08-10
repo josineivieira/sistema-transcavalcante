@@ -37,7 +37,12 @@ export function LoginPage() {
     setMessage('Validando acesso...')
 
     try {
-      const response = await api.post<{ access_token: string, refresh_token: string, user: AuthUser }>('/operational-data/login', {
+      const response = await api.post<{
+        access_token: string,
+        refresh_token: string,
+        session_idle_timeout_minutes: number,
+        user: AuthUser,
+      }>('/operational-data/login', {
         email: normalizedEmail,
         password: normalizedPassword,
       })
@@ -46,7 +51,7 @@ export function LoginPage() {
         ...response.data.user,
         company: response.data.user.company ?? 'Transcavalcante - Matriz Manaus/AM',
         remember,
-      }, response.data.access_token, response.data.refresh_token)
+      }, response.data.access_token, response.data.refresh_token, response.data.session_idle_timeout_minutes)
       setLoading(false)
       navigate(firstAllowedPath(), { replace: true })
     } catch (error: any) {

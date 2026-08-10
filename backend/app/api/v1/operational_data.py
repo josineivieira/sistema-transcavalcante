@@ -31,6 +31,7 @@ class OperationalLoginPayload(BaseModel):
 class OperationalLoginResponse(BaseModel):
     access_token: str
     refresh_token: str
+    session_idle_timeout_minutes: int
     user: dict
 
 
@@ -262,6 +263,7 @@ def login_operational(payload: OperationalLoginPayload, request: Request, db: Se
     return {
         "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
         "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
+        "session_idle_timeout_minutes": settings.session_idle_timeout_minutes,
         "user": _sanitize_user(user),
     }
 
@@ -283,6 +285,7 @@ def refresh_operational(payload: OperationalRefreshPayload, db: Session = Depend
     return {
         "access_token": create_access_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
         "refresh_token": create_refresh_token(f"{LOGIN_TOKEN_PREFIX}{email.lower()}"),
+        "session_idle_timeout_minutes": settings.session_idle_timeout_minutes,
         "user": _sanitize_user(user),
     }
 

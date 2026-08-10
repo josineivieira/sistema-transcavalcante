@@ -14,7 +14,7 @@ let currentToken = ''
 let currentRefreshToken = ''
 let lastActivityAt = Date.now()
 const expiredSessionMessageKey = 'transcavalcante.session-expired-message'
-const sessionIdleTimeoutMs = 30 * 60 * 1000
+let sessionIdleTimeoutMs = 30 * 60 * 1000
 
 export const noPrivilegeMessage = 'Você não tem privilégio para essa ação.'
 
@@ -50,10 +50,11 @@ export const moduleDefaultRoutes = [
   '/settings',
 ]
 
-export function setAuthSession(user: AuthUser, accessToken: string, refreshToken = '') {
+export function setAuthSession(user: AuthUser, accessToken: string, refreshToken = '', idleTimeoutMinutes = 30) {
   currentUser = user
   currentToken = accessToken
   currentRefreshToken = refreshToken
+  sessionIdleTimeoutMs = Math.max(1, idleTimeoutMinutes) * 60 * 1000
   lastActivityAt = Date.now()
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
@@ -65,9 +66,12 @@ export function clearAuthSession() {
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
 }
 
-export function replaceAuthTokens(accessToken: string, refreshToken: string) {
+export function replaceAuthTokens(accessToken: string, refreshToken: string, idleTimeoutMinutes?: number) {
   currentToken = accessToken
   currentRefreshToken = refreshToken
+  if (idleTimeoutMinutes) {
+    sessionIdleTimeoutMs = Math.max(1, idleTimeoutMinutes) * 60 * 1000
+  }
   lastActivityAt = Date.now()
 }
 

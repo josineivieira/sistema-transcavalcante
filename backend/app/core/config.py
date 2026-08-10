@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-too"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    session_idle_timeout_minutes: int = 30
     login_max_attempts: int = 5
     login_lockout_seconds: int = 900
     database_url: str = "sqlite:///./app.db"

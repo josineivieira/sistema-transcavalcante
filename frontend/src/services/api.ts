@@ -57,11 +57,19 @@ async function refreshActiveSession() {
 
   if (!refreshPromise) {
     refreshPromise = axios
-      .post<{ access_token: string, refresh_token: string }>(`${resolveApiUrl()}/operational-data/refresh`, {
+      .post<{
+        access_token: string,
+        refresh_token: string,
+        session_idle_timeout_minutes?: number,
+      }>(`${resolveApiUrl()}/operational-data/refresh`, {
         refresh_token: refreshToken,
       })
       .then((response) => {
-        replaceAuthTokens(response.data.access_token, response.data.refresh_token)
+        replaceAuthTokens(
+          response.data.access_token,
+          response.data.refresh_token,
+          response.data.session_idle_timeout_minutes,
+        )
         return response.data.access_token
       })
       .finally(() => {
