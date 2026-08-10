@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, companies, users, customers, freights, closings, fiscal_documents, operational_data, operational_freights, operational_options, tv_stream
+from app.api.v1 import auth, companies, users, customers, freights, closings, fiscal_documents, operational_data, operational_freights, operational_options
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -12,4 +12,3 @@ api_router.include_router(fiscal_documents.router, prefix="/fiscal-documents", t
 api_router.include_router(operational_data.router, prefix="/operational-data", tags=["operational-data"])
 api_router.include_router(operational_freights.router, prefix="/operational-freights", tags=["operational-freights"])
 api_router.include_router(operational_options.router, prefix="/operational-options", tags=["operational-options"])
-api_router.include_router(tv_stream.router, prefix="/tvcorinthians", tags=["tvcorinthians"])
