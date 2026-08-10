@@ -516,6 +516,7 @@ export function FreightsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingFreightId, setEditingFreightId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [freightNotice, setFreightNotice] = useState<{ title: string; message: string } | null>(null)
   const [activeTab, setActiveTab] = useState<FreightTab>('GERAIS')
   const [plannedExpenseEdit, setPlannedExpenseEdit] = useState<string | null>(null)
   const [savingFreightMode, setSavingFreightMode] = useState<'save' | 'save-close' | null>(null)
@@ -789,6 +790,22 @@ export function FreightsPage() {
       && snapshot.trailerId
       && legacyContainerRows(snapshot).length,
     )
+  }
+
+  function freightSaveMissingFields(snapshot: FreightForm) {
+    const missing: string[] = []
+
+    if (!snapshot.processType.trim()) missing.push('Tipo processo')
+    if (!snapshot.customer.trim()) missing.push('Cliente')
+    if (!snapshot.recipient.trim()) missing.push('Destinatario')
+    if (!snapshot.driver.trim()) missing.push('Motorista')
+    if (!snapshot.tractorId.trim() || !snapshot.trailerId.trim()) missing.push('Frota')
+
+    return missing
+  }
+
+  function showFreightNotice(title: string, message: string) {
+    setFreightNotice({ title, message })
   }
 
   function freightStatusCode(status: string) {
@@ -1204,22 +1221,21 @@ export function FreightsPage() {
       return
     }
     if (savingFreightMode) return
-    setSavingFreightMode(closeAfterSave ? 'save-close' : 'save')
     const process = form.process || nextProcessCode()
     const existingByProcess = freights.find((freight) => freight.process.toUpperCase() === process.toUpperCase())
     const activeFreightId = editingFreightId || existingByProcess?.id || null
     const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== activeFreightId)
     if (duplicatedProcess) {
-      setSavingFreightMode(null)
-      window.alert('Codigo do processo ja existe. Gere ou informe outro codigo.')
+      showFreightNotice('Codigo duplicado', 'Este codigo de processo ja existe. Gere ou informe outro codigo para continuar.')
       return
     }
-    if (!process || !form.processType || !form.customer || !form.serviceTaker) {
-      setSavingFreightMode(null)
-      window.alert('Informe Codigo do processo, Tipo processo, Cliente e Tomador do servico.')
+    const missingFields = freightSaveMissingFields(form)
+    if (missingFields.length) {
+      showFreightNotice('Frete incompleto', `Falta preencher: ${missingFields.join(', ')}.`)
       return
     }
 
+    setSavingFreightMode(closeAfterSave ? 'save-close' : 'save')
     const formSnapshot = applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...form, process })))
     setForm(formSnapshot)
     setEditingCiotId(null)
@@ -1246,7 +1262,7 @@ export function FreightsPage() {
         resetForm()
       }
     } catch {
-      window.alert('Nao foi possivel salvar este frete no banco. Verifique os dados e tente novamente.')
+      showFreightNotice('Falha ao salvar', 'Nao foi possivel salvar este frete no banco. Verifique os dados e tente novamente.')
     } finally {
       setSavingFreightMode(null)
     }
@@ -2609,6 +2625,21 @@ export function FreightsPage() {
       {showForm && savingFreightMode && (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-zinc-950/15">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-zinc-300 border-t-blue-900" />
+        </div>
+      )}
+
+      {freightNotice && (
+        <div className="fixed inset-0 z-[95] flex items-start justify-center bg-zinc-950/30 px-4 py-24">
+          <div className="w-full max-w-lg border border-zinc-600 bg-zinc-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+              <h3 className="text-lg font-normal text-red-600">{freightNotice.title}</h3>
+              <button onClick={() => setFreightNotice(null)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+            </div>
+            <div className="border-b border-zinc-300 bg-white px-5 py-6 text-sm leading-6">{freightNotice.message}</div>
+            <div className="flex justify-end bg-zinc-100 px-3 py-3 text-xs">
+              <button onClick={() => setFreightNotice(null)} className="h-8 bg-black px-5 font-semibold text-white hover:bg-zinc-800">OK</button>
+            </div>
+          </div>
         </div>
       )}
 
