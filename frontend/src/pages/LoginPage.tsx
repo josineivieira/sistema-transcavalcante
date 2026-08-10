@@ -1,9 +1,9 @@
 import { ArrowRight, BarChart3, Clock3, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
-import { firstAllowedPath, setAuthSession } from '../services/authSession'
+import { consumeSessionExpiredMessage, firstAllowedPath, setAuthSession } from '../services/authSession'
 import type { AuthUser } from '../services/authSession'
 
 export function LoginPage() {
@@ -14,6 +14,13 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    const expiredMessage = consumeSessionExpiredMessage()
+    if (expiredMessage) {
+      setMessage(expiredMessage)
+    }
+  }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

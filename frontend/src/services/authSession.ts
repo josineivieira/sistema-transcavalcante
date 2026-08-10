@@ -11,6 +11,7 @@ export type AuthUser = {
 
 let currentUser: AuthUser | null = null
 let currentToken = ''
+const expiredSessionMessageKey = 'transcavalcante.session-expired-message'
 
 export const noPrivilegeMessage = 'Você não tem privilégio para essa ação.'
 
@@ -56,6 +57,16 @@ export function clearAuthSession() {
   currentUser = null
   currentToken = ''
   window.dispatchEvent(new Event('transcavalcante.auth-changed'))
+}
+
+export function markSessionExpired() {
+  sessionStorage.setItem(expiredSessionMessageKey, 'Sessão expirada, faça login novamente.')
+}
+
+export function consumeSessionExpiredMessage() {
+  const message = sessionStorage.getItem(expiredSessionMessageKey) ?? ''
+  sessionStorage.removeItem(expiredSessionMessageKey)
+  return message
 }
 
 export function isAuthenticated() {

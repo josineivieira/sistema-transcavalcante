@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getAuthToken } from './authSession'
+import { clearAuthSession, getAuthToken, markSessionExpired } from './authSession'
 
 function resolveApiUrl() {
   if (
@@ -27,3 +27,25 @@ api.interceptors.request.use((config) => {
   }
   return config
 })
+
+let redirectingToLogin = false
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    const isLoginPage = window.location.pathname === '/login'
+
+    if (status === 401 && !isLoginPage) {
+      clearAuthSession()
+      markSessionExpired()
+
+      if (!redirectingToLogin) {
+        redirectingToLogin = true
+        window.location.assign('/login')
+      }
+    }
+
+    return Promise.reject(error)
+  },
+)
