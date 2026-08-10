@@ -358,6 +358,12 @@ def list_operational_freights(
     _migrate_legacy_freights(db)
     snapshot = _get_or_create_snapshot(db)
     deleted_ids = set(snapshot.data.get("deletedFreightIds") or [])
+    active_closing_numbers = {
+        str(item.get("number") or "")
+        for item in (snapshot.data.get("closings") or [])
+        if str(item.get("status") or "").strip().lower() != "cancelado"
+    }
+    active_closing_numbers.discard("")
     query = db.query(Freight).filter(Freight.external_id.isnot(None))
     if deleted_ids:
         query = query.filter(
@@ -404,7 +410,12 @@ def list_operational_freights(
     if closing:
         query = query.filter(Freight.closing_number == closing)
     if unclosed:
-        query = query.filter(Freight.closing_number.is_(None))
+        unclosed_conditions = [Freight.closing_number.is_(None), Freight.closing_number == ""]
+        if active_closing_numbers:
+            unclosed_conditions.append(~Freight.closing_number.in_(active_closing_numbers))
+        else:
+            unclosed_conditions.append(Freight.closing_number.isnot(None))
+        query = query.filter(or_(*unclosed_conditions))
 
     parsed_date_start = _date_from_payload(date_start, None) if date_start else None
     parsed_date_end = _date_from_payload(date_end, None) if date_end else None
