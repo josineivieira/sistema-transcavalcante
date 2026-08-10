@@ -52,6 +52,7 @@ def _default_snapshot_data() -> dict:
         "fiscalDocuments": [],
         "receivables": [],
         "priceLists": [],
+        "purchaseRequests": [],
         "payrollProfiles": [],
         "payrollClosings": [],
         "issuerSettings": {},
@@ -76,6 +77,7 @@ def _default_snapshot_data() -> dict:
                     "fiscalDocuments": "edit",
                     "finance": "edit",
                     "priceLists": "edit",
+                    "purchaseRequests": "edit",
                     "payroll": "edit",
                     "reports": "view",
                     "users": "edit",
@@ -186,6 +188,8 @@ def _prepare_data_for_storage(incoming: dict, current: dict | None = None) -> di
         secured = deepcopy(user)
         existing = current_users.get(str(secured.get("id")), {})
         permissions = dict(secured.get("permissions") or {})
+        if "purchaseRequests" not in permissions:
+            permissions["purchaseRequests"] = "edit" if secured.get("role") == "Administrador" else "none"
         if "payroll" not in permissions:
             permissions["payroll"] = "edit" if secured.get("role") == "Administrador" else "none"
         secured["permissions"] = permissions

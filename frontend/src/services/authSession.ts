@@ -35,6 +35,7 @@ export const routePermissions: Record<string, string> = {
   '/fiscal-documents': 'fiscalDocuments',
   '/finance': 'finance',
   '/price-lists': 'priceLists',
+  '/purchase-requests': 'purchaseRequests',
   '/payroll': 'payroll',
   '/reports': 'reports',
   '/users': 'users',
@@ -51,6 +52,7 @@ export const moduleDefaultRoutes = [
   '/fiscal-documents',
   '/finance',
   '/price-lists',
+  '/purchase-requests',
   '/payroll',
   '/reports',
   '/users',
@@ -186,7 +188,7 @@ export function isSessionIdleExpired() {
 }
 
 export function getPermission(moduleKey: string) {
-  return currentUser?.permissions[moduleKey] ?? 'none'
+  return currentUser?.permissions[moduleKey] ?? (currentUser?.role === 'Administrador' ? 'edit' : 'none')
 }
 
 export function canView(moduleKey: string) {

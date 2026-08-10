@@ -15,6 +15,7 @@ const modules = [
   ['fiscalDocuments', 'Documentos fiscais'],
   ['finance', 'Financeiro'],
   ['priceLists', 'Lista de precos'],
+  ['purchaseRequests', 'Requisicoes'],
   ['payroll', 'Folha de pagamento'],
   ['reports', 'Relatorios'],
   ['users', 'Usuarios'],

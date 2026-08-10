@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadData, normalizeData } from '../services/localStore'
 import { api } from '../services/api'
-import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, PayrollClosing, PayrollProfile, PriceList, Receivable, SystemUser, Vehicle } from '../services/localStore'
+import type { AppData, Closing, ContainerRecord, Customer, Driver, FiscalDocument, Freight, PayrollClosing, PayrollProfile, PriceList, PurchaseRequest, Receivable, SystemUser, Vehicle } from '../services/localStore'
 import type { IssuerSettings } from '../services/fiscalSettings'
 
 type OperationalFreightsResponse = {
@@ -221,6 +221,7 @@ export function useLocalData() {
     setFiscalDocuments: (fiscalDocuments: FiscalDocument[]) => update({ ...data, fiscalDocuments }),
     setReceivables: (receivables: Receivable[]) => update({ ...data, receivables }),
     setPriceLists: (priceLists: PriceList[]) => update({ ...data, priceLists }),
+    setPurchaseRequests: (purchaseRequests: PurchaseRequest[]) => update({ ...data, purchaseRequests }),
     setPayrollProfiles: (payrollProfiles: PayrollProfile[]) => update({ ...data, payrollProfiles }),
     setPayrollClosings: (payrollClosings: PayrollClosing[]) => update({ ...data, payrollClosings }),
     setUsers: (users: SystemUser[]) => update({ ...data, users }),

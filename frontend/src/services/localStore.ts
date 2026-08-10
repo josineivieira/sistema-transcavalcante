@@ -447,6 +447,29 @@ export type PayrollClosing = {
   createdAt: string
 }
 
+export type PurchaseRequest = {
+  id: string
+  number: string
+  requestDate: string
+  dueDate: string
+  type: string
+  category: string
+  description: string
+  requester: string
+  supplierDocument: string
+  supplier: string
+  freightProcess: string
+  vehiclePlate: string
+  driver: string
+  costCenter: string
+  paymentMethod: string
+  expectedValue: number
+  approvedValue: number
+  paidValue: number
+  status: string
+  notes: string
+}
+
 export type UserPermission = 'none' | 'view' | 'edit'
 
 export type SystemUser = {
@@ -472,6 +495,7 @@ export type AppData = {
   fiscalDocuments: FiscalDocument[]
   receivables: Receivable[]
   priceLists: PriceList[]
+  purchaseRequests: PurchaseRequest[]
   payrollProfiles: PayrollProfile[]
   payrollClosings: PayrollClosing[]
   users: SystemUser[]
@@ -574,6 +598,7 @@ export const seedData: AppData = {
     { id: 'pl-3', listName: 'GEO LOG MANAUS - MULTIMODAL', originPort: 'MANAUS/AM', destinationPort: 'BOA VISTA/RR', product: 'CUSTO FRETE ROD, DESTINO', listValue: 8400, taxPercent: 0, total: 8400, status: 'Ativo' },
     { id: 'pl-4', listName: 'LISTA LOGIN - MANAUS', originPort: 'MANAUS/AM', destinationPort: 'MANAUS - DISTRITO/AM', product: 'CUSTO FRETE ROD, DESTINO', listValue: 1400, taxPercent: 0, total: 1400, status: 'Ativo' },
   ],
+  purchaseRequests: [],
   users: [
     {
       id: 'usr-1',
@@ -594,6 +619,7 @@ export const seedData: AppData = {
         fiscalDocuments: 'edit',
         finance: 'edit',
         priceLists: 'edit',
+        purchaseRequests: 'edit',
         payroll: 'edit',
         reports: 'view',
         users: 'edit',
@@ -812,6 +838,28 @@ export function normalizeData(data: Partial<AppData>): AppData {
       total: Number(price.total ?? price.listValue ?? 0),
       status: price.status ?? 'Ativo',
     })),
+    purchaseRequests: (data.purchaseRequests ?? []).map((request) => ({
+      ...request,
+      number: request.number ?? '',
+      requestDate: request.requestDate ?? '',
+      dueDate: request.dueDate ?? '',
+      type: request.type ?? 'Compra',
+      category: request.category ?? 'Operacional',
+      description: request.description ?? '',
+      requester: request.requester ?? '',
+      supplierDocument: request.supplierDocument ?? '',
+      supplier: request.supplier ?? '',
+      freightProcess: request.freightProcess ?? '',
+      vehiclePlate: request.vehiclePlate ?? '',
+      driver: request.driver ?? '',
+      costCenter: request.costCenter ?? 'Operacao',
+      paymentMethod: request.paymentMethod ?? 'A definir',
+      expectedValue: Number(request.expectedValue ?? 0),
+      approvedValue: Number(request.approvedValue ?? request.expectedValue ?? 0),
+      paidValue: Number(request.paidValue ?? 0),
+      status: request.status ?? 'Aberta',
+      notes: request.notes ?? '',
+    })),
     payrollProfiles: (data.payrollProfiles ?? []).map((profile) => ({
       ...profile,
       salary: Number(profile.salary ?? 0),
@@ -876,6 +924,7 @@ function emptyUserPermissions(): Record<string, UserPermission> {
     fiscalDocuments: 'none',
     finance: 'none',
     priceLists: 'none',
+    purchaseRequests: 'none',
     payroll: 'none',
     reports: 'none',
     users: 'none',
@@ -895,6 +944,7 @@ export function loadData(): AppData {
     fiscalDocuments: [],
     receivables: [],
     priceLists: [],
+    purchaseRequests: [],
     payrollProfiles: [],
     payrollClosings: [],
     users: [],
