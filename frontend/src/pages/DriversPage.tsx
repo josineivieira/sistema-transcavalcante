@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
+import { Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Driver } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -210,10 +210,10 @@ export function DriversPage() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1260px] text-xs">
+        <table className="w-full min-w-[1180px] text-xs">
           <thead className="bg-zinc-100">
             <tr>
-              {['CNPJ/CPF/Codigo', 'Empresa ou Pessoa', 'Dt. vencimento GR', 'Tipo de p.', 'Comunicacao princ', 'Cidade', 'Estado', 'Dt. cadastro', 'Acoes'].map((heading) => (
+              {['CNPJ/CPF/Codigo', 'Empresa ou Pessoa', 'Dt. vencimento GR', 'Tipo de p.', 'Comunicacao princ', 'Cidade', 'Estado', 'Dt. cadastro'].map((heading) => (
                 <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                   {heading}
                 </th>
@@ -222,7 +222,11 @@ export function DriversPage() {
           </thead>
           <tbody>
             {!loading && rows.map((driver) => (
-              <tr key={driver.id} className="hover:bg-sky-50">
+              <tr
+                key={driver.id}
+                onDoubleClick={() => canEditPage ? setEditing(driverForEdit(driver)) : denyNoPrivilege()}
+                className="cursor-default hover:bg-sky-100"
+              >
                 <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{driver.cpf}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.name}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(driver.grExpiration || driver.cnhExpiration)}</td>
@@ -231,17 +235,12 @@ export function DriversPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.city || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.state || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(driver.registrationDate)}</td>
-                <td className="border-b border-zinc-200 px-2 py-1">
-                  <button onClick={() => canEditPage ? setEditing(driverForEdit(driver)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
-                    <Pencil size={14} />
-                  </button>
-                </td>
               </tr>
             ))}
-            {loading && <LoadingRow colSpan={9} label="Carregando condutores..." />}
+            {loading && <LoadingRow colSpan={8} label="Carregando condutores..." />}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
+                <td colSpan={8} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
                   Nenhum condutor encontrado.
                 </td>
               </tr>

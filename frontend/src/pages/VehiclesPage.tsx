@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, Pencil, Save, Search, Trash2, X } from 'lucide-react'
+import { Check, Save, Search, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Vehicle } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -193,10 +193,10 @@ export function VehiclesPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1320px] text-xs">
+          <table className="w-full min-w-[1240px] text-xs">
             <thead className="bg-zinc-100">
               <tr>
-                {['Numero', 'Tipo de frota', 'Descricao', 'Dt. vencimento GR', 'Placa', 'Proprietario', 'CNPJ/CPF propriet.', 'Marca', 'Modelo', 'Ano/Modelo', 'Chassi', 'Acoes'].map((heading) => (
+                {['Numero', 'Tipo de frota', 'Descricao', 'Dt. vencimento GR', 'Placa', 'Proprietario', 'CNPJ/CPF propriet.', 'Marca', 'Modelo', 'Ano/Modelo', 'Chassi'].map((heading) => (
                   <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                     {heading}
                   </th>
@@ -205,7 +205,11 @@ export function VehiclesPage() {
             </thead>
             <tbody>
               {!loading && rows.map((vehicle) => (
-                <tr key={vehicle.id} className="hover:bg-sky-50">
+                <tr
+                  key={vehicle.id}
+                  onDoubleClick={() => canEditPage ? setEditing(openVehicle(vehicle.vehicleType, vehicle)) : denyNoPrivilege()}
+                  className="cursor-default hover:bg-sky-100"
+                >
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetNumber || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetRelation || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{vehicle.description || vehicle.fleetType || vehicle.type}</td>
@@ -217,17 +221,12 @@ export function VehiclesPage() {
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.model || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.yearModel || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.chassis || '-'}</td>
-                  <td className="border-b border-zinc-200 px-2 py-1">
-                    <button onClick={() => canEditPage ? setEditing(openVehicle(vehicle.vehicleType, vehicle)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
-                      <Pencil size={14} />
-                    </button>
-                  </td>
                 </tr>
               ))}
-              {loading && <LoadingRow colSpan={12} label="Carregando veículos..." />}
+              {loading && <LoadingRow colSpan={11} label="Carregando veiculos..." />}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
+                  <td colSpan={11} className="border-b border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
                     Nenhum veiculo encontrado.
                   </td>
                 </tr>
