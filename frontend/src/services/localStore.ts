@@ -359,6 +359,7 @@ export type FiscalDocument = {
   status: string
   protocol: string
   closing: string
+  description?: string
 }
 
 export type Receivable = {
