@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 import httpx
 from fastapi import APIRouter, Depends, Query
@@ -31,12 +32,23 @@ class RouteDistanceRequest(BaseModel):
     destination: str = ""
 
 
+class ProductRouteRequest(BaseModel):
+    product: str = ""
+    destination: str = ""
+
+
 def _digits(value: str) -> str:
     return "".join(char for char in str(value or "") if char.isdigit())
 
 
 def _clean_text(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _normalized_key(value: object) -> str:
+    text = unicodedata.normalize("NFD", str(value or ""))
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+    return re.sub(r"\s+", " ", text).strip().upper()
 
 
 def _format_zip_code(value: str) -> str:
@@ -183,6 +195,28 @@ def _lookup_coordinates(address: str, district: str, city: str, state: str, zip_
     return {}
 
 
+def _active_price_matches_product(price: dict, product: str) -> bool:
+    return (
+        price.get("status") != "Inativo"
+        and _normalized_key(price.get("product")) == _normalized_key(product)
+    )
+
+
+def _select_price_route(price_lists: list[dict], product: str, destination: str = "") -> dict | None:
+    if not product:
+        return None
+    matches = [price for price in price_lists if _active_price_matches_product(price, product)]
+    if not matches:
+        return None
+    selected_destination = _normalized_key(destination)
+    if selected_destination:
+        for price in matches:
+            price_destination = _normalized_key(price.get("destinationPort"))
+            if price_destination and (price_destination in selected_destination or selected_destination in price_destination):
+                return price
+    return matches[0]
+
+
 def _matches(value: object, search: str) -> bool:
     if not search:
         return True
@@ -255,6 +289,48 @@ def resolve_route_distance(
         return {"distanceKm": _format_km(driving_distance), "source": "route"}
 
     return {"distanceKm": "", "source": "unavailable"}
+
+
+@router.post("/product-route-origin")
+def resolve_product_route_origin(
+    payload: ProductRouteRequest,
+    _: str = Depends(_require_operational_auth),
+    db: Session = Depends(get_db),
+):
+    snapshot = _get_or_create_snapshot(db)
+    data = snapshot.data or {}
+    price = _select_price_route(list(data.get("priceLists") or []), payload.product, payload.destination)
+    if not price:
+        return {"found": False}
+
+    origin = _clean_text(price.get("originPort")).upper()
+    zip_code = _format_zip_code(str(price.get("originZipCode") or ""))
+    zip_data = {**_lookup_zip_code(zip_code), **_lookup_zip_coordinates(zip_code)}
+    address = zip_data.get("address", "")
+    district = zip_data.get("district", "")
+    city = zip_data.get("city", "")
+    state = zip_data.get("state", "")
+    coordinates = {
+        "latitude": zip_data.get("latitude", ""),
+        "longitude": zip_data.get("longitude", ""),
+    }
+    if zip_code and (not coordinates["latitude"] or not coordinates["longitude"]):
+        origin_parts = origin.split("/", 1)
+        fallback_city = city or origin_parts[0].strip()
+        fallback_state = state or (origin_parts[1].strip() if len(origin_parts) > 1 else "")
+        coordinates = _lookup_coordinates(address, district, fallback_city, fallback_state, zip_code)
+
+    return {
+        "found": True,
+        "origin": origin,
+        "originZipCode": zip_data.get("zipCode") or zip_code,
+        "originLatitude": coordinates.get("latitude", "0,0000000"),
+        "originLongitude": coordinates.get("longitude", "0,0000000"),
+        "listName": _clean_text(price.get("listName")),
+        "product": _clean_text(price.get("product")),
+        "listValue": price.get("listValue") or 0,
+        "total": price.get("total") or price.get("listValue") or 0,
+    }
 
 
 @router.get("/freight-form")

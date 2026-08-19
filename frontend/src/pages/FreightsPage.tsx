@@ -191,6 +191,16 @@ type RouteDistanceResponse = {
   distanceKm: string
 }
 
+type ProductRouteOriginResponse = {
+  found: boolean
+  origin?: string
+  originZipCode?: string
+  originLatitude?: string
+  originLongitude?: string
+  listValue?: number
+  total?: number
+}
+
 const initialFreightStatus = 'AGENDAMENTO E CARREGAMENTO 15'
 const invoiceReceivedStatus = 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20'
 const deliveryCompletedStatus = 'ENTREGA CONCLUIDA 50'
@@ -399,15 +409,17 @@ function LookupInput({
   onChange,
   onLookup,
   onClear,
+  onBlur,
 }: {
   value: string
   onChange: (value: string) => void
   onLookup: () => void
   onClear: () => void
+  onBlur?: () => void
 }) {
   return (
     <div className="flex">
-      <input value={value} onChange={(event) => onChange(event.target.value)} className={textInputClass()} />
+      <input value={value} onChange={(event) => onChange(event.target.value)} onBlur={onBlur} className={textInputClass()} />
       <button type="button" onClick={onLookup} className="grid h-7 w-8 place-items-center bg-white text-black" title="Consultar"><Filter size={18} fill="currentColor" /></button>
       <button type="button" onClick={onClear} className="grid h-7 w-7 place-items-center bg-white"><X size={18} /></button>
     </div>
@@ -739,6 +751,59 @@ export function FreightsPage() {
     return price ? String(price.total || price.listValue || 0) : ''
   }
 
+  async function applyProductRouteOrigin(product: string) {
+    const selectedProduct = product.trim()
+    if (!selectedProduct) return
+    try {
+      const response = await api.post<ProductRouteOriginResponse>('/operational-options/product-route-origin', {
+        product: selectedProduct,
+        destination: form.destination,
+      })
+      const route = response.data
+      if (!route.found) return
+      const resolvedOriginLatitude = route.originLatitude && route.originLatitude !== '0,0000000' ? route.originLatitude : ''
+      const resolvedOriginLongitude = route.originLongitude && route.originLongitude !== '0,0000000' ? route.originLongitude : ''
+      const distance = resolvedOriginLatitude && resolvedOriginLongitude && hasResolvedCoordinate(form.destinationLatitude) && hasResolvedCoordinate(form.destinationLongitude)
+        ? await resolveRouteDistanceKm(
+          resolvedOriginLatitude,
+          resolvedOriginLongitude,
+          form.destinationLatitude,
+          form.destinationLongitude,
+          route.originZipCode || form.originZipCode,
+          form.destinationZipCode,
+          route.origin || form.origin,
+          form.destination,
+        )
+        : ''
+      setForm((current) => {
+        if (current.product.toUpperCase() !== selectedProduct.toUpperCase()) return current
+        const next = {
+          ...current,
+          origin: route.origin || current.origin,
+          originZipCode: route.originZipCode || current.originZipCode,
+          routeName: `${route.origin || current.origin} X ${current.destination}`.replace(/^ X | X $/g, ''),
+        }
+        if (resolvedOriginLatitude) {
+          next.originLatitude = resolvedOriginLatitude
+        }
+        if (resolvedOriginLongitude) {
+          next.originLongitude = resolvedOriginLongitude
+        }
+        if (route.total || route.listValue) {
+          const value = String(route.total || route.listValue || 0)
+          next.value = value
+          next.plannedFreightCost = value
+        }
+        if (distance) {
+          next.distance = distance
+        }
+        return applyAutomaticFreightStatus(next)
+      })
+    } catch {
+      // Se o backend nao encontrar a origem do produto, mantem o frete como o usuario digitou.
+    }
+  }
+
   function startColumnResize(event: ReactMouseEvent<HTMLSpanElement>, column: typeof freightGridColumns[number]) {
     event.preventDefault()
     const startX = event.clientX
@@ -872,7 +937,9 @@ export function FreightsPage() {
       updateForm('trailerId', option.id || option.plate || '')
     }
     if (lookupOpen === 'product') {
-      updateForm('product', option.value || option.label || '')
+      const product = option.value || option.label || ''
+      updateForm('product', product)
+      void applyProductRouteOrigin(product)
     }
     if (lookupOpen === 'supplier') {
       setFilters((current) => ({ ...current, supplier: option.label || option.name || option.value || '' }))
@@ -2649,7 +2716,7 @@ export function FreightsPage() {
                   <Field label="Tipo processo" required><select value={form.processType} onChange={(event) => updateForm('processType', event.target.value)} className={textInputClass()}><option value="">Selecione...</option><option>Multimodal [M]</option><option>Rodoviario [R]</option></select></Field>
                   <Field label="Identificacao do cliente"><input value={form.customerIdentification} onChange={(event) => updateForm('customerIdentification', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="Cliente" required><LookupInput value={form.customer} onChange={(value) => updateForm('customer', value.toUpperCase())} onLookup={() => openLookup('customer')} onClear={() => updateForm('customer', '')} /></Field>
-                  <Field label="Produto"><LookupInput value={form.product} onChange={(value) => updateForm('product', value.toUpperCase())} onLookup={() => openLookup('product')} onClear={() => updateForm('product', '')} /></Field>
+                  <Field label="Produto"><LookupInput value={form.product} onChange={(value) => updateForm('product', value.toUpperCase())} onBlur={() => void applyProductRouteOrigin(form.product)} onLookup={() => openLookup('product')} onClear={() => updateForm('product', '')} /></Field>
                   <Field label="CNPJ/CPF"><input value={form.recipientDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Destinatario"><input value={form.recipient} className={textInputClass(true)} disabled /></Field>
                 </div>

@@ -9,6 +9,7 @@ const emptyPrice: PriceList = {
   id: '',
   listName: '',
   originPort: '',
+  originZipCode: '',
   destinationPort: '',
   product: 'CUSTO FRETE ROD, DESTINO',
   listValue: 0,
@@ -33,6 +34,12 @@ function Field({ label, children, required = false }: { label: string, children:
 function parseMoney(value: string) {
   const normalized = value.replace(/\./g, '').replace(',', '.')
   return Number(normalized) || 0
+}
+
+function normalizeZipCode(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 8) return value.trim()
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`
 }
 
 export function PriceListsPage() {
@@ -92,6 +99,7 @@ export function PriceListsPage() {
     const normalized = {
       ...editing,
       originPort: editing.originPort.toUpperCase(),
+      originZipCode: normalizeZipCode(editing.originZipCode || ''),
       destinationPort: editing.destinationPort.toUpperCase(),
       product: editing.product.toUpperCase(),
       total: editing.total || editing.listValue + (editing.listValue * editing.taxPercent / 100),
@@ -191,6 +199,7 @@ export function PriceListsPage() {
                 <div className="grid gap-1">
                   <Field label="Lista de preco" required><input value={editing.listName} onChange={(event) => updateEditing('listName', event.target.value.toUpperCase())} className={inputClass()} /></Field>
                   <Field label="Porto de origem" required><input value={editing.originPort} onChange={(event) => updateEditing('originPort', event.target.value.toUpperCase())} className={inputClass()} /></Field>
+                  <Field label="CEP origem"><input value={editing.originZipCode || ''} onChange={(event) => updateEditing('originZipCode', event.target.value)} className={inputClass()} /></Field>
                   <Field label="Porto de destino" required><input value={editing.destinationPort} onChange={(event) => updateEditing('destinationPort', event.target.value.toUpperCase())} className={inputClass()} /></Field>
                   <Field label="Produto"><input value={editing.product} onChange={(event) => updateEditing('product', event.target.value.toUpperCase())} className={inputClass()} /></Field>
                 </div>

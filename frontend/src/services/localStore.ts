@@ -377,6 +377,7 @@ export type PriceList = {
   id: string
   listName: string
   originPort: string
+  originZipCode?: string
   destinationPort: string
   product: string
   listValue: number
@@ -593,10 +594,10 @@ export const seedData: AppData = {
   payrollProfiles: [],
   payrollClosings: [],
   priceLists: [
-    { id: 'pl-1', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'BLUMENAU/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2100, taxPercent: 0, total: 2100, status: 'Ativo' },
-    { id: 'pl-2', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', destinationPort: 'PALHOCA/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2782.55, taxPercent: 0, total: 2870.75, status: 'Ativo' },
-    { id: 'pl-3', listName: 'GEO LOG MANAUS - MULTIMODAL', originPort: 'MANAUS/AM', destinationPort: 'BOA VISTA/RR', product: 'CUSTO FRETE ROD, DESTINO', listValue: 8400, taxPercent: 0, total: 8400, status: 'Ativo' },
-    { id: 'pl-4', listName: 'LISTA LOGIN - MANAUS', originPort: 'MANAUS/AM', destinationPort: 'MANAUS - DISTRITO/AM', product: 'CUSTO FRETE ROD, DESTINO', listValue: 1400, taxPercent: 0, total: 1400, status: 'Ativo' },
+    { id: 'pl-1', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', originZipCode: '', destinationPort: 'BLUMENAU/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2100, taxPercent: 0, total: 2100, status: 'Ativo' },
+    { id: 'pl-2', listName: 'IMPORTACAO - ITAPOA TERM', originPort: 'ITAPOA/SC', originZipCode: '', destinationPort: 'PALHOCA/SC', product: 'CUSTO FRETE ROD, DESTINO', listValue: 2782.55, taxPercent: 0, total: 2870.75, status: 'Ativo' },
+    { id: 'pl-3', listName: 'GEO LOG MANAUS - MULTIMODAL', originPort: 'MANAUS/AM', originZipCode: '', destinationPort: 'BOA VISTA/RR', product: 'CUSTO FRETE ROD, DESTINO', listValue: 8400, taxPercent: 0, total: 8400, status: 'Ativo' },
+    { id: 'pl-4', listName: 'LISTA LOGIN - MANAUS', originPort: 'MANAUS/AM', originZipCode: '', destinationPort: 'MANAUS - DISTRITO/AM', product: 'CUSTO FRETE ROD, DESTINO', listValue: 1400, taxPercent: 0, total: 1400, status: 'Ativo' },
   ],
   purchaseRequests: [],
   users: [
@@ -831,6 +832,7 @@ export function normalizeData(data: Partial<AppData>): AppData {
       ...price,
       listName: price.listName ?? '',
       originPort: price.originPort ?? '',
+      originZipCode: price.originZipCode ?? '',
       destinationPort: price.destinationPort ?? '',
       product: price.product ?? 'CUSTO FRETE ROD, DESTINO',
       listValue: Number(price.listValue ?? 0),
