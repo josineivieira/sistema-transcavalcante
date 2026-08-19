@@ -1378,6 +1378,12 @@ export function FreightsPage() {
     return text.match(/\b\d{5}-?\d{3}\b/)?.[0] ?? ''
   }
 
+  function normalizeZipCode(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length !== 8) return value.trim()
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`
+  }
+
   function lineValueAfterPattern(lines: string[], pattern: RegExp) {
     return lineAfterPattern(lines, pattern)
       .replace(/\b\d{5}-?\d{3}\b/g, '')
@@ -1864,15 +1870,18 @@ export function FreightsPage() {
   }
 
   async function applyInvoiceImport() {
+    const importedOriginZipCode = normalizeZipCode(invoiceImport.senderZipCode)
+    const importedDestinationZipCode = normalizeZipCode(invoiceImport.recipientZipCode)
     const routeDestination = await resolveImportedDestination(invoiceImport)
+    const resolvedDestinationZipCode = routeDestination?.zipCode || importedDestinationZipCode
     const importedDistance = routeDestination
       ? await resolveRouteDistanceKm(
         form.originLatitude,
         form.originLongitude,
         routeDestination.latitude,
         routeDestination.longitude,
-        form.originZipCode,
-        routeDestination.zipCode,
+        importedOriginZipCode || form.originZipCode,
+        resolvedDestinationZipCode || form.destinationZipCode,
         form.origin,
         routeDestination.destination,
       )
@@ -1902,9 +1911,15 @@ export function FreightsPage() {
         invoiceAccessKey: firstInvoice?.invoiceAccessKey || current.invoiceAccessKey,
         invoiceEntries: mergedInvoices,
       }
+      if (importedOriginZipCode) {
+        next.originZipCode = importedOriginZipCode
+      }
+      if (importedDestinationZipCode) {
+        next.destinationZipCode = importedDestinationZipCode
+      }
       if (routeDestination?.destination) {
         next.destination = routeDestination.destination
-        next.destinationZipCode = routeDestination.zipCode || current.destinationZipCode
+        next.destinationZipCode = resolvedDestinationZipCode || current.destinationZipCode
         next.destinationLatitude = routeDestination.latitude || current.destinationLatitude
         next.destinationLongitude = routeDestination.longitude || current.destinationLongitude
         next.distance = importedDistance || current.distance
