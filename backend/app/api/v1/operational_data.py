@@ -29,6 +29,10 @@ class OperationalDataPayload(BaseModel):
     data: dict = Field(default_factory=dict)
 
 
+class OperationalPriceListPayload(BaseModel):
+    data: dict = Field(default_factory=dict)
+
+
 class OperationalLoginPayload(BaseModel):
     email: str
     password: str
@@ -169,6 +173,24 @@ def _sanitize_data(data: dict) -> dict:
     sanitized = deepcopy(data)
     sanitized["users"] = [_sanitize_user(user) for user in sanitized.get("users", [])]
     return sanitized
+
+
+def _digits(value: object) -> str:
+    return "".join(char for char in str(value or "") if char.isdigit())
+
+
+def _format_zip_code(value: object) -> str:
+    digits = _digits(value)[:8]
+    if len(digits) == 8:
+        return f"{digits[:5]}-{digits[5:]}"
+    return str(value or "").strip()
+
+
+def _prepare_price_list_record(record: dict, price_id: str) -> dict:
+    prepared = deepcopy(record)
+    prepared["id"] = str(prepared.get("id") or price_id)
+    prepared["originZipCode"] = _format_zip_code(prepared.get("originZipCode"))
+    return prepared
 
 
 def _prepare_data_for_storage(incoming: dict, current: dict | None = None) -> dict:
@@ -420,3 +442,48 @@ def save_operational_data(
     db.commit()
     db.refresh(snapshot)
     return {"data": _sanitize_data(snapshot.data), "updated_at": snapshot.updated_at}
+
+
+@router.put("/price-lists/{price_id}")
+def save_price_list_record(
+    price_id: str,
+    payload: OperationalPriceListPayload,
+    _: str = Depends(_require_operational_auth),
+    db: Session = Depends(get_db),
+):
+    snapshot = _get_or_create_snapshot(db)
+    current_data = _prepare_data_for_storage(snapshot.data, snapshot.data)
+    price = _prepare_price_list_record(payload.data, price_id)
+    price_lists = list(current_data.get("priceLists") or [])
+    exists = False
+    next_price_lists = []
+    for item in price_lists:
+        if str(item.get("id") or "") == str(price["id"]):
+            next_price_lists.append(price)
+            exists = True
+        else:
+            next_price_lists.append(item)
+    if not exists:
+        next_price_lists.append(price)
+
+    snapshot.data = _prepare_data_for_storage({**current_data, "priceLists": next_price_lists}, snapshot.data)
+    db.commit()
+    db.refresh(snapshot)
+    return {"data": price, "updated_at": snapshot.updated_at}
+
+
+@router.delete("/price-lists/{price_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_price_list_record(
+    price_id: str,
+    _: str = Depends(_require_operational_auth),
+    db: Session = Depends(get_db),
+):
+    snapshot = _get_or_create_snapshot(db)
+    current_data = _prepare_data_for_storage(snapshot.data, snapshot.data)
+    next_price_lists = [
+        item for item in list(current_data.get("priceLists") or [])
+        if str(item.get("id") or "") != str(price_id)
+    ]
+    snapshot.data = _prepare_data_for_storage({**current_data, "priceLists": next_price_lists}, snapshot.data)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

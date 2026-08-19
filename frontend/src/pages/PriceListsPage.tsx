@@ -43,7 +43,7 @@ function normalizeZipCode(value: string) {
 }
 
 export function PriceListsPage() {
-  const { priceLists, loading, setPriceLists } = useLocalData()
+  const { priceLists, loading, savePriceListRecord, deletePriceListRecord } = useLocalData()
   const canEditPage = canEdit('priceLists')
   const [filters, setFilters] = useState({ originPort: '', destinationPort: '' })
   const [query, setQuery] = useState('')
@@ -86,7 +86,7 @@ export function PriceListsPage() {
     setEditing(next)
   }
 
-  function save(closeAfterSave = true) {
+  async function save(closeAfterSave = true) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
@@ -104,19 +104,26 @@ export function PriceListsPage() {
       product: editing.product.toUpperCase(),
       total: editing.total || editing.listValue + (editing.listValue * editing.taxPercent / 100),
     }
-    const exists = priceLists.some((price) => price.id === normalized.id)
-    setPriceLists(exists ? priceLists.map((price) => price.id === normalized.id ? normalized : price) : [...priceLists, normalized])
-    if (closeAfterSave) setEditing(null)
+    try {
+      const saved = await savePriceListRecord(normalized)
+      setEditing(closeAfterSave ? null : saved)
+    } catch {
+      window.alert('Nao foi possivel salvar a lista de preco no banco de dados.')
+    }
   }
 
-  function remove(price: PriceList) {
+  async function remove(price: PriceList) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
     }
     if (window.confirm(`Excluir lista ${price.listName}?`)) {
-      setPriceLists(priceLists.filter((item) => item.id !== price.id))
-      setEditing(null)
+      try {
+        await deletePriceListRecord(price.id)
+        setEditing(null)
+      } catch {
+        window.alert('Nao foi possivel excluir a lista de preco no banco de dados.')
+      }
     }
   }
 
@@ -187,9 +194,9 @@ export function PriceListsPage() {
             <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
               <h3 className="text-lg font-normal text-red-600">Lista de preco</h3>
               <div className="flex items-center gap-3 text-xs">
-                <button onClick={() => save(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
-                <button onClick={() => save(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
-                <button onClick={() => remove(editing)} className="inline-flex items-center gap-1"><Trash2 size={15} /> EXCLUIR</button>
+                <button onClick={() => void save(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
+                <button onClick={() => void save(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
+                <button onClick={() => void remove(editing)} className="inline-flex items-center gap-1"><Trash2 size={15} /> EXCLUIR</button>
                 <button onClick={() => setEditing(null)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
               </div>
             </div>

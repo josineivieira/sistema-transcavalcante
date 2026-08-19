@@ -15,6 +15,10 @@ type OperationalFreightRecordResponse = {
   data: Freight
 }
 
+type OperationalPriceListRecordResponse = {
+  data: PriceList
+}
+
 type FreightQuery = {
   search?: string
   status?: string
@@ -203,6 +207,37 @@ export function useLocalData() {
     })
   }
 
+  function savePriceListRecord(price: PriceList) {
+    return api.put<OperationalPriceListRecordResponse>(`/operational-data/price-lists/${encodeURIComponent(price.id)}`, { data: price }).then((response) => {
+      const saved = response.data.data
+      setData((current) => {
+        const exists = current.priceLists.some((item) => item.id === saved.id)
+        const priceLists = exists
+          ? current.priceLists.map((item) => item.id === saved.id ? saved : item)
+          : [...current.priceLists, saved]
+        return normalizeData({ ...current, priceLists })
+      })
+      setError('')
+      return saved
+    }).catch((reason) => {
+      setError('Nao foi possivel salvar lista de preco no banco de dados.')
+      throw reason
+    })
+  }
+
+  function deletePriceListRecord(id: string) {
+    return api.delete(`/operational-data/price-lists/${encodeURIComponent(id)}`).then(() => {
+      setData((current) => normalizeData({
+        ...current,
+        priceLists: current.priceLists.filter((price) => price.id !== id),
+      }))
+      setError('')
+    }).catch((reason) => {
+      setError('Nao foi possivel excluir lista de preco no banco de dados.')
+      throw reason
+    })
+  }
+
   return {
     ...data,
     loading,
@@ -221,6 +256,8 @@ export function useLocalData() {
     setFiscalDocuments: (fiscalDocuments: FiscalDocument[]) => update({ ...data, fiscalDocuments }),
     setReceivables: (receivables: Receivable[]) => update({ ...data, receivables }),
     setPriceLists: (priceLists: PriceList[]) => update({ ...data, priceLists }),
+    savePriceListRecord,
+    deletePriceListRecord,
     setPurchaseRequests: (purchaseRequests: PurchaseRequest[]) => update({ ...data, purchaseRequests }),
     setPayrollProfiles: (payrollProfiles: PayrollProfile[]) => update({ ...data, payrollProfiles }),
     setPayrollClosings: (payrollClosings: PayrollClosing[]) => update({ ...data, payrollClosings }),

@@ -955,11 +955,6 @@ export function loadData(): AppData {
   })
 }
 
-export function saveData(data: AppData) {
-  void data
-  window.dispatchEvent(new Event('app-data-changed'))
-}
-
 export function formatMoney(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
