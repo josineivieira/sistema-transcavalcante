@@ -1384,6 +1384,10 @@ export function FreightsPage() {
     return `${digits.slice(0, 5)}-${digits.slice(5)}`
   }
 
+  function hasResolvedCoordinate(value: string) {
+    return Boolean(value && value !== '0,0000000')
+  }
+
   function lineValueAfterPattern(lines: string[], pattern: RegExp) {
     return lineAfterPattern(lines, pattern)
       .replace(/\b\d{5}-?\d{3}\b/g, '')
@@ -1738,6 +1742,19 @@ export function FreightsPage() {
     }
   }
 
+  async function resolveImportedOrigin(importData: InvoiceImport) {
+    try {
+      const response = await api.post<RouteDestinationResponse>('/operational-options/route-destination', {
+        zip_code: importData.senderZipCode,
+        address: importData.senderAddress,
+        district: importData.senderDistrict,
+      })
+      return response.data
+    } catch {
+      return null
+    }
+  }
+
   async function resolveRouteDistanceKm(
     originLatitude: string,
     originLongitude: string,
@@ -1872,18 +1889,26 @@ export function FreightsPage() {
   async function applyInvoiceImport() {
     const importedOriginZipCode = normalizeZipCode(invoiceImport.senderZipCode)
     const importedDestinationZipCode = normalizeZipCode(invoiceImport.recipientZipCode)
-    const routeDestination = await resolveImportedDestination(invoiceImport)
+    const [routeOrigin, routeDestination] = await Promise.all([
+      resolveImportedOrigin(invoiceImport),
+      resolveImportedDestination(invoiceImport),
+    ])
+    const resolvedOriginLatitude = hasResolvedCoordinate(routeOrigin?.latitude || '') ? routeOrigin?.latitude || '' : form.originLatitude
+    const resolvedOriginLongitude = hasResolvedCoordinate(routeOrigin?.longitude || '') ? routeOrigin?.longitude || '' : form.originLongitude
+    const resolvedDestinationLatitude = hasResolvedCoordinate(routeDestination?.latitude || '') ? routeDestination?.latitude || '' : form.destinationLatitude
+    const resolvedDestinationLongitude = hasResolvedCoordinate(routeDestination?.longitude || '') ? routeDestination?.longitude || '' : form.destinationLongitude
+    const resolvedOriginZipCode = routeOrigin?.zipCode || importedOriginZipCode
     const resolvedDestinationZipCode = routeDestination?.zipCode || importedDestinationZipCode
-    const importedDistance = routeDestination
+    const importedDistance = routeDestination || routeOrigin
       ? await resolveRouteDistanceKm(
-        form.originLatitude,
-        form.originLongitude,
-        routeDestination.latitude,
-        routeDestination.longitude,
-        importedOriginZipCode || form.originZipCode,
+        resolvedOriginLatitude,
+        resolvedOriginLongitude,
+        resolvedDestinationLatitude,
+        resolvedDestinationLongitude,
+        resolvedOriginZipCode || form.originZipCode,
         resolvedDestinationZipCode || form.destinationZipCode,
-        form.origin,
-        routeDestination.destination,
+        routeOrigin?.destination || form.origin,
+        routeDestination?.destination || form.destination,
       )
       : ''
     setForm((current) => {
@@ -1917,14 +1942,27 @@ export function FreightsPage() {
       if (importedDestinationZipCode) {
         next.destinationZipCode = importedDestinationZipCode
       }
+      if (routeOrigin?.destination) {
+        next.origin = routeOrigin.destination
+      }
+      if (hasResolvedCoordinate(routeOrigin?.latitude || '')) {
+        next.originLatitude = routeOrigin?.latitude || current.originLatitude
+      }
+      if (hasResolvedCoordinate(routeOrigin?.longitude || '')) {
+        next.originLongitude = routeOrigin?.longitude || current.originLongitude
+      }
       if (routeDestination?.destination) {
         next.destination = routeDestination.destination
         next.destinationZipCode = resolvedDestinationZipCode || current.destinationZipCode
-        next.destinationLatitude = routeDestination.latitude || current.destinationLatitude
-        next.destinationLongitude = routeDestination.longitude || current.destinationLongitude
-        next.distance = importedDistance || current.distance
-        next.routeName = `${next.origin || 'Manaus/AM'} X ${routeDestination.destination}`
       }
+      if (hasResolvedCoordinate(routeDestination?.latitude || '')) {
+        next.destinationLatitude = routeDestination?.latitude || current.destinationLatitude
+      }
+      if (hasResolvedCoordinate(routeDestination?.longitude || '')) {
+        next.destinationLongitude = routeDestination?.longitude || current.destinationLongitude
+      }
+      next.distance = importedDistance || current.distance
+      next.routeName = `${next.origin || 'Manaus/AM'} X ${next.destination}`.replace(/^ X | X $/g, '')
       if (editingFreightId) {
         const currentFreight = freights.find((freight) => freight.id === editingFreightId)
         if (currentFreight) {
