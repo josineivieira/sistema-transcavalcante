@@ -1809,19 +1809,6 @@ export function FreightsPage() {
     }
   }
 
-  async function resolveImportedOrigin(importData: InvoiceImport) {
-    try {
-      const response = await api.post<RouteDestinationResponse>('/operational-options/route-destination', {
-        zip_code: importData.senderZipCode,
-        address: importData.senderAddress,
-        district: importData.senderDistrict,
-      })
-      return response.data
-    } catch {
-      return null
-    }
-  }
-
   async function resolveRouteDistanceKm(
     originLatitude: string,
     originLongitude: string,
@@ -1954,27 +1941,20 @@ export function FreightsPage() {
   }
 
   async function applyInvoiceImport() {
-    const importedOriginZipCode = normalizeZipCode(invoiceImport.senderZipCode)
     const importedDestinationZipCode = normalizeZipCode(invoiceImport.recipientZipCode)
-    const [routeOrigin, routeDestination] = await Promise.all([
-      resolveImportedOrigin(invoiceImport),
-      resolveImportedDestination(invoiceImport),
-    ])
-    const resolvedOriginLatitude = hasResolvedCoordinate(routeOrigin?.latitude || '') ? routeOrigin?.latitude || '' : form.originLatitude
-    const resolvedOriginLongitude = hasResolvedCoordinate(routeOrigin?.longitude || '') ? routeOrigin?.longitude || '' : form.originLongitude
+    const routeDestination = await resolveImportedDestination(invoiceImport)
     const resolvedDestinationLatitude = hasResolvedCoordinate(routeDestination?.latitude || '') ? routeDestination?.latitude || '' : form.destinationLatitude
     const resolvedDestinationLongitude = hasResolvedCoordinate(routeDestination?.longitude || '') ? routeDestination?.longitude || '' : form.destinationLongitude
-    const resolvedOriginZipCode = routeOrigin?.zipCode || importedOriginZipCode
     const resolvedDestinationZipCode = routeDestination?.zipCode || importedDestinationZipCode
-    const importedDistance = routeDestination || routeOrigin
+    const importedDistance = routeDestination
       ? await resolveRouteDistanceKm(
-        resolvedOriginLatitude,
-        resolvedOriginLongitude,
+        form.originLatitude,
+        form.originLongitude,
         resolvedDestinationLatitude,
         resolvedDestinationLongitude,
-        resolvedOriginZipCode || form.originZipCode,
+        form.originZipCode,
         resolvedDestinationZipCode || form.destinationZipCode,
-        routeOrigin?.destination || form.origin,
+        form.origin,
         routeDestination?.destination || form.destination,
       )
       : ''
@@ -2003,20 +1983,8 @@ export function FreightsPage() {
         invoiceAccessKey: firstInvoice?.invoiceAccessKey || current.invoiceAccessKey,
         invoiceEntries: mergedInvoices,
       }
-      if (importedOriginZipCode) {
-        next.originZipCode = importedOriginZipCode
-      }
       if (importedDestinationZipCode) {
         next.destinationZipCode = importedDestinationZipCode
-      }
-      if (routeOrigin?.destination) {
-        next.origin = routeOrigin.destination
-      }
-      if (hasResolvedCoordinate(routeOrigin?.latitude || '')) {
-        next.originLatitude = routeOrigin?.latitude || current.originLatitude
-      }
-      if (hasResolvedCoordinate(routeOrigin?.longitude || '')) {
-        next.originLongitude = routeOrigin?.longitude || current.originLongitude
       }
       if (routeDestination?.destination) {
         next.destination = routeDestination.destination
