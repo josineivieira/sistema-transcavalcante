@@ -415,6 +415,27 @@ def logout_operational(request: Request, response: Response):
     return {"status": "ok"}
 
 
+@router.get("/csrf-token")
+def get_csrf_token(
+    request: Request,
+    response: Response,
+    _: str = Depends(_require_operational_auth),
+):
+    csrf_token = request.cookies.get(CSRF_COOKIE_NAME) or token_urlsafe(32)
+    if not request.cookies.get(CSRF_COOKIE_NAME):
+        secure = _cookie_secure(request)
+        samesite = _cookie_samesite(request)
+        response.set_cookie(
+            CSRF_COOKIE_NAME,
+            csrf_token,
+            httponly=False,
+            secure=secure,
+            samesite=samesite,
+            path="/",
+        )
+    return {"csrfToken": csrf_token}
+
+
 @router.get("")
 def get_operational_data(
     _: str = Depends(_require_operational_auth),

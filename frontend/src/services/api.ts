@@ -26,6 +26,8 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+let csrfTokenFromApi = ''
+
 function getCookie(name: string) {
   return document.cookie
     .split('; ')
@@ -39,12 +41,37 @@ function isUnsafeMethod(method?: string) {
   return ['post', 'put', 'patch', 'delete'].includes(String(method || 'get').toLowerCase())
 }
 
-api.interceptors.request.use((config) => {
-  if (isUnsafeMethod(config.method)) {
-    const csrfToken = getCookie('tc_csrf_token')
+function skipsCsrfLookup(url?: string) {
+  const text = String(url || '')
+  return text.includes('/operational-data/login')
+    || text.includes('/operational-data/refresh')
+    || text.includes('/operational-data/csrf-token')
+}
+
+async function resolveCsrfToken() {
+  const cookieToken = getCookie('tc_csrf_token')
+  if (cookieToken) {
+    csrfTokenFromApi = decodeURIComponent(cookieToken)
+    return csrfTokenFromApi
+  }
+  if (csrfTokenFromApi) {
+    return csrfTokenFromApi
+  }
+
+  const response = await axios.get<{ csrfToken?: string }>(
+    `${resolveApiUrl()}/operational-data/csrf-token`,
+    { withCredentials: true },
+  )
+  csrfTokenFromApi = response.data.csrfToken || ''
+  return csrfTokenFromApi
+}
+
+api.interceptors.request.use(async (config) => {
+  if (isUnsafeMethod(config.method) && !skipsCsrfLookup(config.url)) {
+    const csrfToken = await resolveCsrfToken()
     if (csrfToken) {
       config.headers = config.headers ?? {}
-      config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken)
+      config.headers['X-CSRF-Token'] = csrfToken
     }
   }
 
