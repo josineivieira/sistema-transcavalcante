@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Save, Search, Settings, Trash2, X } from 'lucide-react'
+import { FileSpreadsheet, Save, Search, Settings, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
 import { nextId, type Driver } from '../services/localStore'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -190,42 +190,72 @@ export function DriversPage() {
   }
 
   return (
-    <div className="border border-zinc-300 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold">Condutores</h2>
-          <p className="text-xs text-zinc-500">Cadastro de motoristas, ficha de pessoa, comunicacoes, CNH e dados operacionais.</p>
+    <div className="border border-zinc-500 bg-zinc-100">
+      <div className="flex items-center justify-between border-b-4 border-zinc-400 px-2 py-1">
+        <h2 className="text-lg font-normal text-red-600">Consulta motoristas</h2>
+        <div className="flex items-center gap-4 text-xs">
+          <button className="inline-flex items-center gap-1"><FileSpreadsheet size={15} /> GERAR EXCEL</button>
+          <button className="inline-flex items-center gap-1"><FileSpreadsheet size={15} /> GERAR EXCEL SEM FORMATACAO</button>
+          <button
+            onClick={() => canEditPage ? setEditing(driverForEdit()) : denyNoPrivilege()}
+            className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white"
+            title="Novo condutor"
+          >
+            +
+          </button>
         </div>
-        <button onClick={() => canEditPage ? setEditing(driverForEdit()) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
-          Novo condutor
-        </button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 bg-zinc-50 px-4 py-2">
-        <div className="text-xs text-zinc-600">{loading ? 'Carregando...' : `${rows.length} de ${drivers.length} registros`}</div>
-        <label className="flex h-8 items-center border border-zinc-300 bg-white px-2 text-xs text-zinc-500">
-          <Search size={15} className="mr-2" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-full w-64 border-0 p-0 outline-none" placeholder="Busca rapida" />
-        </label>
+      <div className="border-b border-zinc-400">
+        <div className="flex h-7 items-center justify-between border-b border-zinc-300 bg-zinc-100 px-2 text-xs">
+          <span>Filtro</span>
+          <div className="flex items-center gap-2"><Search size={22} /><X size={16} /></div>
+        </div>
+        <div className="px-2 py-1 text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</div>
+        <div className="grid gap-x-16 gap-y-1 px-3 pb-3 text-xs md:grid-cols-2">
+          <label className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-1">
+            <span className="text-right">CNPJ/CPF/Codigo</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-7 border border-zinc-300 bg-white px-2 outline-none focus:border-zinc-500" />
+          </label>
+          <label className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-1">
+            <span className="text-right">Empresa ou Pessoa</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-7 border border-zinc-300 bg-white px-2 outline-none focus:border-zinc-500" />
+          </label>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-xs">
-          <thead className="bg-zinc-100">
+      <div className="bg-white">
+        <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
+          <div className="px-2 font-semibold">CONDUTORES</div>
+          <div className="ml-auto px-2">{loading ? 'Carregando...' : `${rows.length} de ${drivers.length} registros`}</div>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} className="mr-2 h-6 w-44 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
+          <button className="mr-2 inline-flex h-6 items-center gap-1 border border-zinc-500 bg-zinc-100 px-2"><Settings size={14} /> Colunas</button>
+          <div className="flex items-center gap-2 pr-2"><span>&lt;-&gt;</span><span>1:1</span><span>XLS</span></div>
+          <button
+            onClick={() => canEditPage ? setEditing(driverForEdit()) : denyNoPrivilege()}
+            className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white"
+            title="Novo condutor"
+          >
+            +
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] text-xs">
+            <thead className="bg-white">
             <tr>
               {['CNPJ/CPF/Codigo', 'Empresa ou Pessoa', 'Dt. vencimento GR', 'Tipo de p.', 'Comunicacao princ', 'Cidade', 'Estado', 'Dt. cadastro'].map((heading) => (
                 <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
-                  {heading}
+                  {heading}<span className="float-right text-zinc-400">{'\u25BE'}</span>
                 </th>
               ))}
             </tr>
-          </thead>
-          <tbody>
-            {!loading && rows.map((driver) => (
+            </thead>
+            <tbody>
+            {!loading && rows.map((driver, index) => (
               <tr
                 key={driver.id}
                 onDoubleClick={() => canEditPage ? setEditing(driverForEdit(driver)) : denyNoPrivilege()}
-                className="cursor-default hover:bg-sky-100"
+                className={`${index % 2 ? 'bg-zinc-100' : 'bg-white'} cursor-default hover:bg-sky-100`}
               >
                 <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{driver.cpf}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.name}</td>
@@ -245,8 +275,9 @@ export function DriversPage() {
                 </td>
               </tr>
             )}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {editing && (
