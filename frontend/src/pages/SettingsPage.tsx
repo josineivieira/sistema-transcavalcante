@@ -57,11 +57,8 @@ export function SettingsPage() {
     <div className="space-y-4">
       {error && <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
       {loading && <div className="border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-600">Carregando configurações...</div>}
-      <div className="flex items-end justify-between border-b border-zinc-300 pb-3">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-900">Configuracoes</h2>
-          <p className="text-xs text-zinc-600">Dados da empresa emissora, parametros NFS-e e checklist para producao fiscal.</p>
-        </div>
+      <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+        <h2 className="text-lg font-normal text-red-600">Configuracoes</h2>
         <div className="flex gap-2">
           <button onClick={restore} className="inline-flex h-8 items-center gap-2 border border-zinc-400 bg-white px-3 text-xs text-zinc-700"><RotateCcw size={15} />Restaurar</button>
           <button onClick={save} className="inline-flex h-8 items-center gap-2 border border-[#003469] bg-[#004080] px-3 text-xs font-medium text-white"><Save size={15} />Salvar</button>

@@ -172,13 +172,14 @@ export function VehiclesPage() {
   return (
     <div className="space-y-3">
       <div className="border border-zinc-300 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold">Frota de veiculos</h2>
-            <p className="text-xs text-zinc-500">Cadastro de cavalos, carretas, proprietarios, documentos e licenciamento.</p>
-          </div>
-          <button onClick={() => canEditPage ? setEditing(openVehicle('Cavalo')) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
-            Novo veiculo
+        <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+          <h2 className="text-lg font-normal text-red-600">Consulta frota de veiculos</h2>
+          <button
+            onClick={() => canEditPage ? setEditing(openVehicle('Cavalo')) : denyNoPrivilege()}
+            className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white"
+            title="Novo veiculo"
+          >
+            +
           </button>
         </div>
 

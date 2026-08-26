@@ -182,13 +182,14 @@ export function CustomersPage() {
 
   return (
     <div className="border border-zinc-300 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-300 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold">Clientes</h2>
-          <p className="text-xs text-zinc-500">Cadastro de tomadores, comunicacao, endereco e dados fiscais para NFS-e.</p>
-        </div>
-        <button onClick={() => canEditPage ? setEditing(customerForEdit()) : denyNoPrivilege()} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
-          Novo cliente
+      <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+        <h2 className="text-lg font-normal text-red-600">Consulta clientes</h2>
+        <button
+          onClick={() => canEditPage ? setEditing(customerForEdit()) : denyNoPrivilege()}
+          className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white"
+          title="Novo cliente"
+        >
+          +
         </button>
       </div>
 

@@ -284,11 +284,8 @@ export function FiscalDocumentsPage() {
       )}
 
       <div className="border border-zinc-300 bg-white">
-        <div className="flex items-center justify-between border-b border-zinc-300 px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold">Documentos fiscais</h2>
-            <p className="text-xs text-zinc-500">Emissao com pre-visualizacao do fechamento antes de gerar o documento fiscal.</p>
-          </div>
+        <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
+          <h2 className="text-lg font-normal text-red-600">Consulta documentos fiscais</h2>
           <button onClick={openPreview} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
             Emitir documento
           </button>
