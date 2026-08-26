@@ -203,6 +203,17 @@ export function ClosingsPage() {
       denyNoPrivilege()
       return
     }
+    const closing = closings.find((item) => item.id === id)
+    if (!closing) return
+    if (closing.status === 'Cancelado') {
+      setNotice({
+        title: 'Aprovacao bloqueada',
+        message: 'Este fechamento foi cancelado e nao pode mais voltar para aprovado.',
+        tone: 'danger',
+      })
+      setOpenActionId(null)
+      return
+    }
     setSavingLabel('Aprovando fechamento...')
     try {
       await data.update({
@@ -427,9 +438,11 @@ export function ClosingsPage() {
                       <button onClick={() => void viewClosing(closing.number)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
                         Visualizar
                       </button>
-                      <button onClick={() => void approveClosing(closing.id)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
-                        Aprovar
-                      </button>
+                      {closing.status !== 'Cancelado' && (
+                        <button onClick={() => void approveClosing(closing.id)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">
+                          Aprovar
+                        </button>
+                      )}
                       <button onClick={() => void cancelClosing(closing.id)} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">
                         Cancelar
                       </button>
