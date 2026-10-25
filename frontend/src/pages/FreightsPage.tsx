@@ -555,6 +555,9 @@ export function FreightsPage() {
   const [invoiceImport, setInvoiceImport] = useState<InvoiceImport>(emptyInvoiceImport)
   const [invoiceImportMessage, setInvoiceImportMessage] = useState('')
   const [taskHistoryOpen, setTaskHistoryOpen] = useState(false)
+  const [statusHistorySearch, setStatusHistorySearch] = useState('')
+  const [processSettingsOpen, setProcessSettingsOpen] = useState(false)
+  const [processSettings, setProcessSettings] = useState({ urgent: false, consolidateCargo: false, recordDates: false })
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [showPreviousTasks, setShowPreviousTasks] = useState(false)
   const [extraExpenseOpen, setExtraExpenseOpen] = useState(false)
@@ -834,6 +837,18 @@ export function FreightsPage() {
     setHiddenColumns((current) => ({ ...current, [columnKey]: !current[columnKey] }))
   }
 
+  function openProcessSettings() {
+    if (!canEditPage) { denyNoPrivilege(); return }
+    setProcessSettings({ urgent: form.urgent, consolidateCargo: form.consolidateCargo, recordDates: form.recordDates })
+    setProcessSettingsOpen(true)
+  }
+
+  function applyProcessSettings() {
+    if (!canEditPage) { denyNoPrivilege(); return }
+    setForm((current) => applyAutomaticFreightStatus({ ...current, ...processSettings }))
+    setProcessSettingsOpen(false)
+  }
+
   function nextProcessCode() {
     const maxNumber = freights.reduce((max, freight) => {
       const match = freight.process.match(/^TR(\d+)$/i)
@@ -883,12 +898,20 @@ export function FreightsPage() {
   }
 
   function applyAutomaticFreightStatus(snapshot: FreightForm): FreightForm {
+    let status = snapshot.status
     if (freightDeliveryCompleted(snapshot) && freightStatusCode(snapshot.status) < 50) {
-      return { ...snapshot, status: deliveryCompletedStatus }
+      status = deliveryCompletedStatus
+    } else if (freightMinimumReady(snapshot) && (!snapshot.status || snapshot.status === initialFreightStatus)) {
+      status = invoiceReceivedStatus
     }
-    if (!freightMinimumReady(snapshot)) return snapshot
-    if (snapshot.status && snapshot.status !== initialFreightStatus) return snapshot
-    return { ...snapshot, status: invoiceReceivedStatus }
+    if (status === snapshot.status) return snapshot
+    const now = new Date().toLocaleString('pt-BR')
+    const entry: FreightTask = {
+      id: nextId('status'), name: status, description: 'Atualizado pelos dados do frete.',
+      status: 'ENCERRADO', sendToCustomer: 'N', startDate: now, endDate: now,
+      completionPercent: 100, internalUse: 'S', time: 'Hoje', user: authUser?.name || authUser?.email || 'Sistema',
+    }
+    return { ...snapshot, status, taskHistory: [entry, ...snapshot.taskHistory] }
   }
 
   function updateForm(field: keyof FreightForm, value: string | boolean) {
@@ -1208,6 +1231,7 @@ export function FreightsPage() {
   }
 
   function addFlowTask(taskName: string) {
+    if (!canEditPage) { denyNoPrivilege(); return }
     const now = new Date()
     const startDate = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const task: FreightTask = {
@@ -1282,28 +1306,28 @@ export function FreightsPage() {
     }
   }
 
-  async function saveFreight(closeAfterSave = true) {
+  async function saveFreight(closeAfterSave = true, source = form) {
     if (!canEditPage) {
       denyNoPrivilege()
-      return
+      return false
     }
-    if (savingFreightMode) return
-    const process = form.process || nextProcessCode()
+    if (savingFreightMode) return false
+    const process = source.process || nextProcessCode()
     const existingByProcess = freights.find((freight) => freight.process.toUpperCase() === process.toUpperCase())
     const activeFreightId = editingFreightId || existingByProcess?.id || null
     const duplicatedProcess = freights.some((freight) => freight.process.toUpperCase() === process.toUpperCase() && freight.id !== activeFreightId)
     if (duplicatedProcess) {
       showFreightNotice('Codigo duplicado', 'Este codigo de processo ja existe. Gere ou informe outro codigo para continuar.')
-      return
+      return false
     }
-    const missingFields = freightSaveMissingFields(form)
+    const missingFields = freightSaveMissingFields(source)
     if (missingFields.length) {
       showFreightNotice('Frete incompleto', `Falta preencher: ${missingFields.join(', ')}.`)
-      return
+      return false
     }
 
     setSavingFreightMode(closeAfterSave ? 'save-close' : 'save')
-    const formSnapshot = applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...form, process })))
+    const formSnapshot = applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...source, process })))
     setForm(formSnapshot)
     setEditingCiotId(null)
     setPlannedExpenseEdit(null)
@@ -1328,11 +1352,26 @@ export function FreightsPage() {
         setShowForm(false)
         resetForm()
       }
+      return true
     } catch {
       showFreightNotice('Falha ao salvar', 'Nao foi possivel salvar este frete no banco. Verifique os dados e tente novamente.')
+      return false
     } finally {
       setSavingFreightMode(null)
     }
+  }
+
+  async function regenerateProcess() {
+    if (!canEditPage) { denyNoPrivilege(); return }
+    if (savingFreightMode) return
+    const price = priceValueForProcess(form.product, form.origin, form.destination)
+    const snapshot = applyAutomaticFreightStatus({
+      ...form,
+      routeName: form.origin && form.destination ? `${form.origin} X ${form.destination}` : form.routeName,
+      ...(price ? { value: price, plannedFreightCost: price } : {}),
+    })
+    const saved = await saveFreight(false, snapshot)
+    if (saved) showFreightNotice('Processo atualizado', 'Rota, valor da tabela e status recalculados. As alterações foram salvas no mesmo frete.')
   }
 
   function updateFreight(id: string, patch: Partial<(typeof freights)[number]>) {
@@ -2145,22 +2184,17 @@ export function FreightsPage() {
     if (activeTab === 'GERAIS') {
       return (
         <div className="p-3">
-          <div className="grid gap-x-24 gap-y-1 md:grid-cols-2">
+          <div className="grid gap-y-1">
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONTRATADO</div>
               <Field label="CNPJ/CPF"><input value={form.contractorDocument} className={textInputClass(true)} disabled /></Field>
               <Field label="Contratado"><input value={form.contractor} className={textInputClass(true)} disabled /></Field>
-            </div>
-            <div className="grid gap-1">
-              <Field label="Operador da origem"><input className={textInputClass()} /></Field>
-              <Field label="Condicao de negociacao"><select value={form.negotiationCondition} onChange={(event) => updateForm('negotiationCondition', event.target.value)} className={textInputClass()}><option>Selecione...</option><option>7 DIAS [A] (per D)</option><option>A vista</option><option>15 DIAS</option></select></Field>
             </div>
           </div>
           <div className="mt-4 grid gap-x-24 gap-y-1 border-t border-zinc-400 pt-3 md:grid-cols-2">
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">CONDUTORES</div>
               <Field label="Motorista" required><LookupInput value={form.driver} onChange={(value) => updateForm('driver', value.toUpperCase())} onLookup={() => openLookup('driver')} onClear={() => updateForm('driver', '')} /></Field>
-              <Field label="Ajudante"><input value={form.helper} onChange={(event) => updateForm('helper', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
             </div>
             <div className="grid gap-1">
               <Field label="Motorista auxiliar"><input value={form.auxiliaryDriver} onChange={(event) => updateForm('auxiliaryDriver', event.target.value.toUpperCase())} className={textInputClass()} /></Field>
@@ -2515,8 +2549,8 @@ export function FreightsPage() {
     <div className="space-y-4">
       {!showForm && (
         <div className="border border-zinc-500 bg-zinc-100">
-          <div className="flex items-center justify-between border-b-4 border-zinc-400 px-2 py-1">
-            <h2 className="text-lg font-normal text-red-600">Transportes de container no destino</h2>
+          <div className="flex items-center justify-between border-b border-zinc-300 bg-white px-4 py-3">
+            <h2 className="text-base font-semibold text-[#1c344d]">Entrega do contêiner</h2>
             <button onClick={openNewFreight} className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white" title="Novo transporte">+</button>
           </div>
 
@@ -2651,9 +2685,12 @@ export function FreightsPage() {
       {showForm && (
         <div className="border border-zinc-500 bg-zinc-100">
           <div className="system-modal min-h-[calc(100vh-112px)] w-full overflow-hidden bg-zinc-100">
-            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
-              <h3 className="text-lg font-normal text-red-600">Transporte rodoviario de container</h3>
-              <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="freight-form-toolbar">
+              <div className="freight-form-heading">
+                <h3>Transporte rodoviário de contêiner</h3>
+                <span>{form.process || 'Novo frete'}</span>
+              </div>
+              <div className="freight-form-actions">
                 <button onClick={() => saveFreight(false)} disabled={Boolean(savingFreightMode)} className="inline-flex items-center gap-1 disabled:opacity-70">
                   <Save size={15} /> SALVAR
                 </button>
@@ -2661,12 +2698,12 @@ export function FreightsPage() {
                   <Save size={15} /> SALVAR E SAIR
                 </button>
                 <button onClick={requestDeleteFreight} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
-                <button className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
-                <Info size={16} />
-                <Settings size={16} />
+                <button onClick={regenerateProcess} disabled={!canEditPage || Boolean(savingFreightMode)} title="Recalcular rota, valor da tabela e status do mesmo frete" className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
+                <button type="button" onClick={() => showFreightNotice('Processo ' + form.process, `Cliente: ${form.customer || 'Não informado'}. Status: ${form.status}.`)} aria-label="Informações do processo" title="Informações do processo"><Info size={16} /></button>
+                <button type="button" onClick={openProcessSettings} disabled={!canEditPage || Boolean(savingFreightMode)} aria-label="Configurações do processo" title="Configurações do processo"><Settings size={16} /></button>
                 <button onClick={openInvoiceImport} className="inline-flex items-center gap-1"><Paperclip size={15} /> ANEXAR</button>
-                <button onClick={() => setTaskHistoryOpen(true)} className="inline-flex items-center gap-1"><MoreVertical size={15} /> HISTORICO TAREFA</button>
-                <button onClick={() => setShowForm(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+                <button onClick={() => { setStatusHistorySearch(''); setTaskHistoryOpen(true) }} className="inline-flex items-center gap-1"><MoreVertical size={15} /> HISTÓRICO STATUS</button>
+                <button onClick={() => setShowForm(false)} disabled={Boolean(savingFreightMode)} aria-label="Fechar frete" className="freight-close"><X size={18} /></button>
               </div>
             </div>
 
@@ -2732,93 +2769,57 @@ export function FreightsPage() {
       )}
 
       {taskHistoryOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end bg-zinc-950/30 px-4 py-8">
-          <div className="max-h-[calc(100vh-64px)] w-full max-w-5xl overflow-hidden border-4 border-red-700 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
-              <h3 className="text-sm font-semibold text-red-600">TAREFAS DO FLUXO</h3>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setTaskHistoryOpen(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/30 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="status-history-title" className="flex max-h-[85vh] w-full max-w-4xl flex-col border border-zinc-400 bg-white shadow-xl">
+            <header className="flex items-center justify-between border-b border-zinc-300 bg-zinc-100 px-4 py-3">
+              <h3 id="status-history-title" className="text-sm font-semibold">Histórico Status — {form.process}</h3>
+              <button onClick={() => setTaskHistoryOpen(false)} aria-label="Fechar histórico" className="p-1 hover:bg-zinc-200"><X size={18} /></button>
+            </header>
+            <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 text-xs">
+              <span>{form.taskHistory.length} registro(s)</span>
+              <input aria-label="Buscar no histórico de status" value={statusHistorySearch} onChange={(event) => setStatusHistorySearch(event.target.value)} className="h-8 w-60 max-w-full border border-zinc-300 px-2" placeholder="Buscar status ou usuário" />
             </div>
-            <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 px-2 text-xs">
-              <span>Historico Tarefa</span>
-              <span className="ml-auto mr-2">{form.taskHistory.length} de {form.taskHistory.length} registros</span>
-              <input className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 outline-none" placeholder="Busca rapida" />
-              <Settings size={17} />
-              <span className="px-2">1:1</span>
-              <X size={18} />
-            </div>
-            <div className="min-h-[430px] overflow-auto bg-white">
-              <table className="w-full min-w-[980px] text-xs">
-                <thead>
-                  <tr className="bg-white">
-                    {['Nome da tarefa', 'Situacao', 'Envia ao clier', 'Data de inicio', 'Tempo', 'Usuario'].map((heading) => (
-                      <th key={heading} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">{heading} <span className="float-right text-zinc-400">▼</span></th>
-                    ))}
-                  </tr>
-                  <tr className="bg-white">
-                    {['Descricao', 'Conclusao %', 'Uso Interno?', 'Data fim', '', ''].map((heading, index) => (
-                      <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">{heading} {heading && <span className="float-right text-zinc-400">▼</span>}</th>
-                    ))}
-                  </tr>
-                </thead>
+            <div className="min-h-[180px] overflow-auto">
+              <table className="w-full min-w-[640px] text-xs">
+                <thead className="bg-zinc-50"><tr>{['Status', 'Data', 'Usuário', 'Observação'].map((heading) => <th key={heading} className="border-b border-zinc-200 px-4 py-3 text-left font-semibold">{heading}</th>)}</tr></thead>
                 <tbody>
-                  {form.taskHistory.map((task) => (
-                    <tr key={task.id} className="odd:bg-zinc-100 even:bg-white">
-                      <td className="border-b border-r border-zinc-200 px-2 py-2">
-                        <div>{task.name}</div>
-                        <div className="pt-3 text-zinc-700">{task.description}</div>
-                      </td>
-                      <td className="border-b border-r border-zinc-200 px-2 py-2">
-                        <div>{task.status}</div>
-                        <div className="pt-3 text-right">{task.completionPercent.toFixed(2).replace('.', ',')}</div>
-                      </td>
-                      <td className="border-b border-r border-zinc-200 px-2 py-2">
-                        <div>{task.sendToCustomer}</div>
-                        <div className="pt-3">{task.internalUse}</div>
-                      </td>
-                      <td className="border-b border-r border-zinc-200 px-2 py-2">
-                        <div>{task.startDate}</div>
-                        <div className="pt-3">{task.endDate}</div>
-                      </td>
-                      <td className="border-b border-r border-zinc-200 px-2 py-2">{task.time}</td>
-                      <td className="border-b border-zinc-200 px-2 py-2">Incluido e Alterado por {task.user}</td>
+                  {form.taskHistory.filter((task) => [task.name, task.user, task.description, task.startDate].join(' ').toLocaleLowerCase('pt-BR').includes(statusHistorySearch.toLocaleLowerCase('pt-BR'))).map((task) => (
+                    <tr key={task.id} className="border-b border-zinc-100 even:bg-zinc-50">
+                      <td className="px-4 py-3">{task.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{task.startDate}</td>
+                      <td className="px-4 py-3">{task.user}</td>
+                      <td className="px-4 py-3">{task.description || '—'}</td>
                     </tr>
                   ))}
-                  {!form.taskHistory.length && (
-                    <tr><td colSpan={6} className="px-3 py-16 text-center text-zinc-500">Nenhuma tarefa no fluxo.</td></tr>
-                  )}
+                  {!form.taskHistory.some((task) => [task.name, task.user, task.description, task.startDate].join(' ').toLocaleLowerCase('pt-BR').includes(statusHistorySearch.toLocaleLowerCase('pt-BR'))) && <tr><td colSpan={4} className="px-4 py-12 text-center text-zinc-500">{statusHistorySearch ? 'Nenhum resultado para a busca.' : 'Nenhuma alteração de status registrada.'}</td></tr>}
                 </tbody>
               </table>
             </div>
-            <div className="flex h-10 items-center justify-end border-t border-zinc-300 bg-white px-3">
-              <button onClick={() => { setShowPreviousTasks(false); setTaskPickerOpen(true) }} className="inline-flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-black text-white">+</span> ADICIONAR</button>
-            </div>
-          </div>
+            <footer className="flex justify-end border-t border-zinc-200 px-4 py-3">
+              <button disabled={!canEditPage} onClick={() => { setShowPreviousTasks(false); setTaskPickerOpen(true) }} className="border border-[#244761] bg-[#244761] px-3 py-2 text-xs text-white">Adicionar status</button>
+            </footer>
+          </section>
         </div>
       )}
 
-      {deleteConfirmOpen && (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center bg-zinc-950/30 px-4 py-24">
-          <div className="w-full max-w-lg border border-zinc-600 bg-zinc-100 shadow-2xl">
-            <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
-              <h3 className="text-lg font-normal text-red-600">Confirmar exclusao</h3>
-              <button onClick={() => setDeleteConfirmOpen(false)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+      {processSettingsOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/30 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="process-settings-title" className="w-full max-w-md border border-zinc-400 bg-white shadow-xl">
+            <header className="flex items-center justify-between border-b border-zinc-300 bg-zinc-100 px-4 py-3">
+              <h3 id="process-settings-title" className="text-sm font-semibold">Configurações do processo</h3>
+              <button onClick={() => setProcessSettingsOpen(false)} aria-label="Fechar configurações" className="p-1 hover:bg-zinc-200"><X size={18} /></button>
+            </header>
+            <div className="grid gap-4 p-5 text-sm">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={processSettings.urgent} onChange={(event) => setProcessSettings((current) => ({ ...current, urgent: event.target.checked }))} /> Frete urgente</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={processSettings.consolidateCargo} onChange={(event) => setProcessSettings((current) => ({ ...current, consolidateCargo: event.target.checked }))} /> Carga consolidada</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={processSettings.recordDates} onChange={(event) => setProcessSettings((current) => ({ ...current, recordDates: event.target.checked }))} /> Habilitar edição no controle de datas</label>
+              <p className="text-xs text-zinc-500">As alterações serão gravadas ao salvar o frete.</p>
             </div>
-            <div className="border-b border-zinc-300 bg-white px-4 py-5 text-xs">
-              <div className="mb-3 font-semibold">Deseja excluir este processo?</div>
-              <div className="grid gap-1">
-                <div><span className="font-semibold">Codigo:</span> {form.process || '-'}</div>
-                <div><span className="font-semibold">Cliente:</span> {form.customer || '-'}</div>
-                <div><span className="font-semibold">Destinatario:</span> {form.recipient || '-'}</div>
-              </div>
-              <div className="mt-4 text-red-700">Esta acao remove o frete do banco de dados.</div>
-            </div>
-            <div className="flex justify-end gap-2 bg-zinc-100 px-3 py-3 text-xs">
-              <button onClick={() => setDeleteConfirmOpen(false)} className="h-8 border border-zinc-400 bg-white px-4 hover:bg-zinc-200">Cancelar</button>
-              <button onClick={confirmDeleteFreight} className="h-8 bg-black px-4 font-semibold text-white hover:bg-red-800">Excluir processo</button>
-            </div>
-          </div>
+            <footer className="flex justify-end gap-2 border-t border-zinc-200 p-3 text-xs">
+              <button onClick={() => setProcessSettingsOpen(false)} className="border border-zinc-300 px-3 py-2">Cancelar</button>
+              <button onClick={applyProcessSettings} disabled={!canEditPage} className="border border-[#244761] bg-[#244761] px-3 py-2 text-white">Aplicar</button>
+            </footer>
+          </section>
         </div>
       )}
 

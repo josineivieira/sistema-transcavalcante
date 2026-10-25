@@ -318,3 +318,22 @@ button:disabled {
   .login-truck-photo { height: 120px; background-position: 38% 67%; }
   .login-body { padding: 30px 28px; }
 }
+
+.freight-form-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #c5cdd6;
+  background: #fff;
+}
+.freight-form-heading h3 { margin: 0; color: #1c344d; font-size: 15px; font-weight: 600; }
+.freight-form-heading > span { display: block; margin-top: 4px; color: #697589; font-size: 11px; }
+.freight-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; }
+.freight-form-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 8px; border: 1px solid transparent; border-radius: 2px; }
+.freight-form-actions > button:hover:not(:disabled) { border-color: #c5cdd6; background: #edf1f5; }
+.freight-form-actions > button:first-child { border-color: #244761; background: #244761; color: #fff; }
+.freight-form-actions > button:first-child:hover:not(:disabled) { background: #193a53; }
+.freight-form-actions > .freight-close { margin-left: 6px; color: #546173; }
