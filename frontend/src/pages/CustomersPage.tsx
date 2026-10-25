@@ -1,5 +1,7 @@
+import { RecordDetails } from '../components/RecordDetails'
+import { customerDetails } from '../services/recordDetails'
 import { cloneElement, useId, useMemo, useState, type ReactElement } from 'react'
-import { Pencil, Save, Search, Trash2, X } from 'lucide-react'
+import { Eye, Save, Search, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -94,6 +96,7 @@ function customerForEdit(customer?: Customer): Customer {
 export function CustomersPage() {
   const { customers, loading, setCustomers } = useLocalData()
   const canEditPage = canEdit('customers')
+  const [viewing, setViewing] = useState<Customer | null>(null)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [query, setQuery] = useState('')
   const [documentError, setDocumentError] = useState('')
@@ -220,8 +223,8 @@ export function CustomersPage() {
           </thead>
           <tbody>
             {!loading && rows.map((customer) => (
-              <tr key={customer.id} className="hover:bg-sky-50">
-                <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{customer.name}</td>
+              <tr key={customer.id} onClick={() => setViewing(customer)} className="cursor-pointer hover:bg-sky-50">
+                <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium"><button className="text-left hover:underline" aria-label={`Visualizar cliente ${customer.name}`} onClick={(event) => { event.stopPropagation(); setViewing(customer) }}>{customer.name}</button></td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.emailFiscal || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.phone || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.street || '-'}</td>
@@ -237,8 +240,8 @@ export function CustomersPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.stateRegistration || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(customer.registrationDate)}</td>
                 <td className="border-b border-zinc-200 px-2 py-1">
-                  <button onClick={() => canEditPage ? openCustomer(customer) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
-                    <Pencil size={14} />
+                  <button onClick={(event) => { event.stopPropagation(); setViewing(customer) }} className="border border-zinc-300 bg-white px-2 py-1" title="Visualizar cliente">
+                    <Eye size={14} />
                   </button>
                 </td>
               </tr>
@@ -250,6 +253,8 @@ export function CustomersPage() {
           </tbody>
         </table>
       </div>
+
+      {viewing && <RecordDetails title="Ficha do cliente" name={viewing.name} sections={customerDetails(viewing)} onClose={() => setViewing(null)} onEdit={canEditPage ? () => { openCustomer(viewing); setViewing(null) } : undefined} />}
 
       {editing && (
         <div className="customer-editor-overlay">

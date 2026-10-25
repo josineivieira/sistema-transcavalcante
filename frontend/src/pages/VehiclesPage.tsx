@@ -1,3 +1,5 @@
+import { RecordDetails } from '../components/RecordDetails'
+import { vehicleDetails } from '../services/recordDetails'
 import { cloneElement, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Download, Paperclip, Save, Search, Trash2, X } from 'lucide-react'
 import { useLocalData } from '../hooks/useLocalData'
@@ -97,6 +99,7 @@ function openVehicle(type: VehicleType, vehicle?: Vehicle): Vehicle {
 export function VehiclesPage() {
   const { vehicles, loading, setVehicles } = useLocalData()
   const canEditPage = canEdit('vehicles')
+  const [viewing, setViewing] = useState<Vehicle | null>(null)
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [modalTab, setModalTab] = useState('GERAL')
   const [query, setQuery] = useState('')
@@ -304,14 +307,14 @@ export function VehiclesPage() {
               {!loading && rows.map((vehicle) => (
                 <tr
                   key={vehicle.id}
-                  onDoubleClick={() => canEditPage ? editVehicle(vehicle) : denyNoPrivilege()}
-                  className="cursor-default hover:bg-sky-100"
+                  onClick={() => setViewing(vehicle)}
+                  className="cursor-pointer hover:bg-sky-100"
                 >
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetNumber || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.fleetRelation || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{vehicle.description || vehicle.fleetType || vehicle.type}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(vehicle.grExpiration)}</td>
-                  <td className="border-b border-r border-zinc-200 px-2 py-2 font-semibold">{plateOf(vehicle)}</td>
+                  <td className="border-b border-r border-zinc-200 px-2 py-2 font-semibold"><button className="text-left hover:underline" aria-label={`Visualizar veículo ${plateOf(vehicle)}`} onClick={(event) => { event.stopPropagation(); setViewing(vehicle) }}>{plateOf(vehicle)}</button></td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.owner || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.ownerDocument || '-'}</td>
                   <td className="border-b border-r border-zinc-200 px-2 py-2">{vehicle.brand || '-'}</td>
@@ -332,6 +335,8 @@ export function VehiclesPage() {
           </table>
         </div>
       </div>
+
+      {viewing && <RecordDetails title="Ficha do veículo" name={plateOf(viewing)} sections={vehicleDetails(viewing)} attachments={viewing.attachments} onClose={() => setViewing(null)} onEdit={canEditPage ? () => { editVehicle(viewing); setViewing(null) } : undefined} />}
 
       {editing && (
         <div className="customer-editor-overlay">

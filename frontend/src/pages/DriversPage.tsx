@@ -1,3 +1,5 @@
+import { RecordDetails } from '../components/RecordDetails'
+import { driverDetails } from '../services/recordDetails'
 import { cloneElement, useId, useMemo, useState, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import { FileSpreadsheet, Save, Search, Trash2, X } from 'lucide-react'
@@ -95,6 +97,7 @@ function driverForEdit(driver?: Driver): Driver {
 export function DriversPage() {
   const { drivers, payrollProfiles, loading, setDrivers } = useLocalData()
   const canEditPage = canEdit('drivers')
+  const [viewing, setViewing] = useState<Driver | null>(null)
   const [editing, setEditing] = useState<Driver | null>(null)
   const [mainTab, setMainTab] = useState('CADASTRO')
   const [query, setQuery] = useState('')
@@ -219,11 +222,11 @@ export function DriversPage() {
             {!loading && rows.map((driver) => (
               <tr
                 key={driver.id}
-                onDoubleClick={() => canEditPage ? openDriver(driver) : denyNoPrivilege()}
-                className="cursor-default hover:bg-sky-100"
+                onClick={() => setViewing(driver)}
+                className="cursor-pointer hover:bg-sky-100"
               >
                 <td className="border-b border-r border-zinc-200 px-2 py-2 font-medium">{driver.cpf}</td>
-                <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.name}</td>
+                <td className="border-b border-r border-zinc-200 px-2 py-2"><button className="text-left hover:underline" aria-label={`Visualizar motorista ${driver.name}`} onClick={(event) => { event.stopPropagation(); setViewing(driver) }}>{driver.name}</button></td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(driver.grExpiration || driver.cnhExpiration)}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.personType || 'Fisica'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{driver.mainCommunication || driver.phone}</td>
@@ -243,6 +246,8 @@ export function DriversPage() {
           </tbody>
         </table>
       </div>
+
+      {viewing && <RecordDetails title="Ficha do motorista" name={viewing.name} sections={driverDetails(viewing)} onClose={() => setViewing(null)} onEdit={canEditPage ? () => { openDriver(viewing); setViewing(null) } : undefined} />}
 
       {editing && (
         <div className="customer-editor-overlay">
