@@ -1306,7 +1306,7 @@ export function FreightsPage() {
     }
   }
 
-  async function saveFreight(closeAfterSave = true, source = form) {
+  async function saveFreight(closeAfterSave = true, source = form, regenerateCode = false) {
     if (!canEditPage) {
       denyNoPrivilege()
       return false
@@ -1327,7 +1327,7 @@ export function FreightsPage() {
     }
 
     setSavingFreightMode(closeAfterSave ? 'save-close' : 'save')
-    const formSnapshot = applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...source, process })))
+    const formSnapshot = regenerateCode ? { ...source, process } : applyAutomaticFreightStatus(materializeCiotDraft(materializeContainerDraft({ ...source, process })))
     setForm(formSnapshot)
     setEditingCiotId(null)
     setPlannedExpenseEdit(null)
@@ -1338,11 +1338,13 @@ export function FreightsPage() {
         const freightToSave = currentFreight
           ? buildFreightRecord(formSnapshot, currentFreight)
           : { ...buildFreightRecord(formSnapshot), id: activeFreightId, number: formSnapshot.process }
-        await saveFreightRecord(freightToSave)
+        const savedFreight = await saveFreightRecord(freightToSave, regenerateCode)
+        if (regenerateCode) setForm((current) => ({ ...current, process: savedFreight.process }))
         setEditingFreightId(activeFreightId)
       } else {
         const createdFreight = buildFreightRecord(formSnapshot)
-        const savedFreight = await saveFreightRecord(createdFreight)
+        const savedFreight = await saveFreightRecord(createdFreight, regenerateCode)
+        if (regenerateCode) setForm((current) => ({ ...current, process: savedFreight.process }))
         if (!closeAfterSave) {
           setEditingFreightId(savedFreight.id)
         }
@@ -1364,14 +1366,8 @@ export function FreightsPage() {
   async function regenerateProcess() {
     if (!canEditPage) { denyNoPrivilege(); return }
     if (savingFreightMode) return
-    const price = priceValueForProcess(form.product, form.origin, form.destination)
-    const snapshot = applyAutomaticFreightStatus({
-      ...form,
-      routeName: form.origin && form.destination ? `${form.origin} X ${form.destination}` : form.routeName,
-      ...(price ? { value: price, plannedFreightCost: price } : {}),
-    })
-    const saved = await saveFreight(false, snapshot)
-    if (saved) showFreightNotice('Processo atualizado', 'Rota, valor da tabela e status recalculados. As alterações foram salvas no mesmo frete.')
+    const saved = await saveFreight(false, form, true)
+    if (saved) showFreightNotice('Código gerado', 'O novo código foi salvo no mesmo frete.')
   }
 
   function updateFreight(id: string, patch: Partial<(typeof freights)[number]>) {
@@ -2698,7 +2694,7 @@ export function FreightsPage() {
                   <Save size={15} /> SALVAR E SAIR
                 </button>
                 <button onClick={requestDeleteFreight} className="inline-flex items-center gap-1"><X size={16} /> EXCLUIR</button>
-                <button onClick={regenerateProcess} disabled={!canEditPage || Boolean(savingFreightMode)} title="Recalcular rota, valor da tabela e status do mesmo frete" className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
+                <button onClick={regenerateProcess} disabled={!canEditPage || Boolean(savingFreightMode)} title="Gerar outro código para este processo" className="inline-flex items-center gap-1"><Check size={16} /> REGERAR PROCESSO</button>
                 <button type="button" onClick={() => showFreightNotice('Processo ' + form.process, `Cliente: ${form.customer || 'Não informado'}. Status: ${form.status}.`)} aria-label="Informações do processo" title="Informações do processo"><Info size={16} /></button>
                 <button type="button" onClick={openProcessSettings} disabled={!canEditPage || Boolean(savingFreightMode)} aria-label="Configurações do processo" title="Configurações do processo"><Settings size={16} /></button>
                 <button onClick={openInvoiceImport} className="inline-flex items-center gap-1"><Paperclip size={15} /> ANEXAR</button>

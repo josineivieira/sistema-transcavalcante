@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import date
 from decimal import Decimal, InvalidOperation
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,6 +22,7 @@ _freight_schema_checked = False
 
 class OperationalFreightPayload(BaseModel):
     data: dict = Field(default_factory=dict)
+    regenerate_process: bool = False
 
 
 def _ensure_freight_operational_schema(db: Session) -> None:
@@ -457,6 +459,16 @@ def upsert_operational_freight(
     _ensure_freight_operational_schema(db)
     data = deepcopy(payload.data)
     data["id"] = external_id
+    if payload.regenerate_process:
+        company = _get_company(db, data)
+        # Serialize code generation for this company, including freights outside the current list/filter.
+        db.query(Company).filter(Company.id == company.id).with_for_update().one()
+        codes = db.query(Freight.process_number).filter(Freight.company_id == company.id).all()
+        numbers = [int(match.group(1)) for (code,) in codes if (match := re.fullmatch(r"TR(\d+)", code or "", re.IGNORECASE))]
+        current = re.fullmatch(r"TR(\d+)", str(data.get("process") or ""), re.IGNORECASE)
+        next_number = max([0, *numbers, int(current.group(1)) if current else 0]) + 1
+        data["process"] = f"TR{next_number:02d}"
+        data["number"] = data["process"]
     freight = _upsert_freight_data(db, data)
     db.commit()
     db.refresh(freight)

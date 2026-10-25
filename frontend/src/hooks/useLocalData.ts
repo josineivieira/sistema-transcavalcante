@@ -158,7 +158,7 @@ export function useLocalData() {
     })
   }
 
-  function saveFreightRecord(freight: Freight) {
+  function saveFreightRecord(freight: Freight, regenerateProcess = false) {
     setData((current) => {
       const exists = current.freights.some((item) => item.id === freight.id)
       const freights = exists
@@ -167,7 +167,7 @@ export function useLocalData() {
       return normalizeData({ ...current, freights })
     })
 
-    return api.put<OperationalFreightRecordResponse>(`/operational-freights/${encodeURIComponent(freight.id)}`, { data: freight }).then((response) => {
+    return api.put<OperationalFreightRecordResponse>(`/operational-freights/${encodeURIComponent(freight.id)}`, { data: freight, regenerate_process: regenerateProcess }).then((response) => {
       const saved = response.data.data
       setData((current) => {
         const exists = current.freights.some((item) => item.id === saved.id)
