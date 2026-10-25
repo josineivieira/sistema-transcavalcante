@@ -1,5 +1,5 @@
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Pencil, Save, Search, Settings, Trash2, X } from 'lucide-react'
+import { cloneElement, useId, useMemo, useState, type ReactElement } from 'react'
+import { Pencil, Save, Search, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
@@ -94,10 +94,7 @@ export function CustomersPage() {
   const { customers, loading, setCustomers } = useLocalData()
   const canEditPage = canEdit('customers')
   const [editing, setEditing] = useState<Customer | null>(null)
-  const [mainTab, setMainTab] = useState('GERAIS')
-  const [subTab, setSubTab] = useState('ENDERECO')
   const [query, setQuery] = useState('')
-  const [topSectionHeight, setTopSectionHeight] = useState(190)
 
   const rows = useMemo(() => {
     const term = query.toLowerCase()
@@ -159,25 +156,6 @@ export function CustomersPage() {
       setCustomers(customers.filter((item) => item.id !== customer.id))
       setEditing(null)
     }
-  }
-
-  function startTopResize(event: ReactMouseEvent<HTMLDivElement>) {
-    event.preventDefault()
-    const startY = event.clientY
-    const startHeight = topSectionHeight
-    function resize(moveEvent: MouseEvent) {
-      setTopSectionHeight(Math.min(230, Math.max(72, startHeight + moveEvent.clientY - startY)))
-    }
-    function stopResize() {
-      window.removeEventListener('mousemove', resize)
-      window.removeEventListener('mouseup', stopResize)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    document.body.style.cursor = 'row-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('mousemove', resize)
-    window.addEventListener('mouseup', stopResize)
   }
 
   return (
@@ -255,182 +233,92 @@ export function CustomersPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-950/30 px-4 py-6">
-          <div className="max-h-[calc(100vh-48px)] w-full max-w-7xl overflow-hidden border border-zinc-500 bg-zinc-100 shadow-2xl">
-            <div className="flex items-center justify-between border-b-2 border-zinc-400 bg-zinc-100 px-2 py-1">
-              <h3 className="text-lg font-normal text-red-600">Cliente</h3>
-              <div className="flex items-center gap-3 text-xs">
-                <button onClick={() => saveCustomer(false)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR</button>
-                <button onClick={() => saveCustomer(true)} className="inline-flex items-center gap-1"><Save size={15} /> SALVAR E SAIR</button>
-                <button onClick={() => deleteCustomer(editing)} className="inline-flex items-center gap-1"><Trash2 size={15} /> EXCLUIR</button>
-                <Settings size={16} />
-                <button onClick={() => setEditing(null)} className="grid h-7 w-7 place-items-center bg-black text-white"><X size={18} /></button>
+        <div className="customer-editor-overlay">
+          <section className="customer-editor" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
+            <header className="customer-editor-header">
+              <h3 id="customer-editor-title">{customers.some((customer) => customer.id === editing.id) ? 'Editar cliente' : 'Novo cliente'}</h3>
+              <div className="customer-editor-actions">
+                <button type="button" onClick={() => saveCustomer(false)} disabled={!canEditPage}><Save size={15} /> Salvar</button>
+                <button type="button" onClick={() => saveCustomer(true)} disabled={!canEditPage}><Save size={15} /> Salvar e sair</button>
+                {customers.some((customer) => customer.id === editing.id) && <button type="button" onClick={() => deleteCustomer(editing)} disabled={!canEditPage}><Trash2 size={15} /> Excluir</button>}
+                <button type="button" onClick={() => setEditing(null)} aria-label="Fechar cadastro"><X size={18} /></button>
               </div>
-            </div>
+            </header>
 
-            <div className="max-h-[calc(100vh-92px)] overflow-y-auto p-2">
-              <div className="grid items-start gap-x-12 overflow-hidden pb-1 md:grid-cols-2" style={{ height: topSectionHeight }}>
-                <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
-                  <label className="text-right">Mercado</label>
-                  <input value={editing.market} onChange={(event) => updateEditing('market', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                  <label className="text-right text-red-600">Tipo de participante</label>
-                  <select value={editing.participantType} onChange={(event) => updateEditing('participantType', event.target.value)} className="h-7 border border-zinc-300 px-2">
-                    <option>Fisica</option><option>Juridica</option><option>Exterior</option>
-                  </select>
-                  <label className="text-right text-red-600">Nome completo</label>
-                  <input value={editing.name} onChange={(event) => updateEditing('name', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                  <label className="text-right">E-mail principal</label>
-                  <input value={editing.emailFiscal} onChange={(event) => updateEditing('emailFiscal', event.target.value)} className="h-7 border border-zinc-300 px-2" />
+            <div className="customer-editor-body">
+              <fieldset>
+                <legend>Identificação</legend>
+                <div className="customer-editor-grid">
+                  <CustomerField label="Tipo de pessoa">
+                    <select value={editing.participantType} onChange={(event) => updateEditing('participantType', event.target.value)}>
+                      <option value="Juridica">Pessoa jurídica</option><option value="Fisica">Pessoa física</option><option value="Exterior">Exterior</option>
+                    </select>
+                  </CustomerField>
+                  <CustomerField label={editing.participantType === 'Exterior' ? 'Documento' : 'CPF/CNPJ'} required>
+                    <input value={editing.document} required onChange={(event) => updateEditing('document', event.target.value)} />
+                  </CustomerField>
+                  <CustomerField label="Situação">
+                    <select value={editing.status} onChange={(event) => updateEditing('status', event.target.value)}><option>Ativo</option><option>Inativo</option></select>
+                  </CustomerField>
+                  <CustomerField label={editing.participantType === 'Fisica' ? 'Nome completo' : 'Razão social'} required className="customer-editor-wide">
+                    <input value={editing.name} required onChange={(event) => updateEditing('name', event.target.value.toUpperCase())} />
+                  </CustomerField>
+                  {editing.participantType !== 'Fisica' && <CustomerField label="Nome fantasia">
+                    <input value={editing.tradeName} onChange={(event) => updateEditing('tradeName', event.target.value.toUpperCase())} />
+                  </CustomerField>}
                 </div>
-                <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
-                  <label className="text-right">Categoria</label>
-                  <input value={editing.category} onChange={(event) => updateEditing('category', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                  <label className="text-right text-red-600">CPF/CNPJ</label>
-                  <input value={editing.document} onChange={(event) => updateEditing('document', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                  <label />
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" /> Informar pesquisar por?</label>
-                  <label className="text-right">Pesquisar por</label>
-                  <input value={editing.name} readOnly className="h-7 border border-zinc-300 bg-zinc-200 px-2" />
-                  <label className="text-right">Indicado por</label>
-                  <input className="h-7 border border-zinc-300 px-2" />
-                  <label className="text-right">Desativar?</label>
-                  <input type="checkbox" checked={editing.status !== 'Ativo'} onChange={(event) => updateEditing('status', event.target.checked ? 'Inativo' : 'Ativo')} className="h-4 w-4" />
-                  <label />
-                  <div className="h-7 border border-zinc-400 bg-white px-2 leading-7 text-emerald-700">Registro ativo</div>
-                </div>
-              </div>
+              </fieldset>
 
-              <div onMouseDown={startTopResize} onDoubleClick={() => setTopSectionHeight(topSectionHeight > 90 ? 72 : 190)} className="relative my-1 h-3 cursor-row-resize border-t-4 border-zinc-400" title="Arraste para ajustar a area superior">
-                <span className="absolute left-1/2 top-[-4px] h-2 w-12 -translate-x-1/2 border-x border-zinc-400 bg-zinc-100" />
-              </div>
-
-              <div className="flex border-b border-zinc-400 text-xs">
-                {['GERAIS', 'FICHA CADASTRO', 'CONSELHO'].map((tab) => (
-                  <button key={tab} onClick={() => setMainTab(tab)} className={`border border-b-0 px-3 py-1 ${mainTab === tab ? 'bg-zinc-300' : 'border-transparent bg-zinc-100'}`}>{tab}</button>
-                ))}
-              </div>
-
-              {mainTab === 'GERAIS' && (
-                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
-                  <div className="grid content-start grid-cols-[140px_1fr_130px] items-center gap-1 text-xs">
-                    <label className="text-right">Dt. nascimento</label>
-                    <input type="date" value={editing.birthDate} onChange={(event) => updateEditing('birthDate', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <span />
-                    <label className="text-right">Aniversario</label>
-                    <input value={editing.anniversary} onChange={(event) => updateEditing('anniversary', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <span />
-                    <label className="text-right">Sexo</label>
-                    <select value={editing.gender} onChange={(event) => updateEditing('gender', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Masculino</option><option>Feminino</option></select>
-                    <span />
-                    <label className="text-right">RG</label>
-                    <div className="grid grid-cols-[1fr_70px_60px] gap-1">
-                      <input value={editing.rg} onChange={(event) => updateEditing('rg', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                      <input value={editing.rgIssuer} onChange={(event) => updateEditing('rgIssuer', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" placeholder="Orgao" />
-                      <input value={editing.rgState} onChange={(event) => updateEditing('rgState', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
+              <fieldset>
+                <legend>Contato</legend>
+                <div className="customer-editor-grid">
+                  <CustomerField label="E-mail fiscal">
+                    <input type="email" value={editing.emailFiscal} onChange={(event) => updateEditing('emailFiscal', event.target.value)} />
+                  </CustomerField>
+                  <div className="customer-editor-field"><span>Telefone</span>
+                    <div className="customer-editor-phone">
+                      <input type="tel" aria-label="DDD" placeholder="DDD" maxLength={3} value={editing.phoneDdd} onChange={(event) => updateEditing('phoneDdd', event.target.value)} />
+                      <input type="tel" aria-label="Número do telefone" value={editing.phone} onChange={(event) => updateEditing('phone', event.target.value)} />
                     </div>
-                    <span />
-                    <label className="text-right">Observacao</label>
-                    <textarea value={editing.notes} onChange={(event) => updateEditing('notes', event.target.value)} className="h-20 border border-zinc-300 px-2 py-1" />
                   </div>
-                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
-                    <label className="text-right">Nome reduzido</label>
-                    <input value={editing.shortName || automaticShortName(editing.name)} onChange={(event) => updateEditing('shortName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Sitio (site) sem http://</label>
-                    <input value={editing.website} onChange={(event) => updateEditing('website', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Grupo economico</label>
-                    <input value={editing.economicGroup} onChange={(event) => updateEditing('economicGroup', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Codigo agrupador</label>
-                    <input value={editing.groupedCode} onChange={(event) => updateEditing('groupedCode', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Ocupacao</label>
-                    <input value={editing.occupation} onChange={(event) => updateEditing('occupation', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Grau escolaridade</label>
-                    <select value={editing.educationLevel} onChange={(event) => updateEditing('educationLevel', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Ensino medio</option><option>Superior</option></select>
-                  </div>
+                  <CustomerField label="WhatsApp">
+                    <select value={editing.hasWhatsapp} onChange={(event) => updateEditing('hasWhatsapp', event.target.value)}><option value="S">Sim</option><option value="N">Não</option></select>
+                  </CustomerField>
                 </div>
-              )}
+              </fieldset>
 
-              {mainTab === 'FICHA CADASTRO' && (
-                <div className="grid items-start gap-x-12 border border-t-0 border-zinc-300 p-2 md:grid-cols-2">
-                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
-                    <label className="text-right">Estado civil</label>
-                    <select value={editing.civilStatus} onChange={(event) => updateEditing('civilStatus', event.target.value)} className="h-7 border border-zinc-300 px-2"><option>Selecione...</option><option>Solteiro</option><option>Casado</option></select>
-                    <label className="text-right">Nome do conjuge</label>
-                    <input value={editing.spouseName} onChange={(event) => updateEditing('spouseName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Codigo/CNPJ</label>
-                    <input value={editing.employerDocument} onChange={(event) => updateEditing('employerDocument', event.target.value)} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Empregador</label>
-                    <input value={editing.employer} onChange={(event) => updateEditing('employer', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Cargo</label>
-                    <input value={editing.jobTitle} onChange={(event) => updateEditing('jobTitle', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Naturalidade</label>
-                    <input value={editing.birthplace} onChange={(event) => updateEditing('birthplace', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Nacionalidade</label>
-                    <input value={editing.nationality} onChange={(event) => updateEditing('nationality', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                  </div>
-                  <div className="grid content-start grid-cols-[140px_1fr] items-center gap-1 text-xs">
-                    <label className="text-right">Nome da mae</label>
-                    <input value={editing.motherName} onChange={(event) => updateEditing('motherName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                    <label className="text-right">Nome do pai</label>
-                    <input value={editing.fatherName} onChange={(event) => updateEditing('fatherName', event.target.value.toUpperCase())} className="h-7 border border-zinc-300 px-2" />
-                  </div>
+              <fieldset>
+                <legend>Endereço</legend>
+                <div className="customer-editor-grid">
+                  <CustomerField label="CEP"><input value={editing.zipCode} onChange={(event) => updateEditing('zipCode', event.target.value)} /></CustomerField>
+                  <CustomerField label="Logradouro" className="customer-editor-wide"><input value={editing.street} onChange={(event) => updateEditing('street', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="Número"><input value={editing.number} onChange={(event) => updateEditing('number', event.target.value)} /></CustomerField>
+                  <CustomerField label="Complemento"><input value={editing.complement} onChange={(event) => updateEditing('complement', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="Bairro"><input value={editing.district} onChange={(event) => updateEditing('district', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="Cidade"><input value={editing.city} onChange={(event) => updateEditing('city', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="UF"><input maxLength={2} value={editing.state} onChange={(event) => updateEditing('state', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="País"><input maxLength={2} value={editing.country} onChange={(event) => updateEditing('country', event.target.value.toUpperCase())} /></CustomerField>
                 </div>
-              )}
+              </fieldset>
 
-              {mainTab === 'CONSELHO' && <div className="border border-t-0 border-zinc-300 p-8 text-sm text-zinc-500">Dados de conselho quando aplicavel.</div>}
-
-              <div className="mt-3 flex border-b border-zinc-400 text-xs">
-                {['ENDERECO', 'COMUNICACOES (TELEFONES/EMAIL)', 'CONTATOS'].map((tab) => (
-                  <button key={tab} onClick={() => setSubTab(tab)} className={`border border-b-0 px-3 py-1 ${subTab === tab ? 'bg-zinc-300' : 'border-transparent bg-zinc-100'}`}>{tab}</button>
-                ))}
-              </div>
-
-              {subTab === 'ENDERECO' && (
-                <div className="border border-t-0 border-zinc-300 p-2">
-                  <div className="flex justify-between bg-zinc-300 px-2 py-1 text-xs"><span>Endereco</span><span>1 registro</span></div>
-                  <table className="w-full text-xs"><tbody>
-                    <tr className="bg-white">{['Logradouro', 'Numero', 'Complemento', 'Bairro', 'Cidade', 'Estado', 'Sg. pais', 'CEP', 'Inscricao estadual', 'Inscricao municipal'].map((h) => <td key={h} className="border border-zinc-200 px-2 py-1 text-zinc-600">{h}</td>)}</tr>
-                    <tr>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.street} onChange={(e) => updateEditing('street', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.number} onChange={(e) => updateEditing('number', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.complement} onChange={(e) => updateEditing('complement', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.district} onChange={(e) => updateEditing('district', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.city} onChange={(e) => updateEditing('city', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.state} onChange={(e) => updateEditing('state', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" maxLength={2} /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.country} onChange={(e) => updateEditing('country', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.zipCode} onChange={(e) => updateEditing('zipCode', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.stateRegistration} onChange={(e) => updateEditing('stateRegistration', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.municipalRegistration} onChange={(e) => updateEditing('municipalRegistration', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                    </tr>
-                  </tbody></table>
+              <fieldset>
+                <legend>Faturamento</legend>
+                <div className="customer-editor-grid">
+                  <CustomerField label="Inscrição estadual"><input value={editing.stateRegistration} onChange={(event) => updateEditing('stateRegistration', event.target.value)} /></CustomerField>
+                  <CustomerField label="Inscrição municipal"><input value={editing.municipalRegistration} onChange={(event) => updateEditing('municipalRegistration', event.target.value)} /></CustomerField>
+                  <CustomerField label="Prazo de pagamento"><input value={editing.paymentTerm} onChange={(event) => updateEditing('paymentTerm', event.target.value)} /></CustomerField>
                 </div>
-              )}
-
-              {subTab === 'COMUNICACOES (TELEFONES/EMAIL)' && (
-                <div className="border border-t-0 border-zinc-300 p-2">
-                  <div className="flex justify-between bg-zinc-300 px-2 py-1 text-xs"><span>Comunicacoes</span><span>1 registro</span></div>
-                  <table className="w-full text-xs"><tbody>
-                    <tr className="bg-white">{['Principal?', 'Tipo de comunicacao', 'DDD', 'Telefone', 'Ramal', 'Tem whats?', 'E-mail/Conta', 'Excluido?', 'Registrado por', 'Observacao'].map((h) => <td key={h} className="border border-zinc-200 px-2 py-1 text-zinc-600">{h}</td>)}</tr>
-                    <tr>
-                      <td className="border border-zinc-200 px-2 py-1">S</td>
-                      <td className="border border-zinc-200 px-2 py-1">E-mail/Telefone</td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phoneDdd} onChange={(e) => updateEditing('phoneDdd', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phone} onChange={(e) => updateEditing('phone', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.phoneExtension} onChange={(e) => updateEditing('phoneExtension', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.hasWhatsapp} onChange={(e) => updateEditing('hasWhatsapp', e.target.value.toUpperCase())} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1"><input value={editing.contactEmail} onChange={(e) => updateEditing('contactEmail', e.target.value)} className="w-full border-0 bg-transparent" /></td>
-                      <td className="border border-zinc-200 px-2 py-1">N</td>
-                      <td className="border border-zinc-200 px-2 py-1">Sistema</td>
-                      <td className="border border-zinc-200 px-2 py-1" />
-                    </tr>
-                  </tbody></table>
-                </div>
-              )}
-
-              {subTab === 'CONTATOS' && <div className="border border-t-0 border-zinc-300 p-8 text-sm text-zinc-500">Contatos adicionais do cliente.</div>}
+              </fieldset>
+              <CustomerField label="Observações"><textarea rows={2} value={editing.notes} onChange={(event) => updateEditing('notes', event.target.value)} /></CustomerField>
             </div>
-          </div>
+          </section>
         </div>
       )}
     </div>
   )
+}
+
+function CustomerField({ label, children, required = false, className = '' }: { label: string; children: ReactElement<{ id?: string }>; required?: boolean; className?: string }) {
+  const id = useId()
+  return <div className={`customer-editor-field ${className}`}><label htmlFor={id}>{label}{required && <span className="customer-required"> *</span>}</label>{cloneElement(children, { id })}</div>
 }
