@@ -69,7 +69,7 @@ export function LoginPage() {
             <span>Transcavalcante</span>
             <h2>Sistema de<br />gestão</h2>
           </div>
-          <div className="login-brand-mark" aria-hidden="true"><i /><i /><i /></div>
+          <div className="login-truck-photo" role="img" aria-label="Caminhão na estrada" />
         </aside>
 
         <div className="login-body">

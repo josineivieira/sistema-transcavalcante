@@ -151,16 +151,16 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   overflow: hidden;
-  padding: 40px 36px 58px;
+  padding: 30px 36px 260px;
   background: #10233e;
   color: #fff;
 }
 
 .login-identity > img {
-  width: 154px;
-  height: 84px;
+  width: 140px;
+  height: 76px;
   object-fit: contain;
   filter: brightness(0) invert(1);
 }
@@ -168,41 +168,30 @@ button:disabled {
 .login-identity-title {
   position: relative;
   z-index: 1;
-  margin-top: 64px;
+  margin-top: 24px;
 }
 
 .login-identity-title > span {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   color: #b0bfd2;
   font-size: 13px;
 }
 
 .login-identity-title h2 {
   margin: 0;
-  font-size: 40px;
+  font-size: 30px;
   line-height: 1.15;
   letter-spacing: -1.2px;
   font-weight: 600;
 }
 
-.login-brand-mark {
+.login-truck-photo {
   position: absolute;
-  right: -35px;
-  bottom: 0;
-  display: flex;
-  gap: 10px;
-  height: 165px;
-  transform: skewX(-34deg);
-  pointer-events: none;
+  inset: auto 0 0;
+  height: 245px;
+  background: url('/login-truck-bg.png') 38% center / cover no-repeat;
 }
-
-.login-brand-mark i {
-  width: 27px;
-  background: #1b365b;
-}
-
-.login-brand-mark i:last-child { background: #255083; }
 
 .login-body {
   align-self: center;
@@ -321,11 +310,11 @@ button:disabled {
 @media (max-width: 680px) {
   .login-page { padding: 20px; }
   .login-window { grid-template-columns: minmax(0, 1fr); width: 420px; min-height: 0; }
-  .login-identity { padding: 22px 28px; flex-direction: row; align-items: center; gap: 20px; }
+  .login-identity { min-height: 220px; padding: 20px 28px 140px; flex-direction: row; align-items: center; gap: 20px; }
   .login-identity > img { width: 104px; height: 58px; }
   .login-identity-title { margin: 0; }
   .login-identity-title > span { margin: 0; color: #fff; font-size: 14px; }
   .login-identity-title h2 { display: none; }
-  .login-brand-mark { display: none; }
+  .login-truck-photo { height: 120px; background-position: 38% 67%; }
   .login-body { padding: 30px 28px; }
 }
