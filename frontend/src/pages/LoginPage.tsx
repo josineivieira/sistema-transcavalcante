@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Clock3, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-react'
+import { Eye, EyeOff, LockKeyhole, PanelsTopLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -29,7 +29,7 @@ export function LoginPage() {
     const normalizedPassword = password.trim()
 
     if (!normalizedEmail || !normalizedPassword) {
-      setMessage('Informe usuario e senha para continuar.')
+      setMessage('Informe usuário e senha para continuar.')
       return
     }
 
@@ -54,7 +54,7 @@ export function LoginPage() {
       setLoading(false)
       navigate(firstAllowedPath(), { replace: true })
     } catch (error: any) {
-      setMessage(error.response?.data?.detail || 'Nao foi possivel validar o acesso no backend.')
+      setMessage(error.response?.data?.detail || 'Não foi possível validar o acesso. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -62,161 +62,93 @@ export function LoginPage() {
 
   return (
     <main className="login-page">
-      <section className="brand-panel" aria-label="Apresentacao da empresa">
-        <div className="brand-glow brand-glow-one" />
-        <div className="brand-glow brand-glow-two" />
-
-        <div className="brand-content">
-          <img className="brand-logo" src="/logo-trans-cavalcante.png" alt="Logo Trans Cavalcante" />
-
-          <div className="brand-message">
-            <h1>
-              Solucoes que movem.
-              <br />
-              <span>Resultados que permanecem.</span>
-            </h1>
-            <span className="brand-title-line" />
-          </div>
-
-          <div className="brand-benefits">
-            <article className="benefit-card">
-              <div className="benefit-icon">
-                <ShieldCheck size={34} />
-              </div>
-              <strong>Seguranca</strong>
-              <span>Protecao de dados em primeiro lugar.</span>
-            </article>
-
-            <article className="benefit-card">
-              <div className="benefit-icon">
-                <BarChart3 size={34} />
-              </div>
-              <strong>Confiabilidade</strong>
-              <span>Informacoes precisas e sempre disponiveis.</span>
-            </article>
-
-            <article className="benefit-card">
-              <div className="benefit-icon">
-                <Clock3 size={34} />
-              </div>
-              <strong>Performance</strong>
-              <span>Tecnologia para trazer agilidade ao seu dia.</span>
-            </article>
-          </div>
+      <section className="login-window" aria-labelledby="login-title">
+        <div className="login-titlebar">
+          <PanelsTopLeft size={15} aria-hidden="true" />
+          <span>Trans Cavalcante — Acesso ao sistema</span>
         </div>
-      </section>
 
-      <section className="form-panel">
-        <div className="login-card">
-          <div className="mobile-logo-wrapper">
-            <img className="mobile-logo" src="/logo-trans-cavalcante.png" alt="Logo Trans Cavalcante" />
+        <header className="login-brand">
+          <img src="/logo-trans-cavalcante.png" alt="Trans Cavalcante" />
+          <div>
+            <strong>Sistema de Gestão</strong>
+            <span>Transportes e logística</span>
           </div>
+        </header>
 
+        <div className="login-body">
           <header className="login-header">
-            <div className="login-icon">
-              <UserRound size={37} />
-            </div>
-
-            <h2>Bem-vindo(a)!</h2>
-            <p>Acesse sua conta para continuar</p>
-            <span className="header-line" />
+            <h1 id="login-title">Identificação do usuário</h1>
+            <p>Informe suas credenciais para acessar o sistema.</p>
           </header>
 
           <form onSubmit={submit} className="login-form" noValidate>
-            <div className="form-group">
-              <label htmlFor="usuario">Usuario</label>
-
-              <div className="input-wrapper">
-                <span className="input-icon">
-                  <UserRound size={24} />
-                </span>
-
-                <input
-                  id="usuario"
-                  name="usuario"
-                  type="text"
-                  placeholder="Digite seu usuario"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </div>
+            <div className="login-field">
+              <label htmlFor="usuario">Usuário</label>
+              <input
+                id="usuario"
+                name="usuario"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                autoFocus
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
             </div>
 
-            <div className="form-group">
+            <div className="login-field">
               <label htmlFor="senha">Senha</label>
-
-              <div className="input-wrapper">
-                <span className="input-icon">
-                  <Lock size={24} />
-                </span>
-
+              <div className="login-password">
                 <input
                   id="senha"
                   name="senha"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Digite sua senha"
                   autoComplete="current-password"
+                  required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
-
                 <button
-                  className="password-toggle"
+                  className="login-password-toggle"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={showPassword}
                 >
-                  {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </div>
 
-            <div className="form-options">
-              <label className="remember-option">
-                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-                <span className="custom-checkbox">
-                  <ShieldCheck size={13} />
-                </span>
-                <span>Lembrar-me</span>
-              </label>
+            <label className="login-remember">
+              <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+              <span>Lembrar meu acesso</span>
+            </label>
 
+            {message ? <div className="login-message" role="status" aria-live="polite">{message}</div> : null}
+
+            <div className="login-actions">
               <button
-                className="forgot-password"
+                className="login-help"
                 type="button"
-                onClick={() => setMessage('Recuperacao de senha sera integrada ao cadastro de usuarios.')}
+                onClick={() => setMessage('Para recuperar sua senha, entre em contato com o administrador do sistema.')}
               >
                 Esqueci minha senha
               </button>
+              <button className="login-submit" type="submit" disabled={loading}>
+                {loading ? 'Validando...' : 'Entrar'}
+              </button>
             </div>
-
-            <button className="submit-button" type="submit" disabled={loading}>
-              <span>{loading ? 'Validando...' : 'Entrar'}</span>
-              <ArrowRight size={27} />
-            </button>
-
-            {message ? <div className="form-message">{message}</div> : null}
           </form>
-
-          <footer className="login-footer">
-            <div className="login-divider">
-              <span />
-              ou
-              <span />
-            </div>
-
-            <div className="security-message">
-              <ShieldCheck size={36} />
-
-              <div>
-                <strong>Acesso seguro e protegido</strong>
-                <span>Seus dados estao protegidos conosco.</span>
-              </div>
-            </div>
-          </footer>
         </div>
 
-        <p className="login-copyright">© 2024 <strong>Trans Cavalcante.</strong> Todos os direitos reservados.</p>
+        <footer className="login-statusbar">
+          <span><LockKeyhole size={12} aria-hidden="true" /> Acesso restrito</span>
+          <span>Trans Cavalcante</span>
+        </footer>
       </section>
     </main>
   )
