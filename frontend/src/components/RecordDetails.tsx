@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Copy, Download, Pencil, Printer, Share2, X } from 'lucide-react'
 import type { VehicleAttachment } from '../services/localStore'
+import { renderRecordPrint } from '../services/recordPrint'
 import { recordText, type DetailSection } from '../services/recordDetails'
 
 export function RecordDetails({ title, name, sections, onClose, onEdit, attachments = [] }: { title: string; name: string; sections: DetailSection[]; onClose: () => void; onEdit?: () => void; attachments?: VehicleAttachment[] }) {
@@ -48,7 +49,7 @@ export function RecordDetails({ title, name, sections, onClose, onEdit, attachme
     } catch { setMessage('Não foi possível baixar o documento. Tente novamente.') }
   }
 
-  function print() {
+  async function print() {
     const frame = document.createElement('iframe')
     frame.style.cssText = 'position:fixed;width:0;height:0;border:0;bottom:0;right:0'
     frame.title = 'Impressão da ficha'
@@ -56,19 +57,8 @@ export function RecordDetails({ title, name, sections, onClose, onEdit, attachme
     const doc = frame.contentDocument
     const win = frame.contentWindow
     if (!doc || !win) { frame.remove(); return }
-    doc.open(); doc.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Ficha cadastral</title></head><body></body></html>'); doc.close()
-    doc.title = `${title} - ${name}`
-    const style = doc.createElement('style')
-    style.textContent = '@page{margin:18mm}body{font:12px Arial,sans-serif;color:#172a40}h1{font-size:21px;margin:0 0 6px}h2{font-size:14px;border-bottom:1px solid #ccd3dc;padding-bottom:6px;margin-top:22px}p{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0}section{break-inside:avoid}small{color:#566577}'
-    doc.head.appendChild(style)
-    const brand = doc.createElement('small'); brand.textContent = 'Transcavalcante'; doc.body.appendChild(brand)
-    const heading = doc.createElement('h1'); heading.textContent = title; doc.body.appendChild(heading)
-    const subtitle = doc.createElement('p'); subtitle.textContent = name; doc.body.appendChild(subtitle)
-    selectedSections.forEach((item) => {
-      const section = doc.createElement('section'); const h2 = doc.createElement('h2'); h2.textContent = item.title; section.appendChild(h2)
-      item.fields.forEach(([label, value]) => { const p = doc.createElement('p'); const strong = doc.createElement('strong'); strong.textContent = label + ': '; p.append(strong, doc.createTextNode(value)); section.appendChild(p) })
-      doc.body.appendChild(section)
-    })
+    const logo = renderRecordPrint(doc, title, name, selectedSections, new URL('/transcavalcante-logo-transparent.png', window.location.origin).href)
+    try { await logo.decode() } catch { logo.style.visibility = 'hidden' }
     win.addEventListener('afterprint', () => frame.remove(), { once: true })
     win.focus(); win.print()
     window.setTimeout(() => frame.remove(), 120000)
@@ -82,7 +72,7 @@ export function RecordDetails({ title, name, sections, onClose, onEdit, attachme
           {onEdit && <button onClick={onEdit}><Pencil size={15} /> Editar</button>}
           <button onClick={() => void share(true)} disabled={!selected.length}><Copy size={15} /> Copiar ficha</button>
           <button onClick={() => void share()} disabled={!selected.length}><Share2 size={15} /> Compartilhar</button>
-          <button onClick={print} disabled={!selected.length}><Printer size={15} /> Imprimir / PDF</button>
+          <button onClick={() => void print()} disabled={!selected.length}><Printer size={15} /> Imprimir / PDF</button>
           <button ref={closeButton} onClick={onClose} aria-label="Fechar visualização"><X size={18} /></button>
         </div>
       </header>
