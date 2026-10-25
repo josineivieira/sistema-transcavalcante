@@ -3,6 +3,7 @@ import { Pencil, Save, Search, Trash2, X } from 'lucide-react'
 import { nextId, type Customer } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { customerDocumentError, formatCustomerDocument } from '../services/customerDocument'
 import { LoadingRow } from '../components/LoadingState'
 
 const emptyCustomer: Customer = {
@@ -95,6 +96,7 @@ export function CustomersPage() {
   const canEditPage = canEdit('customers')
   const [editing, setEditing] = useState<Customer | null>(null)
   const [query, setQuery] = useState('')
+  const [documentError, setDocumentError] = useState('')
 
   const rows = useMemo(() => {
     const term = query.toLowerCase()
@@ -111,9 +113,19 @@ export function CustomersPage() {
     ].join(' ').toLowerCase().includes(term))
   }, [customers, query])
 
+  function openCustomer(customer?: Customer) {
+    setDocumentError('')
+    setEditing(customerForEdit(customer))
+  }
+
   function updateEditing(field: keyof Customer, value: string) {
     if (!editing) return
     const next = { ...editing, [field]: value }
+    if (field === 'document') {
+      next.document = formatCustomerDocument(value, editing.participantType || 'Juridica')
+      setDocumentError('')
+    }
+    if (field === 'participantType') setDocumentError(customerDocumentError(editing.document, value))
     if (field === 'name') {
       const previousAutoShortName = automaticShortName(editing.name)
       next.tradeName = next.tradeName || value
@@ -135,8 +147,15 @@ export function CustomersPage() {
       window.alert('Informe CPF/CNPJ e razao social/nome.')
       return
     }
+    const error = customerDocumentError(editing.document, editing.participantType || 'Juridica')
+    if (error) {
+      setDocumentError(error)
+      document.querySelector<HTMLInputElement>('[data-customer-document]')?.focus()
+      return
+    }
     const normalized = {
       ...editing,
+      document: formatCustomerDocument(editing.document, editing.participantType || 'Juridica'),
       tradeName: editing.tradeName || editing.name,
       shortName: editing.shortName || automaticShortName(editing.name),
       contactEmail: editing.contactEmail || editing.emailFiscal,
@@ -163,7 +182,7 @@ export function CustomersPage() {
       <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
         <h2 className="text-lg font-normal text-red-600">Consulta clientes</h2>
         <button
-          onClick={() => canEditPage ? setEditing(customerForEdit()) : denyNoPrivilege()}
+          onClick={() => canEditPage ? openCustomer() : denyNoPrivilege()}
           className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white"
           title="Novo cliente"
         >
@@ -218,7 +237,7 @@ export function CustomersPage() {
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{customer.stateRegistration || '-'}</td>
                 <td className="border-b border-r border-zinc-200 px-2 py-2">{formatDate(customer.registrationDate)}</td>
                 <td className="border-b border-zinc-200 px-2 py-1">
-                  <button onClick={() => canEditPage ? setEditing(customerForEdit(customer)) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
+                  <button onClick={() => canEditPage ? openCustomer(customer) : denyNoPrivilege()} className="border border-zinc-300 bg-white px-2 py-1" title="Editar">
                     <Pencil size={14} />
                   </button>
                 </td>
@@ -254,8 +273,8 @@ export function CustomersPage() {
                       <option value="Juridica">Pessoa jurídica</option><option value="Fisica">Pessoa física</option><option value="Exterior">Exterior</option>
                     </select>
                   </CustomerField>
-                  <CustomerField label={editing.participantType === 'Exterior' ? 'Documento' : 'CPF/CNPJ'} required>
-                    <input value={editing.document} required onChange={(event) => updateEditing('document', event.target.value)} />
+                  <CustomerField label={editing.participantType === 'Exterior' ? 'Documento' : 'CPF/CNPJ'} required error={documentError}>
+                    <input data-customer-document value={editing.document} required maxLength={editing.participantType === 'Exterior' ? 30 : editing.participantType === 'Fisica' ? 14 : 18} inputMode={editing.participantType === 'Fisica' ? 'numeric' : 'text'} autoCapitalize="characters" spellCheck={false} aria-invalid={Boolean(documentError)} aria-describedby={documentError ? 'customer-document-error' : undefined} onBlur={() => setDocumentError(customerDocumentError(editing.document, editing.participantType || 'Juridica'))} onChange={(event) => updateEditing('document', event.target.value)} />
                   </CustomerField>
                   <CustomerField label="Situação">
                     <select value={editing.status} onChange={(event) => updateEditing('status', event.target.value)}><option>Ativo</option><option>Inativo</option></select>
@@ -318,7 +337,7 @@ export function CustomersPage() {
   )
 }
 
-function CustomerField({ label, children, required = false, className = '' }: { label: string; children: ReactElement<{ id?: string }>; required?: boolean; className?: string }) {
+function CustomerField({ label, children, required = false, className = '', error = '' }: { label: string; children: ReactElement<{ id?: string }>; required?: boolean; className?: string; error?: string }) {
   const id = useId()
-  return <div className={`customer-editor-field ${className}`}><label htmlFor={id}>{label}{required && <span className="customer-required"> *</span>}</label>{cloneElement(children, { id })}</div>
+  return <div className={`customer-editor-field ${className}`}><label htmlFor={id}>{label}{required && <span className="customer-required"> *</span>}</label>{cloneElement(children, { id })}{error && <p id="customer-document-error" role="alert" className="mt-1 text-xs text-red-700">{error}</p>}</div>
 }

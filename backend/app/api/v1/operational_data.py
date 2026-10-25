@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.customer_document import valid_customer_document
 from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
 from app.database.session import get_db
 from app.models.operational_data import OperationalSnapshot
@@ -195,6 +196,16 @@ def _prepare_price_list_record(record: dict, price_id: str) -> dict:
 
 def _prepare_data_for_storage(incoming: dict, current: dict | None = None) -> dict:
     data = deepcopy(incoming)
+    current_customers = {str(item.get("id")): item for item in (current or {}).get("customers", []) if item.get("id")}
+    for customer in data.get("customers", []):
+        document = str(customer.get("document") or "")
+        participant_type = str(customer.get("participantType") or ("Fisica" if len(document.replace(".", "").replace("-", "")) == 11 else "Juridica"))
+        existing = current_customers.get(str(customer.get("id")))
+        # Do not block unrelated updates because a legacy customer has an invalid document.
+        if existing and existing.get("document") == customer.get("document") and existing.get("participantType") == customer.get("participantType"):
+            continue
+        if not valid_customer_document(document, participant_type):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Documento do cliente inválido. Confira o CPF/CNPJ e o tipo de pessoa.")
     current_deleted_freights = set((current or {}).get("deletedFreightIds") or [])
     incoming_deleted_freights = set(data.get("deletedFreightIds") or [])
     data["deletedFreightIds"] = sorted(current_deleted_freights | incoming_deleted_freights)
