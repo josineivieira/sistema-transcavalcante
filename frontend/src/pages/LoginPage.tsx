@@ -1,4 +1,4 @@
-import { Eye, EyeOff, PanelsTopLeft } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -63,21 +63,18 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-window" aria-labelledby="login-title">
-        <div className="login-titlebar">
-          <PanelsTopLeft size={15} aria-hidden="true" />
-          <span>Transcavalcante</span>
-        </div>
-
-        <header className="login-brand">
-          <img src="/logo-trans-cavalcante.png" alt="Transcavalcante" />
-          <div>
-            <strong>Sistema de Gestão</strong>
+        <aside className="login-identity" aria-label="Transcavalcante">
+          <img src="/transcavalcante-logo-transparent.png" alt="Transcavalcante" />
+          <div className="login-identity-title">
+            <span>Transcavalcante</span>
+            <h2>Sistema de<br />gestão</h2>
           </div>
-        </header>
+          <div className="login-brand-mark" aria-hidden="true"><i /><i /><i /></div>
+        </aside>
 
         <div className="login-body">
           <header className="login-header">
-            <h1 id="login-title">Entrar no sistema</h1>
+            <h1 id="login-title">Login</h1>
           </header>
 
           <form onSubmit={submit} className="login-form" aria-busy={loading} noValidate>
@@ -137,7 +134,8 @@ export function LoginPage() {
                 Esqueci minha senha
               </button>
               <button className="login-submit" type="submit" disabled={loading}>
-                {loading ? 'Entrando...' : 'Entrar'}
+                <span>{loading ? 'Entrando...' : 'Entrar'}</span>
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
             </div>
           </form>
