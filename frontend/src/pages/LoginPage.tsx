@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LockKeyhole, PanelsTopLeft } from 'lucide-react'
+import { Eye, EyeOff, PanelsTopLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -34,7 +34,7 @@ export function LoginPage() {
     }
 
     setLoading(true)
-    setMessage('Validando acesso...')
+    setMessage('')
 
     try {
       const response = await api.post<{
@@ -65,24 +65,22 @@ export function LoginPage() {
       <section className="login-window" aria-labelledby="login-title">
         <div className="login-titlebar">
           <PanelsTopLeft size={15} aria-hidden="true" />
-          <span>Trans Cavalcante — Acesso ao sistema</span>
+          <span>Transcavalcante</span>
         </div>
 
         <header className="login-brand">
-          <img src="/logo-trans-cavalcante.png" alt="Trans Cavalcante" />
+          <img src="/logo-trans-cavalcante.png" alt="Transcavalcante" />
           <div>
             <strong>Sistema de Gestão</strong>
-            <span>Transportes e logística</span>
           </div>
         </header>
 
         <div className="login-body">
           <header className="login-header">
-            <h1 id="login-title">Identificação do usuário</h1>
-            <p>Informe suas credenciais para acessar o sistema.</p>
+            <h1 id="login-title">Entrar no sistema</h1>
           </header>
 
-          <form onSubmit={submit} className="login-form" noValidate>
+          <form onSubmit={submit} className="login-form" aria-busy={loading} noValidate>
             <div className="login-field">
               <label htmlFor="usuario">Usuário</label>
               <input
@@ -139,16 +137,12 @@ export function LoginPage() {
                 Esqueci minha senha
               </button>
               <button className="login-submit" type="submit" disabled={loading}>
-                {loading ? 'Validando...' : 'Entrar'}
+                {loading ? 'Entrando...' : 'Entrar'}
               </button>
             </div>
           </form>
         </div>
 
-        <footer className="login-statusbar">
-          <span><LockKeyhole size={12} aria-hidden="true" /> Acesso restrito</span>
-          <span>Trans Cavalcante</span>
-        </footer>
       </section>
     </main>
   )
