@@ -367,3 +367,12 @@ button:disabled {
   .customer-editor-wide { grid-column: auto; }
   .customer-editor-header, .customer-editor-body { padding: 14px; }
 }
+
+.vehicle-editor { width: 1080px; }
+.vehicle-identity { padding: 16px 18px; border-bottom: 1px solid #d6dce3; background: #fff; }
+@media (max-width: 680px) { .vehicle-identity { padding: 14px; } }
+
+@media (max-width: 680px) {
+  .vehicle-editor { display: block; overflow-y: auto; }
+  .vehicle-editor > .customer-editor-body { overflow: visible; }
+}

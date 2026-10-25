@@ -138,6 +138,18 @@ export function useLocalData() {
     })
   }
 
+  async function saveVehicles(vehicles: Vehicle[]) {
+    const normalized = normalizeData({ ...data, vehicles })
+    try {
+      await api.put('/operational-data', { data: { ...normalized, freights: [], deletedFreightIds: [...deletedFreightIdsRef.current] } })
+      setData((current) => ({ ...current, vehicles: normalized.vehicles }))
+      setError('')
+    } catch (reason) {
+      setError('Nao foi possivel salvar os veiculos.')
+      throw reason
+    }
+  }
+
   function setFreights(freights: Freight[]) {
     const normalized = normalizeData({ ...data, freights })
     const currentIds = new Set(data.freights.map((freight) => freight.id))
@@ -246,7 +258,7 @@ export function useLocalData() {
     error,
     setCustomers: (customers: Customer[]) => update({ ...data, customers }),
     setDrivers: (drivers: Driver[]) => update({ ...data, drivers }),
-    setVehicles: (vehicles: Vehicle[]) => update({ ...data, vehicles }),
+    setVehicles: saveVehicles,
     setContainers: (containers: ContainerRecord[]) => update({ ...data, containers }),
     setFreights,
     loadFreights,

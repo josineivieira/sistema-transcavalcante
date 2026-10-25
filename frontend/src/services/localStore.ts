@@ -117,6 +117,27 @@ export type Driver = {
   status: string
 }
 
+export type VehicleAttachment = {
+  id: string
+  name: string
+  size: number
+  kind: string
+  uploadedAt: string
+  dataUrl: string
+  hash: string
+}
+
+export type VehicleLicensing = {
+  id: string
+  year: string
+  issueDate: string
+  dueDate: string
+  paidDate: string
+  amount: string
+  status: string
+  attachmentId?: string
+}
+
 export type Vehicle = {
   id: string
   vehicleType: 'Cavalo' | 'Carreta'
@@ -148,6 +169,29 @@ export type Vehicle = {
   renavam?: string
   tare?: string
   capacityM3?: string
+  fuel?: string
+  crlvCapacity?: string
+  grossWeight?: string
+  cmt?: string
+  engineNumber?: string
+  crvNumber?: string
+  licensingYear?: string
+  crlvIssueDate?: string
+  attachments?: VehicleAttachment[]
+  licensingRecords?: VehicleLicensing[]
+  insurer?: string
+  insurancePolicy?: string
+  insuranceStart?: string
+  insuranceEnd?: string
+  insuranceValue?: string
+  insuranceContact?: string
+  purchaseDate?: string
+  purchaseValue?: string
+  seller?: string
+  sellerDocument?: string
+  purchaseInvoice?: string
+  purchasePayment?: string
+  notes?: string
   capacityKg?: string
   trackerUsed?: boolean
   trackerBrand?: string
