@@ -27,7 +27,7 @@ from app.database.session import get_db
 from app.main import app
 from app.models.operational_data import OperationalSnapshot
 from app.models.nfse import NfseCertificate, NfseEmission, NfseSequence
-from app.services.fiscal.certificates.a1 import CertificateError, cipher, load_a1
+from app.services.fiscal.certificates.a1 import CertificateError, certificate_cnpj, cipher, load_a1
 from app.services.fiscal.nfse import operational_service
 from app.services.fiscal.nfse.national_client import NationalClient, NationalError, encode_xml, parse_authorized, decode_xml, endpoint
 from app.services.fiscal.nfse.xml_builder import NS, NationalSigner, build_dps, build_cancel, node, sign_xml, validate_xml
@@ -281,3 +281,25 @@ def test_substitution_dps_has_official_reference(issuer, customer, a1):
     root = build_dps(issuer, customer, 100, "Servico de teste", 1, 2, "2026-10-25", substitution={"key": KEY, "code": "99", "reason": "Correcao de dados para homologacao"})
     signed = sign_xml(root, a1[0], a1[1])
     assert KEY in signed
+
+
+@pytest.mark.parametrize("serial,legacy,expected", [
+    (CNPJ, None, CNPJ),
+    (CNPJ, CNPJ, CNPJ),
+    ("52998224725", None, None),
+    (CNPJ, "99999999999999", None),
+])
+def test_cnpj_new_subject_serial_number(a1, serial, legacy, expected):
+    key, _, _ = a1
+    now = datetime.now(timezone.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "TESTE"), x509.NameAttribute(NameOID.SERIAL_NUMBER, serial)])
+    builder = x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+    if legacy:
+        builder = builder.add_extension(x509.SubjectAlternativeName([x509.OtherName(ObjectIdentifier("2.16.76.1.3.3"), b"\x0c\x0e" + legacy.encode())]), critical=False)
+    cert = builder.sign(key, hashes.SHA256())
+    if expected:
+        assert certificate_cnpj(cert) == expected
+        raw = pkcs12.serialize_key_and_certificates(b"test", key, cert, None, serialization.BestAvailableEncryption(b"test-password"))
+        assert load_a1(raw, "test-password", CNPJ)[1].serial_number == cert.serial_number
+    else:
+        with pytest.raises(CertificateError): certificate_cnpj(cert)
