@@ -465,11 +465,26 @@ def get_operational_data(
 @router.put("")
 def save_operational_data(
     payload: OperationalDataPayload,
-    _: str = Depends(_require_operational_auth),
+    email: str = Depends(_require_operational_auth),
     db: Session = Depends(get_db),
 ):
     snapshot = _get_or_create_snapshot(db)
-    snapshot.data = _prepare_data_for_storage(payload.data, snapshot.data)
+    user = _find_user(snapshot.data, email)
+    if not user or user.get("status") != "Ativo":
+        raise HTTPException(403, "Usuario sem acesso.")
+    modules = {
+        "customers": "customers", "drivers": "drivers", "vehicles": "vehicles",
+        "containers": "containers", "freights": "freights", "deletedFreightIds": "freights",
+        "closings": "closings", "fiscalDocuments": "fiscalDocuments", "receivables": "finance",
+        "priceLists": "priceLists", "purchaseRequests": "purchaseRequests",
+        "payrollProfiles": "payroll", "payrollClosings": "payroll", "users": "users",
+        "issuerSettings": "settings", "settingsSavedAt": "settings",
+    }
+    merged = deepcopy(snapshot.data)
+    for key, module in modules.items():
+        if key in payload.data and (user.get("role") == "Administrador" or (user.get("permissions") or {}).get(module) == "edit"):
+            merged[key] = payload.data[key]
+    snapshot.data = _prepare_data_for_storage(merged, snapshot.data)
 
     db.commit()
     db.refresh(snapshot)

@@ -1,3 +1,4 @@
+import { FiscalCertificateSettings } from '../components/FiscalCertificateSettings'
 import { Building2, FileKey2, RotateCcw, Save, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { defaultIssuerSettings, type IssuerSettings } from '../services/fiscalSettings'
@@ -20,6 +21,8 @@ export function SettingsPage() {
   const canEditPage = canEdit('settings')
   const [issuer, setIssuer] = useState<IssuerSettings>(issuerSettings)
   const [savedAt, setSavedAt] = useState(settingsSavedAt)
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
 
   useEffect(() => {
     setIssuer(issuerSettings)
@@ -34,15 +37,16 @@ export function SettingsPage() {
     setIssuer((current) => ({ ...current, ...patch }))
   }
 
-  function save() {
+  async function save() {
     if (!canEditPage) {
       denyNoPrivilege()
       return
     }
     const now = new Date().toLocaleString('pt-BR')
-    setIssuerSettings(issuer, now)
-    setSavedAt(now)
-    window.alert('Configuracoes fiscais salvas no banco de dados.')
+    setSaving(true); setSaveMessage('')
+    try { await setIssuerSettings(issuer, now); setSavedAt(now); setSaveMessage('Configurações salvas no backend.') }
+    catch { setSaveMessage('Não foi possível salvar as configurações. Tente novamente.') }
+    finally { setSaving(false) }
   }
 
   function restore() {
@@ -56,12 +60,13 @@ export function SettingsPage() {
   return (
     <div className="space-y-4">
       {error && <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+      {saveMessage && <p role="status" className="border border-zinc-300 bg-white p-3 text-xs">{saveMessage}</p>}
       {loading && <div className="border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-600">Carregando configurações...</div>}
       <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
         <h2 className="text-lg font-normal text-red-600">Configuracoes</h2>
         <div className="flex gap-2">
           <button onClick={restore} className="inline-flex h-8 items-center gap-2 border border-zinc-400 bg-white px-3 text-xs text-zinc-700"><RotateCcw size={15} />Restaurar</button>
-          <button onClick={save} className="inline-flex h-8 items-center gap-2 border border-[#003469] bg-[#004080] px-3 text-xs font-medium text-white"><Save size={15} />Salvar</button>
+          <button onClick={save} disabled={saving} className="inline-flex h-8 items-center gap-2 border border-[#003469] bg-[#004080] px-3 text-xs font-medium text-white"><Save size={15} />Salvar</button>
         </div>
       </div>
 
@@ -100,8 +105,8 @@ export function SettingsPage() {
           <span className="ml-auto text-xs text-zinc-500">Ultima alteracao: {savedAt}</span>
         </div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
-          <label className="field">Ambiente<select value={issuer.nfseEnvironment} onChange={(event) => updateIssuer({ nfseEnvironment: event.target.value })}><option>Homologacao</option><option>Producao bloqueada</option></select></label>
-          <label className="field">Provider/API<select value={issuer.nfseProvider} onChange={(event) => updateIssuer({ nfseProvider: event.target.value })}><option>Mock</option><option>NFS-e Nacional</option><option>Provider contratado</option><option>Prefeitura Manaus</option></select></label>
+          <label className="field">Ambiente<select value={issuer.nfseEnvironment} onChange={(event) => updateIssuer({ nfseEnvironment: event.target.value })}><option>Homologacao</option></select></label>
+          <label className="field">Provider/API<select value={issuer.nfseProvider} onChange={(event) => updateIssuer({ nfseProvider: event.target.value })}><option>Mock</option><option>NFS-e Nacional</option></select></label>
           <label className="field">Serie NFS-e<input value={issuer.nfseSeries} onChange={(event) => updateIssuer({ nfseSeries: event.target.value })} /></label>
           <label className="field">Proxima DPS<input value={issuer.nextDpsNumber} onChange={(event) => updateIssuer({ nextDpsNumber: event.target.value })} /></label>
           <label className="field">Item nacional servico<input value={issuer.nationalServiceCode} onChange={(event) => updateIssuer({ nationalServiceCode: event.target.value })} /></label>
@@ -115,13 +120,33 @@ export function SettingsPage() {
           <label className="field">IRRF %<input value={issuer.irrfRate} onChange={(event) => updateIssuer({ irrfRate: event.target.value })} /></label>
           <label className="field">CSLL %<input value={issuer.csllRate} onChange={(event) => updateIssuer({ csllRate: event.target.value })} /></label>
           <label className="field md:col-span-2">Descricao padrao do servico<input value={issuer.defaultServiceDescription} onChange={(event) => updateIssuer({ defaultServiceDescription: event.target.value })} /></label>
+          <label className="field">Situação no Simples<select value={issuer.nationalSimpleRegime || (issuer.simplesNacional === 'Sim' ? '3' : '1')} onChange={(event) => updateIssuer({ nationalSimpleRegime: event.target.value })}><option value="1">1 - Não optante</option><option value="2">2 - MEI</option><option value="3">3 - ME/EPP</option></select></label>
+          <label className="field">Regime de apuração SN<select value={issuer.simpleTaxRegime || '1'} onChange={(event) => updateIssuer({ simpleTaxRegime: event.target.value })}><option value="1">1 - Tributos e ISS pelo SN</option><option value="2">2 - ISS fora do SN</option><option value="3">3 - Tributos fora do SN</option></select></label>
+          <label className="field">Regime especial (código)<input value={issuer.specialTaxRegime || '0'} onChange={(event) => updateIssuer({ specialTaxRegime: event.target.value })} /></label>
+          <label className="field">Tributação ISSQN<select value={issuer.issTaxation || '1'} onChange={(event) => updateIssuer({ issTaxation: event.target.value })}><option value="1">1 - Operação tributável</option></select></label>
+          <label className="field">Enviar alíquota ISS na DPS<select value={issuer.sendIssRate || 'Nao'} onChange={(event) => updateIssuer({ sendIssRate: event.target.value })}><option>Nao</option><option>Sim</option></select></label>
+          <label className="field">Enviar IM do prestador<select value={issuer.sendMunicipalRegistration || 'Nao'} onChange={(event) => updateIssuer({ sendMunicipalRegistration: event.target.value })}><option>Nao</option><option>Sim</option></select></label>
+          <label className="field">Total tributos SN % (se aplicável)<input value={issuer.totalTaxSimplesRate || ''} onChange={(event) => updateIssuer({ totalTaxSimplesRate: event.target.value })} /></label>
+          <label className="field">Informar tributos federais na DPS<select value={issuer.sendFederalTaxes || 'Nao'} onChange={(event) => updateIssuer({ sendFederalTaxes: event.target.value })}><option>Nao</option><option>Sim</option></select></label>
+          {issuer.sendFederalTaxes === 'Sim' && <>
+            <label className="field">CST PIS/COFINS<input maxLength={2} value={issuer.pisCofinsCst || ''} onChange={(event) => updateIssuer({ pisCofinsCst: event.target.value })} /></label>
+            <label className="field">Tipo de retenção PIS/COFINS (código)<input value={issuer.pisCofinsRetention || ''} onChange={(event) => updateIssuer({ pisCofinsRetention: event.target.value })} /></label>
+            <label className="field">CP retida (valor R$)<input value={issuer.withheldSocialSecurityValue || ''} onChange={(event) => updateIssuer({ withheldSocialSecurityValue: event.target.value })} /></label>
+          </>}
+          <label className="field">Informar IBS/CBS<select value={issuer.ibsCbsEnabled || 'Nao'} onChange={(event) => updateIssuer({ ibsCbsEnabled: event.target.value })}><option>Nao</option><option>Sim</option></select></label>
+          {issuer.ibsCbsEnabled === 'Sim' && <>
+            <label className="field">CST IBS/CBS<input maxLength={3} value={issuer.ibsCbsCst || ''} onChange={(event) => updateIssuer({ ibsCbsCst: event.target.value })} /></label>
+            <label className="field">cClassTrib (6 dígitos)<input maxLength={6} value={issuer.ibsCbsClass || ''} onChange={(event) => updateIssuer({ ibsCbsClass: event.target.value })} /></label>
+            <label className="field">cIndOp (6 dígitos)<input maxLength={6} value={issuer.ibsCbsOperation || ''} onChange={(event) => updateIssuer({ ibsCbsOperation: event.target.value })} /></label>
+            <label className="field">Uso / consumo pessoal<select value={issuer.ibsCbsFinal || '0'} onChange={(event) => updateIssuer({ ibsCbsFinal: event.target.value })}><option value="0">Não</option><option value="1">Sim</option></select></label>
+          </>}
+          <label className="flex items-center gap-2 text-xs md:col-span-4"><input type="checkbox" checked={issuer.nfseDataConfirmed === 'Sim'} onChange={(event) => updateIssuer({ nfseDataConfirmed: event.target.checked ? 'Sim' : 'Nao' })} /> Conferi os códigos de serviço, o regime e a tributação com o responsável fiscal.</label>
+          <p className="text-xs text-zinc-500 md:col-span-4">O cTribNac exige 6 dígitos. O item da lista de serviços (ex.: 16.02) não substitui esse código. A seleção dos códigos e da tributação depende do enquadramento da empresa.</p>
           <label className="field md:col-span-2">Endpoint/API<input value={issuer.nfseEndpoint} onChange={(event) => updateIssuer({ nfseEndpoint: event.target.value })} placeholder="URL do provider, prefeitura ou API nacional" /></label>
-          <label className="field md:col-span-2">Certificado A1<input value={issuer.certificateName} onChange={(event) => updateIssuer({ certificateName: event.target.value })} /></label>
-          <label className="field">Vencimento certificado<input value={issuer.certificateExpiration} onChange={(event) => updateIssuer({ certificateExpiration: event.target.value })} type="date" /></label>
-          <label className="field">Liberar producao<select value={issuer.productionReady} onChange={(event) => updateIssuer({ productionReady: event.target.value })}><option>Nao</option><option>Sim</option></select></label>
         </div>
       </section>
 
+      <FiscalCertificateSettings canEdit={canEditPage} dirty={JSON.stringify(issuer) !== JSON.stringify(issuerSettings)} issuerDocument={issuerSettings.document} />
       <section className="border border-zinc-300 bg-white">
         <div className="flex items-center gap-2 border-b border-zinc-300 bg-[#f7f9fc] px-4 py-2.5">
           <ShieldCheck size={18} className="text-[#004080]" />

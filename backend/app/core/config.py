@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     enable_mdfe: bool = False
     allow_mock_in_production: bool = False
     nfse_base_url: str = ""
+    nfse_signature_algorithm: Literal["rsa-sha1", "rsa-sha256"] = "rsa-sha1"
     cte_authorization_url: str = ""
     cte_status_url: str = ""
     cte_event_url: str = ""

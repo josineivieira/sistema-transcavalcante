@@ -36,6 +36,23 @@ export type IssuerSettings = {
   certificateName: string
   certificateExpiration: string
   productionReady: string
+  sendFederalTaxes?: string
+  pisCofinsCst?: string
+  pisCofinsRetention?: string
+  withheldSocialSecurityValue?: string
+  nfseDataConfirmed?: string
+  nationalSimpleRegime?: string
+  simpleTaxRegime?: string
+  specialTaxRegime?: string
+  issTaxation?: string
+  sendIssRate?: string
+  sendMunicipalRegistration?: string
+  totalTaxSimplesRate?: string
+  ibsCbsEnabled?: string
+  ibsCbsCst?: string
+  ibsCbsClass?: string
+  ibsCbsOperation?: string
+  ibsCbsFinal?: string
 }
 
 export const defaultIssuerSettings: IssuerSettings = {
@@ -69,8 +86,8 @@ export const defaultIssuerSettings: IssuerSettings = {
   irrfRate: '0',
   csllRate: '0',
   nfseEnvironment: 'Homologacao',
-  nfseProvider: 'Mock',
-  nfseEndpoint: '',
+  nfseProvider: 'NFS-e Nacional',
+  nfseEndpoint: 'https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional',
   nfseSeries: '1',
   nextDpsNumber: '1',
   certificateName: 'Nao instalado',

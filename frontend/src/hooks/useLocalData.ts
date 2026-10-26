@@ -138,6 +138,13 @@ export function useLocalData() {
     })
   }
 
+  async function saveIssuerSettings(issuerSettings: IssuerSettings, settingsSavedAt = new Date().toLocaleString('pt-BR')) {
+    const normalized = normalizeData({ ...data, issuerSettings, settingsSavedAt })
+    await api.put('/operational-data', { data: { ...normalized, freights: [], deletedFreightIds: [...deletedFreightIdsRef.current] } })
+    setData((current) => ({ ...current, issuerSettings: normalized.issuerSettings, settingsSavedAt }))
+    setError('')
+  }
+
   async function saveVehicles(vehicles: Vehicle[]) {
     const normalized = normalizeData({ ...data, vehicles })
     try {
@@ -274,7 +281,7 @@ export function useLocalData() {
     setPayrollProfiles: (payrollProfiles: PayrollProfile[]) => update({ ...data, payrollProfiles }),
     setPayrollClosings: (payrollClosings: PayrollClosing[]) => update({ ...data, payrollClosings }),
     setUsers: (users: SystemUser[]) => update({ ...data, users }),
-    setIssuerSettings: (issuerSettings: IssuerSettings, settingsSavedAt = data.settingsSavedAt) => update({ ...data, issuerSettings, settingsSavedAt }),
+    setIssuerSettings: saveIssuerSettings,
     update,
   }
 }

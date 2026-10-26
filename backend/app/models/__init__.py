@@ -6,3 +6,5 @@ from app.models.closing import Closing, ClosingItem
 from app.models.fiscal_document import FiscalDocument
 from app.models.audit_log import AuditLog
 from app.models.operational_data import OperationalSnapshot
+
+from app.models.nfse import NfseCertificate, NfseSequence, NfseEmission

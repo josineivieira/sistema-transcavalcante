@@ -320,6 +320,7 @@ export function CustomersPage() {
                   <CustomerField label="Complemento"><input value={editing.complement} onChange={(event) => updateEditing('complement', event.target.value.toUpperCase())} /></CustomerField>
                   <CustomerField label="Bairro"><input value={editing.district} onChange={(event) => updateEditing('district', event.target.value.toUpperCase())} /></CustomerField>
                   <CustomerField label="Cidade"><input value={editing.city} onChange={(event) => updateEditing('city', event.target.value.toUpperCase())} /></CustomerField>
+                  <CustomerField label="Código IBGE do município"><input maxLength={7} inputMode="numeric" value={editing.cityCode} onChange={(event) => updateEditing('cityCode', event.target.value.replace(/\D/g, '').slice(0, 7))} /></CustomerField>
                   <CustomerField label="UF"><input maxLength={2} value={editing.state} onChange={(event) => updateEditing('state', event.target.value.toUpperCase())} /></CustomerField>
                   <CustomerField label="País"><input maxLength={2} value={editing.country} onChange={(event) => updateEditing('country', event.target.value.toUpperCase())} /></CustomerField>
                 </div>

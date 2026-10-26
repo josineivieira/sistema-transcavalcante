@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { formatMoney, nextId, type Freight } from '../services/localStore'
+import { formatMoney, type Freight, type FiscalDocument } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege } from '../services/authSession'
 import { LoadingRow } from '../components/LoadingState'
@@ -38,7 +38,7 @@ function freightInvoiceLabel(freight: Freight) {
 
 export function FiscalDocumentsPage() {
   const data = useLocalData()
-  const { customers, closings, freights, fiscalDocuments } = data
+  const { customers, closings, freights, fiscalDocuments: legacyDocuments } = data
   const canEditPage = canEdit('fiscalDocuments')
   const issuer = data.issuerSettings
   const [showPreview, setShowPreview] = useState(false)
@@ -51,13 +51,62 @@ export function FiscalDocumentsPage() {
   const [viewingFreightsLoading, setViewingFreightsLoading] = useState(false)
   const [savingLabel, setSavingLabel] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [nationalDocuments, setNationalDocuments] = useState<FiscalDocument[]>([])
+  const [nfseError, setNfseError] = useState('')
+  const [competence, setCompetence] = useState(new Date().toLocaleDateString('en-CA'))
+  const [cancelTarget, setCancelTarget] = useState<FiscalDocument | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelCode, setCancelCode] = useState('1')
+  const [substituteId, setSubstituteId] = useState('')
+  const [substitutionReason, setSubstitutionReason] = useState('')
+  const [substitutionCode, setSubstitutionCode] = useState('99')
+  const fiscalDocuments = [...nationalDocuments, ...legacyDocuments.filter((document) => document.source !== 'national')]
+  function upsertNational(document: FiscalDocument) {
+    setNationalDocuments((current) => [document, ...current.filter((item) => item.id !== document.id)])
+  }
+  async function loadNationalDocuments() {
+    try {
+      const response = await api.get<{ items: FiscalDocument[] }>('/operational-nfse')
+      setNationalDocuments(response.data.items); setNfseError('')
+    } catch { setNfseError('Não foi possível consultar o serviço de NFS-e Nacional. Confira o backend e as migrações antes de emitir.') }
+  }
+  useEffect(() => { void loadNationalDocuments() }, [])
+  async function fiscalError(error: any) {
+    let body = error.response?.data
+    if (body instanceof Blob) { try { body = JSON.parse(await body.text()) } catch { body = {} } }
+    return typeof body?.detail === 'string' ? body.detail : Array.isArray(body?.detail) ? body.detail.map((item: any) => item.msg).join('; ') : 'Falha na comunicação fiscal. Consulte a lista antes de tentar novamente.'
+  }
+  function notePath(document: FiscalDocument) { return '/operational-nfse/' + encodeURIComponent(document.id.replace(/^nfse:/, '')) }
+  async function consultNational(document: FiscalDocument) {
+    setSavingLabel('Consultando a NFS-e Nacional...')
+    try { const response = await api.post<{ document: FiscalDocument }>(notePath(document) + '/consult'); upsertNational(response.data.document); setNotice({ title: response.data.document.status, message: response.data.document.message || 'Consulta fiscal concluída.' }) }
+    catch (error) { setNotice({ title: 'Falha na consulta', message: await fiscalError(error), tone: 'danger' }) }
+    finally { setSavingLabel('') }
+  }
+  async function downloadNational(document: FiscalDocument, kind: 'pdf' | 'xml' | 'dps') {
+    setSavingLabel('Baixando documento fiscal...')
+    try {
+      const response = await api.get(notePath(document) + (kind === 'dps' ? '/xml?request=true' : '/' + kind), { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data); const link = window.document.createElement('a'); link.href = url; link.download = `${kind}-${document.number.replace(/[^a-zA-Z0-9]/g, '_')}.${kind === 'pdf' ? 'pdf' : 'xml'}`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) { setNotice({ title: 'Documento indisponível', message: await fiscalError(error), tone: 'danger' }) }
+    finally { setSavingLabel('') }
+  }
+  async function confirmCancellation() {
+    if (!cancelTarget || !canEditPage) return
+    setSavingLabel('Solicitando cancelamento em homologação...')
+    try {
+      const response = await api.post<{ document: FiscalDocument }>(notePath(cancelTarget) + '/cancel', { justification: cancelReason, reason_code: cancelCode })
+      upsertNational(response.data.document); setCancelTarget(null); setNotice({ title: response.data.document.status, message: response.data.document.message || 'Retorno do pedido de cancelamento recebido.' })
+    } catch (error) { setNotice({ title: 'Cancelamento não concluído', message: await fiscalError(error), tone: 'danger' }) }
+    finally { setSavingLabel('') }
+  }
 
   const approvedClosings = useMemo(
     () => closings.filter((closing) =>
       closing.status === 'Aprovado'
-      && !fiscalDocuments.some((document) => document.closing === closing.number),
+      && !nationalDocuments.some((document) => document.closing === closing.number && !['rejected', 'not_found'].includes(document.statusCode || '')),
     ),
-    [closings, fiscalDocuments],
+    [closings, nationalDocuments],
   )
 
   const selectedClosing = approvedClosings.find((closing) => closing.number === selectedClosingNumber)
@@ -164,6 +213,7 @@ export function FiscalDocumentsPage() {
       return
     }
 
+    setSubstituteId(''); setSubstitutionReason(''); setSubstitutionCode('99')
     setSelectedClosingNumber(approvedClosings[0].number)
     setDocumentType('NFS-e')
     setSelectedFreights([])
@@ -171,100 +221,23 @@ export function FiscalDocumentsPage() {
   }
 
   async function confirmIssueDocument() {
-    if (!canEditPage) {
-      denyNoPrivilege()
-      return
-    }
-    if (!selectedClosing) {
-      setNotice({
-        title: 'Selecao obrigatoria',
-        message: 'Selecione um fechamento para emitir.',
-      })
-      return
-    }
-
-    if (fiscalDocuments.some((document) => document.closing === selectedClosing.number)) {
-      setNotice({
-        title: 'Documento ja emitido',
-        message: 'Ja existe documento fiscal para este fechamento. Idempotencia aplicada.',
-      })
-      return
-    }
-
-    if (!selectedCustomer || missingCustomerFields.length) {
-      setNotice({
-        title: 'Tomador incompleto',
-        message: `Cadastro do cliente incompleto para NFS-e: ${missingCustomerFields.map(([label]) => label).join(', ')}`,
-        tone: 'danger',
-      })
-      return
-    }
-
-    if (missingIssuerFields.length) {
-      setNotice({
-        title: 'Prestador incompleto',
-        message: `Cadastro da empresa emissora incompleto para NFS-e: ${missingIssuerFields.map(([label]) => label).join(', ')}`,
-        tone: 'danger',
-      })
-      return
-    }
-
-    if (!selectedFreights.length) {
-      setNotice({
-        title: 'Fretes nao localizados',
-        message: 'Nao ha fretes vinculados ao fechamento selecionado.',
-        tone: 'danger',
-      })
-      return
-    }
-
-    const number = String(fiscalDocuments.length + 1).padStart(6, '0')
+    if (!canEditPage) { denyNoPrivilege(); return }
+    if (!selectedClosing || !selectedCustomer) { setNotice({ title: 'Cadastro incompleto', message: 'Selecione um fechamento aprovado e seu cliente.', tone: 'danger' }); return }
+    if (selectedFreightsLoading || !selectedFreights.length) { setNotice({ title: 'Fretes não localizados', message: 'Confira os fretes vinculados ao fechamento antes de transmitir.', tone: 'danger' }); return }
+    const payload = { closing_id: selectedClosing.id, customer_id: selectedCustomer.id, competence, description: fiscalDescription, substitute_note_id: substituteId || null, substitution_reason: substitutionReason, substitution_code: substitutionCode }
+    setSavingLabel('Validando certificado e XML da DPS...')
     try {
-      setSavingLabel('Emitindo documento fiscal...')
-      await Promise.all(selectedFreights.map((freight) =>
-        data.saveFreightRecord({
-          ...freight,
-          operationalStatus: 'NFe EMITIDA',
-          fiscalStatus: 'Emitido',
-        }),
-      ))
-      data.update({
-        ...data,
-        closings: closings.map((item) => item.id === selectedClosing.id ? { ...item, status: 'Emitido' } : item),
-        freights: freights.map((freight) =>
-          freight.closing === selectedClosing.number ? { ...freight, fiscalStatus: 'Emitido', operationalStatus: 'NFe EMITIDA' } : freight,
-        ),
-        fiscalDocuments: [
-          ...fiscalDocuments,
-          {
-            id: nextId('doc'),
-            type: documentType,
-            number,
-            series: issuer.nfseSeries,
-            customer: selectedClosing.customer,
-            date: new Date().toISOString().slice(0, 10),
-            value: selectedClosing.netTotal,
-            environment: 'Homologacao',
-            status: 'Autorizado mock',
-            protocol: `NFSE-SIMULADA-${issuer.cityCode}-${selectedCustomer.cityCode}-${number}`,
-            closing: selectedClosing.number,
-            description: fiscalDescription,
-          },
-        ],
-      })
-
-      setShowPreview(false)
-      setSelectedClosingNumber('')
-      setSelectedFreights([])
-    } catch {
-      setNotice({
-        title: 'Falha na emissao',
-        message: 'Nao foi possivel atualizar os fretes e emitir o documento fiscal no banco.',
-        tone: 'danger',
-      })
-    } finally {
-      setSavingLabel('')
-    }
+      await api.post('/operational-nfse/validate', payload)
+      setSavingLabel('Transmitindo DPS em homologação...')
+      const response = await api.post<{ document: FiscalDocument }>('/operational-nfse/issue', payload)
+      const note = response.data.document
+      upsertNational(note)
+      setShowPreview(false); setSelectedClosingNumber(''); setSelectedFreights([]); setViewingDocumentId(note.id)
+      setNotice({ title: note.status, message: note.statusCode === 'authorized' ? `NFS-e ${note.number} autorizada em homologação. Chave: ${note.accessKey}` : note.message || 'Resultado ainda não confirmado. Use Consultar situação para verificar a DPS.', tone: note.statusCode === 'rejected' ? 'danger' : 'info' })
+    } catch (error) {
+      await loadNationalDocuments()
+      setNotice({ title: 'Emissão não concluída', message: await fiscalError(error), tone: 'danger' })
+    } finally { setSavingLabel('') }
   }
 
   function openDocument(documentId: string, closingNumber: string) {
@@ -274,6 +247,8 @@ export function FiscalDocumentsPage() {
 
   return (
     <div className="space-y-4">
+      <div className="border border-[#b8c9da] bg-[#edf3f9] px-4 py-3 text-xs text-[#244761]">NFS-e Nacional — produção restrita / homologação. A transmissão utiliza o A1 instalado no backend. Documentos antigos marcados como mock continuam sendo simulações.</div>
+      {nfseError && <p role="alert" className="border border-red-300 bg-red-50 p-3 text-xs text-red-700">{nfseError}</p>}
       {savingLabel && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/20">
           <div className="border border-zinc-300 bg-white px-8 py-6 text-center shadow-lg">
@@ -297,7 +272,7 @@ export function FiscalDocumentsPage() {
           <input className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Cliente" />
           <input className="border border-zinc-300 px-2 py-1.5 text-sm" placeholder="Numero ou referencia" />
           <input className="border border-zinc-300 px-2 py-1.5 text-sm" type="date" />
-          <button onClick={() => setNotice({ title: 'Consulta fiscal', message: 'Consulta atualizada.' })} className="border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-sm font-medium">Consultar</button>
+          <button onClick={() => void loadNationalDocuments()} className="border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-sm font-medium">Consultar</button>
         </div>
       </div>
 
@@ -313,7 +288,7 @@ export function FiscalDocumentsPage() {
                 Cancelar
               </button>
               <button onClick={confirmIssueDocument} className="border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
-                Confirmar emissao
+                Transmitir em homologação
               </button>
             </div>
           </div>
@@ -333,16 +308,17 @@ export function FiscalDocumentsPage() {
               Tipo fiscal
               <select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>
                 <option>NFS-e</option>
-                <option>CT-e</option>
+
               </select>
             </label>
+            <label className="field">Competência do serviço<input type="date" value={competence} onChange={(event) => setCompetence(event.target.value)} /></label>
             <div className="border border-zinc-300 bg-white px-3 py-2 text-sm">
               <div className="text-xs text-zinc-500">Fretes no fechamento</div>
               <div className="font-semibold">{selectedFreightsLoading ? 'Carregando...' : selectedFreights.length}</div>
             </div>
             <div className="border border-zinc-300 bg-white px-3 py-2 text-sm">
-              <div className="text-xs text-zinc-500">Valor liquido</div>
-              <div className="font-semibold">{formatMoney(selectedClosing?.netTotal ?? 0)}</div>
+              <div className="text-xs text-zinc-500">Valor dos serviços</div>
+              <div className="font-semibold">{formatMoney(selectedClosing?.subtotal ?? selectedClosing?.netTotal ?? 0)}</div>
             </div>
             <div className="border border-zinc-300 bg-white px-3 py-2 text-sm">
               <div className="text-xs text-zinc-500">Ambiente</div>
@@ -350,6 +326,10 @@ export function FiscalDocumentsPage() {
             </div>
           </div>
 
+          <div className="grid gap-3 border-b border-zinc-300 p-3 md:grid-cols-3">
+            <label className="field">Substituir uma NFS-e autorizada (opcional)<select value={substituteId} onChange={(event) => setSubstituteId(event.target.value)}><option value="">Emissão normal</option>{nationalDocuments.filter((item) => item.statusCode === 'authorized' && item.closing !== selectedClosingNumber).map((item) => <option key={item.id} value={item.id}>NFS-e {item.number} - {item.customer}</option>)}</select></label>
+            {substituteId && <><label className="field">Motivo da substituição<select value={substitutionCode} onChange={(event) => setSubstitutionCode(event.target.value)}><option value="99">99 - Outros</option><option value="01">01 - Desenquadramento do SN</option><option value="02">02 - Enquadramento no SN</option><option value="03">03 - Inclusão retroativa de imunidade/isenção</option><option value="04">04 - Exclusão retroativa de imunidade/isenção</option><option value="05">05 - Rejeição pelo tomador/intermediário</option></select></label><label className="field">Justificativa (15 a 255 caracteres)<input maxLength={255} value={substitutionReason} onChange={(event) => setSubstitutionReason(event.target.value)} /></label></>}
+          </div>
           <div className="grid gap-3 border-b border-zinc-300 p-3 md:grid-cols-2">
             <div className="border border-zinc-300 bg-white">
               <div className="border-b border-zinc-300 px-3 py-2 text-xs font-semibold uppercase text-zinc-500">Prestador / emissor</div>
@@ -386,7 +366,7 @@ export function FiscalDocumentsPage() {
                 <div className={missingCustomerFields.length ? 'text-red-700' : 'text-emerald-700'}>
                   {missingCustomerFields.length
                     ? `Faltando: ${missingCustomerFields.map(([label]) => label).join(', ')}`
-                    : 'Cadastro fiscal completo para simulacao.'}
+                    : 'Dados preenchidos. Certificado e XML serão validados no backend.'}
                 </div>
               </div>
             </div>
@@ -472,7 +452,20 @@ export function FiscalDocumentsPage() {
         </div>
       </div>
 
-      {viewingDocument && (
+      {viewingDocument?.source === 'national' && <section className="border border-zinc-300 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">NFS-e Nacional — {viewingDocument.number}</h3><button onClick={() => setViewingDocumentId(null)} className="border border-zinc-300 px-3 py-2 text-xs">Fechar</button></div>
+        <dl className="my-4 grid gap-3 text-xs md:grid-cols-3"><div><dt>Situação</dt><dd className="mt-1 font-semibold">{viewingDocument.status}</dd></div><div><dt>DPS / série</dt><dd className="mt-1">{viewingDocument.dpsNumber} / {viewingDocument.series}</dd></div><div><dt>Ambiente</dt><dd className="mt-1">Homologação</dd></div><div className="break-all md:col-span-3"><dt>Chave de acesso</dt><dd className="mt-1">{viewingDocument.accessKey || 'Ainda não recebida'}</dd></div></dl>
+        {viewingDocument.message && <p role="status" className="mb-4 border border-zinc-200 bg-zinc-50 p-3 text-xs">{viewingDocument.message}</p>}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <button disabled={!canEditPage} onClick={() => void consultNational(viewingDocument)} className="border border-zinc-300 px-3 py-2">Consultar situação</button>
+          <button onClick={() => void downloadNational(viewingDocument, 'dps')} className="border border-zinc-300 px-3 py-2">Baixar DPS assinada</button>
+          <button disabled={!viewingDocument.hasXml} onClick={() => void downloadNational(viewingDocument, 'xml')} className="border border-zinc-300 px-3 py-2">Baixar XML autorizado</button>
+          <button disabled={!viewingDocument.hasXml} onClick={() => void downloadNational(viewingDocument, 'pdf')} className="border border-zinc-300 px-3 py-2">Baixar DANFSe oficial</button>
+          {canEditPage && viewingDocument.statusCode === 'authorized' && <button onClick={() => { setCancelTarget(viewingDocument); setCancelReason(''); setCancelCode('1') }} className="border border-red-300 px-3 py-2 text-red-700">Cancelar NFS-e de homologação</button>}
+        </div>
+      </section>}
+
+      {viewingDocument && viewingDocument.source !== 'national' && (
         <section className="border border-zinc-300 bg-white">
           <div className="flex items-center justify-between border-b border-zinc-300 px-4 py-3">
             <div>
@@ -655,6 +648,13 @@ export function FiscalDocumentsPage() {
           </div>
         </section>
       )}
+
+      {cancelTarget && <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4"><section role="dialog" aria-modal="true" aria-labelledby="nfse-cancel-title" className="w-full max-w-lg border border-zinc-400 bg-white p-5">
+        <h3 id="nfse-cancel-title" className="mb-4 text-sm font-semibold">Cancelar NFS-e {cancelTarget.number} em homologação</h3>
+        <label className="field">Motivo<select value={cancelCode} onChange={(event) => setCancelCode(event.target.value)}><option value="1">Erro na emissão</option><option value="2">Serviço não prestado</option><option value="9">Outros</option></select></label>
+        <label className="field mt-4">Justificativa (15 a 255 caracteres)<textarea rows={4} minLength={15} maxLength={255} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>
+        <footer className="mt-4 flex justify-end gap-3 text-xs"><button onClick={() => setCancelTarget(null)} className="border border-zinc-300 px-3 py-2">Voltar</button><button disabled={cancelReason.trim().length < 15} onClick={() => void confirmCancellation()} className="border border-red-600 bg-red-600 px-3 py-2 text-white">Solicitar cancelamento</button></footer>
+      </section></div>}
 
       {notice && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">

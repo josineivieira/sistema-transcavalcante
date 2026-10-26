@@ -392,6 +392,14 @@ export type Closing = {
 }
 
 export type FiscalDocument = {
+  source?: 'national'
+  statusCode?: string
+  dpsId?: string
+  dpsNumber?: string
+  accessKey?: string
+  message?: string
+  hasXml?: boolean
+  attempts?: number
   id: string
   type: string
   number: string
