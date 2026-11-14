@@ -48,13 +48,13 @@ function skipsCsrfLookup(url?: string) {
     || text.includes('/operational-data/csrf-token')
 }
 
-async function resolveCsrfToken() {
+async function resolveCsrfToken(forceRefresh = false) {
   const cookieToken = getCookie('tc_csrf_token')
-  if (cookieToken) {
+  if (cookieToken && !forceRefresh) {
     csrfTokenFromApi = decodeURIComponent(cookieToken)
     return csrfTokenFromApi
   }
-  if (csrfTokenFromApi) {
+  if (csrfTokenFromApi && !forceRefresh) {
     return csrfTokenFromApi
   }
 
@@ -68,7 +68,8 @@ async function resolveCsrfToken() {
 
 api.interceptors.request.use(async (config) => {
   if (isUnsafeMethod(config.method) && !skipsCsrfLookup(config.url)) {
-    const csrfToken = await resolveCsrfToken()
+    if (refreshPromise) await refreshPromise
+    const csrfToken = await resolveCsrfToken(Boolean((config as typeof config & { _csrfRetry?: boolean })._csrfRetry))
     if (csrfToken) {
       config.headers = config.headers ?? {}
       config.headers['X-CSRF-Token'] = csrfToken
@@ -102,6 +103,7 @@ async function refreshActiveSession() {
         session_idle_timeout_minutes?: number,
       }>(`${resolveApiUrl()}/operational-data/refresh`, {}, { withCredentials: true })
       .then((response) => {
+        csrfTokenFromApi = ''
         refreshAuthSession(response.data.session_idle_timeout_minutes)
       })
       .finally(() => {
@@ -118,6 +120,19 @@ api.interceptors.response.use(
     const status = error.response?.status
     const isLoginPage = window.location.pathname === '/login'
     const originalRequest = error.config
+
+    // The API checks CSRF before writing any data. Only retry its explicit
+    // token rejection; permission denials must remain visible to the caller.
+    if (status === 403
+      && error.response?.data?.detail === 'Requisicao nao autorizada'
+      && originalRequest
+      && isUnsafeMethod(originalRequest.method)
+      && !skipsCsrfLookup(originalRequest.url)
+      && !originalRequest._csrfRetry) {
+      originalRequest._csrfRetry = true
+      csrfTokenFromApi = ''
+      return api(originalRequest)
+    }
 
     if (status === 401 && !isLoginPage) {
       if (!originalRequest?._sessionRetry && !String(originalRequest?.url || '').includes('/operational-data/refresh')) {
