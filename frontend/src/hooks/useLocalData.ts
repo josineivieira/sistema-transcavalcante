@@ -26,6 +26,7 @@ type FreightQuery = {
   process_code?: string
   date_start?: string
   date_end?: string
+  customer?: string
   process_description?: string
   supplier?: string
   process_type?: string

@@ -343,6 +343,7 @@ def list_operational_freights(
     date_start: str = "",
     date_end: str = "",
     process_description: str = "",
+    customer: str = "",
     supplier: str = "",
     process_type: str = "",
     container: str = "",
@@ -389,6 +390,8 @@ def list_operational_freights(
         query = query.filter(Freight.internal_number.ilike(f"%{process_number}%"))
     if process_code:
         query = query.filter(Freight.process_number.ilike(f"%{process_code}%"))
+    if customer:
+        query = query.filter(Freight.customer_name.ilike(f"%{customer}%"))
     if process_description:
         like = f"%{process_description}%"
         query = query.filter(or_(

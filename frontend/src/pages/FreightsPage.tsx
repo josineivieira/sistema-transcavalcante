@@ -460,7 +460,7 @@ const freightGridColumns = [
   { key: 'select', label: '', width: 30, locked: true },
   { key: 'code', label: 'Codigo', width: 118, minWidth: 82, locked: true },
   { key: 'dateStart', label: 'Dt. inicio', width: 132, minWidth: 96 },
-  { key: 'status', label: 'Situacao', width: 190, minWidth: 128 },
+  { key: 'status', label: 'Status', width: 190, minWidth: 128 },
   { key: 'customer', label: 'Cliente', width: 210, minWidth: 130 },
   { key: 'sender', label: 'Remetente', width: 210, minWidth: 130 },
   { key: 'recipient', label: 'Destinatario', width: 210, minWidth: 130 },
@@ -487,7 +487,7 @@ const freightGridColumns = [
   { key: 'cntrReturn', label: 'Dt. devolucao CNTR', width: 142, minWidth: 116 },
   { key: 'fiscalNumber', label: 'NFS-e', width: 116, minWidth: 96 },
   { key: 'ciot', label: 'CIOT', width: 128, minWidth: 100 },
-  { key: 'ciotStatus', label: 'Situacao CIOT', width: 122, minWidth: 100 },
+  { key: 'ciotStatus', label: 'Status CIOT', width: 122, minWidth: 100 },
   { key: 'actions', label: 'Acoes', width: 58, minWidth: 54, locked: true },
 ] as const
 
@@ -538,7 +538,7 @@ export function FreightsPage() {
     processCode: '',
     dateStart: '',
     dateEnd: '',
-    processDescription: '',
+    customer: '',
     status: '',
     supplier: '',
     processType: '',
@@ -683,7 +683,7 @@ export function FreightsPage() {
         process_code: filters.processCode,
         date_start: filters.dateStart,
         date_end: filters.dateEnd,
-        process_description: filters.processDescription,
+        customer: filters.customer,
         supplier: filters.supplier,
         process_type: filters.processType,
         container: filters.container,
@@ -701,7 +701,7 @@ export function FreightsPage() {
     filters.originDateEnd,
     filters.originDateStart,
     filters.processCode,
-    filters.processDescription,
+    filters.customer,
     filters.processNumber,
     filters.processType,
     filters.status,
@@ -727,7 +727,7 @@ export function FreightsPage() {
       processCode: '',
       dateStart: '',
       dateEnd: '',
-      processDescription: '',
+      customer: '',
       status: '',
       supplier: '',
       processType: '',
@@ -2491,7 +2491,7 @@ export function FreightsPage() {
             <table className="w-full min-w-[780px] table-fixed text-xs">
               <thead className="bg-white">
                 <tr>
-                  {['CIOT', 'Situacao', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
+                  {['CIOT', 'Status', 'Dt. Inicio viagem', 'Dt. fim viagem', 'Dt. registro', 'Dt. quitacao', 'Dt. retificacao'].map((heading, index) => (
                     <th key={`${heading}-${index}`} className="border-b border-r border-zinc-300 px-2 py-2 text-left font-medium text-zinc-700">
                       {heading}
                       {heading && <span className="float-right text-zinc-400">▾</span>}
@@ -2545,11 +2545,6 @@ export function FreightsPage() {
     <div className="space-y-4">
       {!showForm && (
         <div className="border border-zinc-500 bg-zinc-100">
-          <div className="flex items-center justify-between border-b border-zinc-300 bg-white px-4 py-3">
-            <h2 className="text-base font-semibold text-[#1c344d]">Entrega do contêiner</h2>
-            <button onClick={openNewFreight} className="grid h-7 w-7 place-items-center bg-black text-lg font-bold text-white" title="Novo transporte">+</button>
-          </div>
-
           <div
             className="grid min-h-[calc(100vh-150px)] transition-[grid-template-columns]"
             style={{ gridTemplateColumns: filtersCollapsed ? '30px minmax(0,1fr)' : '430px minmax(0,1fr)' }}
@@ -2582,21 +2577,12 @@ export function FreightsPage() {
                     </div>
                   </div>
                   <div className="mx-1 grid min-h-[calc(100vh-220px)] content-start gap-1 border border-dotted border-zinc-500 p-1 text-xs">
-                    <Field label="Nr. do processo"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
-                    <Field label="Codigo do processo"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
+                    <Field label="Nº do frete"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
+                    <Field label="Código do frete"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="Data inicial"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
-                    <Field label="Descricao do Processo"><input value={filters.processDescription} onChange={(event) => setFilters({ ...filters, processDescription: event.target.value })} className={textInputClass()} /></Field>
-                    <Field label="Situacao"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
-                    <div className="mt-2 border border-zinc-400">
-                      <div className="flex h-7 items-center justify-between bg-zinc-100 px-2 text-xs"><span>Fornecedor</span><div className="flex gap-2"><Filter size={18} fill="currentColor" /><X size={18} /></div></div>
-                      <div className="flex border-t border-zinc-300">
-                        <input value={filters.supplier} onChange={(event) => setFilters({ ...filters, supplier: event.target.value.toUpperCase() })} className="h-7 min-w-0 flex-1 bg-white px-2 text-xs outline-none" placeholder="Selecione..." />
-                        <button onClick={() => openLookup('supplier')} className="grid h-7 w-8 place-items-center bg-white" title="Consultar fornecedor"><Filter size={18} fill="currentColor" /></button>
-                      </div>
-                    </div>
-                    <Field label="Tipo processo"><input value={filters.processType} onChange={(event) => setFilters({ ...filters, processType: event.target.value })} className={textInputClass()} /></Field>
-                    <Field label="No Container"><input value={filters.container} onChange={(event) => setFilters({ ...filters, container: event.target.value.toUpperCase() })} className={textInputClass()} /></Field>
-                    <Field label="Dt. origem"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input type="date" value={filters.originDateStart} onChange={(event) => setFilters({ ...filters, originDateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.originDateEnd} onChange={(event) => setFilters({ ...filters, originDateEnd: event.target.value })} className={textInputClass()} /></div></Field>
+                    <Field label="Cliente"><input value={filters.customer} onChange={(event) => setFilters({ ...filters, customer: event.target.value })} className={textInputClass()} /></Field>
+                    <Field label="Status"><input value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className={textInputClass()} /></Field>
+
                   </div>
                 </>
               )}
@@ -2706,8 +2692,8 @@ export function FreightsPage() {
             <div>
               <div className="grid gap-x-24 gap-y-1 border-b-4 border-zinc-400 p-3 md:grid-cols-2">
                 <div className="grid gap-1">
-                  <Field label="Codigo do processo" required><input value={form.process} className={textInputClass(true)} disabled /></Field>
-                  <Field label="Situacao"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
+                  <Field label="Código do frete" required><input value={form.process} className={textInputClass(true)} disabled /></Field>
+                  <Field label="Status"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
                   <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Tomador do servico"><input value={form.serviceTaker} className={textInputClass(true)} disabled /></Field>
                   <Field label="CNPJ/CPF"><input value={form.senderDocument} className={textInputClass(true)} disabled /></Field>
