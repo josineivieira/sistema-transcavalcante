@@ -546,6 +546,7 @@ export function FreightsPage() {
     originDateStart: '',
     originDateEnd: '',
   })
+  const [appliedFilters, setAppliedFilters] = useState<(typeof filters & { search: string }) | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [columnMenuOpen, setColumnMenuOpen] = useState(false)
@@ -675,43 +676,29 @@ export function FreightsPage() {
   }
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      loadFreights({
-        search,
-        status: filters.status,
-        process_number: filters.processNumber,
-        process_code: filters.processCode,
-        date_start: filters.dateStart,
-        date_end: filters.dateEnd,
-        customer: filters.customer,
-        supplier: filters.supplier,
-        process_type: filters.processType,
-        container: filters.container,
-        origin_date_start: filters.originDateStart,
-        origin_date_end: filters.originDateEnd,
-        limit: 500,
-      })
-    }, 250)
+    if (!appliedFilters || loading) return
+    void loadFreights({
+      search: appliedFilters.search,
+      status: appliedFilters.status,
+      process_number: appliedFilters.processNumber,
+      process_code: appliedFilters.processCode,
+      date_start: appliedFilters.dateStart,
+      date_end: appliedFilters.dateEnd,
+      customer: appliedFilters.customer,
+      limit: 500,
+    })
+  }, [appliedFilters, loading, loadFreights])
 
-    return () => window.clearTimeout(timeout)
-  }, [
-    filters.container,
-    filters.dateEnd,
-    filters.dateStart,
-    filters.originDateEnd,
-    filters.originDateStart,
-    filters.processCode,
-    filters.customer,
-    filters.processNumber,
-    filters.processType,
-    filters.status,
-    filters.supplier,
-    loadFreights,
-    search,
-  ])
+  function submitFreightFilters() {
+    if (![filters.processNumber, filters.processCode, filters.dateStart, filters.dateEnd, filters.customer, filters.status, search].some((value) => value.trim())) {
+      setAppliedFilters(null)
+      return
+    }
+    setAppliedFilters({ ...filters, search })
+  }
 
-  const visibleFreights = freights
-  const freightListLoading = loading || freightsLoading
+  const visibleFreights = appliedFilters ? freights : []
+  const freightListLoading = Boolean(appliedFilters) && (loading || freightsLoading)
 
   const visibleFreightColumns = useMemo(
     () => freightGridColumns.filter((column) => !hiddenColumns[column.key]),
@@ -721,6 +708,7 @@ export function FreightsPage() {
   const freightGridMinWidth = visibleFreightColumns.reduce((total, column) => total + (columnWidths[column.key] ?? column.width), 0)
 
   function clearFreightFilters() {
+    setAppliedFilters(null)
     setSearch('')
     setFilters({
       processNumber: '',
@@ -2547,7 +2535,7 @@ export function FreightsPage() {
         <div className="border border-zinc-500 bg-zinc-100">
           <div
             className="grid min-h-[calc(100vh-150px)] transition-[grid-template-columns]"
-            style={{ gridTemplateColumns: filtersCollapsed ? '30px minmax(0,1fr)' : '430px minmax(0,1fr)' }}
+            style={{ gridTemplateColumns: filtersCollapsed ? '30px minmax(0,1fr)' : '350px minmax(0,1fr)' }}
           >
             <aside className="overflow-hidden border-r border-zinc-500 bg-zinc-100">
               {filtersCollapsed ? (
@@ -2568,15 +2556,15 @@ export function FreightsPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between px-2 py-1">
-                    <span className="text-[11px] text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</span>
+                    <span className="min-w-0 text-[10px] leading-tight text-red-600">INFORME PELO MENOS UM CAMPO PARA CONSULTAR OS DADOS</span>
                     <div className="flex items-center gap-2">
-                      <Search size={22} strokeWidth={2.5} />
+                      <button type="button" onClick={submitFreightFilters} title="Consultar fretes" aria-label="Consultar fretes"><Search size={22} strokeWidth={2.5} /></button>
                       <button onClick={clearFreightFilters} title="Limpar filtro">
                         <Eraser size={20} strokeWidth={2.4} />
                       </button>
                     </div>
                   </div>
-                  <div className="mx-1 grid min-h-[calc(100vh-220px)] content-start gap-1 border border-dotted border-zinc-500 p-1 text-xs">
+                  <div className="mx-1 grid min-h-[calc(100vh-220px)] content-start gap-1 border border-dotted border-zinc-500 p-1 text-xs [&>label]:grid-cols-[100px_minmax(0,1fr)]">
                     <Field label="Nº do frete"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input value={filters.processNumber} onChange={(event) => setFilters({ ...filters, processNumber: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input className={textInputClass()} /></div></Field>
                     <Field label="Código do frete"><input value={filters.processCode} onChange={(event) => setFilters({ ...filters, processCode: event.target.value })} className={textInputClass()} /></Field>
                     <Field label="Data inicial"><div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-1"><input type="date" value={filters.dateStart} onChange={(event) => setFilters({ ...filters, dateStart: event.target.value })} className={textInputClass()} /><span className="text-center leading-7">ate</span><input type="date" value={filters.dateEnd} onChange={(event) => setFilters({ ...filters, dateEnd: event.target.value })} className={textInputClass()} /></div></Field>
@@ -2591,7 +2579,7 @@ export function FreightsPage() {
             <section className="min-w-0 bg-white">
               <div className="flex h-8 items-center border-b border-zinc-400 bg-zinc-400 text-xs">
                 <div className="px-2 font-semibold">Transportes de carga rodoviario</div>
-                <div className="ml-auto px-2">{freightListLoading ? '' : `${freightsTotal} registros`}</div>
+                <div className="ml-auto px-2">{freightListLoading ? '' : `${appliedFilters ? freightsTotal : 0} registros`}</div>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="mr-2 h-6 w-36 border border-zinc-300 bg-white px-2 text-xs outline-none" placeholder="Busca rapida" />
                 <div className="relative flex items-center gap-2 pr-2">
                   <button onClick={() => setColumnMenuOpen(!columnMenuOpen)} className="inline-flex h-6 items-center gap-1 border border-zinc-500 bg-zinc-200 px-2 hover:bg-white">
@@ -2650,7 +2638,7 @@ export function FreightsPage() {
                         ))}
                       </tr>
                     ))}
-                    {!freightListLoading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">Nenhum transporte encontrado.</td></tr>}
+                    {!freightListLoading && !visibleFreights.length && <tr><td colSpan={visibleFreightColumns.length} className="px-3 py-10 text-center text-zinc-500">{appliedFilters ? 'Nenhum transporte encontrado.' : 'Preencha pelo menos um campo e clique na lupa para consultar os fretes.'}</td></tr>}
                   </tbody>
                 </table>
                 {freightListLoading && (
