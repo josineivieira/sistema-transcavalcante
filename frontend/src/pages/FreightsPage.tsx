@@ -5,6 +5,7 @@ import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 import { LoadingState } from '../components/LoadingState'
 import { api } from '../services/api'
+import { addFreightStatus, freightStatuses, freightStatusFlow } from '../services/freightStatus'
 
 const freightTabs = [
   'GERAIS',
@@ -201,9 +202,7 @@ type ProductRouteOriginResponse = {
   total?: number
 }
 
-const initialFreightStatus = 'AGENDAMENTO E CARREGAMENTO 15'
-const invoiceReceivedStatus = 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20'
-const deliveryCompletedStatus = 'ENTREGA CONCLUIDA 50'
+const initialFreightStatus = freightStatuses.newFreight
 
 const emptyForm: FreightForm = {
   customer: '',
@@ -477,13 +476,13 @@ const freightGridColumns = [
   { key: 'value', label: 'Vl. frete lista', width: 122, minWidth: 100 },
   { key: 'fuelValue', label: 'Vl. abastecimento', width: 128, minWidth: 110 },
   { key: 'documentRelease', label: 'Dt. liberacao doc.', width: 132, minWidth: 110 },
-  { key: 'pdWithdrawal', label: 'Dt. retirada P.D.', width: 128, minWidth: 108 },
+  { key: 'pdWithdrawal', label: 'Dt. Montagem', width: 128, minWidth: 108 },
   { key: 'scheduleDelivery', label: 'Dt. agendamento entrega', width: 170, minWidth: 138 },
   { key: 'scheduleDeliveryHour', label: 'Hr. agendamento entrega', width: 160, minWidth: 128 },
-  { key: 'destinationArrival', label: 'Dt.chegada destinatario', width: 160, minWidth: 128 },
-  { key: 'destinationArrivalHour', label: 'Hr. chegada destinatario', width: 156, minWidth: 126 },
-  { key: 'destinationDeparture', label: 'Dt. saida destinatario', width: 150, minWidth: 120 },
-  { key: 'destinationDepartureHour', label: 'Hr. saida destinatario', width: 146, minWidth: 118 },
+  { key: 'destinationArrival', label: 'Dt. chegada cliente', width: 160, minWidth: 128 },
+  { key: 'destinationArrivalHour', label: 'Hr. chegada cliente', width: 156, minWidth: 126 },
+  { key: 'destinationDeparture', label: 'Dt. saida cliente', width: 150, minWidth: 120 },
+  { key: 'destinationDepartureHour', label: 'Hr. saida cliente', width: 146, minWidth: 118 },
   { key: 'cntrReturn', label: 'Dt. devolucao CNTR', width: 142, minWidth: 116 },
   { key: 'fiscalNumber', label: 'NFS-e', width: 116, minWidth: 96 },
   { key: 'ciot', label: 'CIOT', width: 128, minWidth: 100 },
@@ -499,13 +498,7 @@ const defaultFreightColumnWidths = freightGridColumns.reduce<Record<string, numb
 }, {})
 
 const freightTaskOptions = [
-  invoiceReceivedStatus,
-  deliveryCompletedStatus,
-  'OPERACAO ENCERRADA 55',
-  'PROCESSO INTERROMPIDO 60',
-  'AUDITORIA INICIADA 65',
-  'PROCESSO AUDITADO 70',
-  'AUDITORIA ENCERRADA 75',
+  ...freightStatusFlow,
 ]
 
 function currentMonthDateRange() {
@@ -640,13 +633,11 @@ export function FreightsPage() {
   const generalReady = Boolean(form.process && form.processType && form.customer && form.serviceTaker)
   const routeReady = Boolean(form.routeName && form.origin && form.destination)
   const serviceReady = Boolean(generalReady && routeReady && form.driver && form.tractorId)
-  const hasNotasRecebidas = form.status === invoiceReceivedStatus
-    || form.taskHistory.some((task) => task.name === invoiceReceivedStatus)
-    || freightMinimumReady(form)
+  const hasNotasRecebidas = freightMinimumReady(form)
   const containerRows = legacyContainerRows(form)
   const containerReady = Boolean(serviceReady && containerRows.length)
   const availableTaskOptions = freightTaskOptions.filter((task) => (
-    showPreviousTasks || (form.status !== task && !form.taskHistory.some((history) => history.name === task))
+    showPreviousTasks || form.status !== task
   ))
   const filteredExtraProducts = useMemo(() => {
     const term = extraProductSearch.toLowerCase()
@@ -892,30 +883,67 @@ export function FreightsPage() {
     setFreightNotice({ title, message })
   }
 
-  function freightStatusCode(status: string) {
-    const match = status.match(/(\d+)\s*$/)
-    return match ? Number(match[1]) : 0
-  }
-
-  function freightDeliveryCompleted(snapshot: FreightForm) {
-    return Boolean(snapshot.destinationArrivalDate && snapshot.destinationDepartureDate)
-  }
-
-  function applyAutomaticFreightStatus(snapshot: FreightForm): FreightForm {
-    let status = snapshot.status
-    if (freightDeliveryCompleted(snapshot) && freightStatusCode(snapshot.status) < 50) {
-      status = deliveryCompletedStatus
-    } else if (freightMinimumReady(snapshot) && (!snapshot.status || snapshot.status === initialFreightStatus)) {
-      status = invoiceReceivedStatus
-    }
-    if (status === snapshot.status) return snapshot
+  function createStatusHistoryEntry(status: string, description = 'Atualizado pelos dados do frete.'): FreightTask {
     const now = new Date().toLocaleString('pt-BR')
-    const entry: FreightTask = {
-      id: nextId('status'), name: status, description: 'Atualizado pelos dados do frete.',
+    return {
+      id: nextId('status'), name: status, description,
       status: 'ENCERRADO', sendToCustomer: 'N', startDate: now, endDate: now,
       completionPercent: 100, internalUse: 'S', time: 'Hoje', user: authUser?.name || authUser?.email || 'Sistema',
     }
-    return { ...snapshot, status, taskHistory: [entry, ...snapshot.taskHistory] }
+  }
+
+  function highestAutomaticFreightStatus(snapshot: FreightForm) {
+    if (!snapshot.destinationScheduleDate) return freightStatuses.newFreight
+    if (!snapshot.portWithdrawalDate) return freightStatuses.scheduledDelivery
+    if (!snapshot.destinationArrivalDate) return freightStatuses.containerMounted
+    if (!snapshot.destinationDepartureDate) return freightStatuses.customerArrival
+    if (!snapshot.documentReleaseDate || !snapshot.cntrReturnDate) return freightStatuses.customerDeparture
+    return freightStatuses.deliveryCompleted
+  }
+
+  function applyAutomaticFreightStatus(snapshot: FreightForm): FreightForm {
+    const operationalFlow = freightStatusFlow.slice(0, 6)
+    const currentIndex = operationalFlow.indexOf(snapshot.status)
+    const targetStatus = highestAutomaticFreightStatus(snapshot)
+    const targetIndex = operationalFlow.indexOf(targetStatus)
+    let status = snapshot.status || initialFreightStatus
+    let taskHistory = snapshot.taskHistory ?? []
+
+    if (!taskHistory.some((entry) => entry.name === status) && operationalFlow.includes(status)) {
+      taskHistory = [createStatusHistoryEntry(status, 'Status inicial do frete.'), ...taskHistory]
+    }
+
+    if (currentIndex >= 0 && targetIndex > currentIndex) {
+      const advancedStatuses = operationalFlow.slice(currentIndex + 1, targetIndex + 1)
+      status = targetStatus
+      taskHistory = [
+        ...advancedStatuses.reverse().map((nextStatus) => createStatusHistoryEntry(nextStatus)),
+        ...taskHistory,
+      ]
+    }
+
+    return status === snapshot.status && taskHistory === snapshot.taskHistory
+      ? snapshot
+      : { ...snapshot, status, taskHistory }
+  }
+
+  function canAdvanceToStatus(status: string) {
+    const currentIndex = freightStatusFlow.indexOf(form.status)
+    const requestedIndex = freightStatusFlow.indexOf(status)
+    const availableIndex = freightStatusFlow.indexOf(highestAutomaticFreightStatus(form))
+    return requestedIndex > currentIndex && requestedIndex <= availableIndex && requestedIndex <= 5
+  }
+
+  function statusRequirement(status: string) {
+    if (status === freightStatuses.scheduledDelivery) return 'Preencha a Dt. agendamento entrega.'
+    if (status === freightStatuses.containerMounted) return 'Preencha a Dt. Montagem e as etapas anteriores.'
+    if (status === freightStatuses.customerArrival) return 'Preencha a Dt. chegada cliente e as etapas anteriores.'
+    if (status === freightStatuses.customerDeparture) return 'Preencha a Dt. saida cliente e as etapas anteriores.'
+    if (status === freightStatuses.deliveryCompleted) return 'Preencha todas as datas do fluxo de entrega.'
+    if (status === freightStatuses.includedInClosing) return 'Este status é aplicado ao incluir o frete em um fechamento.'
+    if (status === freightStatuses.awaitingPayment) return 'Este status é aplicado após a emissão da nota de serviço.'
+    if (status === freightStatuses.paid) return 'Este status é aplicado pelo financeiro após o recebimento.'
+    return 'O status do frete só pode avançar na sequência definida.'
   }
 
   function updateForm(field: keyof FreightForm, value: string | boolean) {
@@ -1219,6 +1247,7 @@ export function FreightsPage() {
       ciotDraft: '',
       ciotNumber: ciotEntries[0]?.number ?? '',
       ciotEntries,
+      taskHistory: (savedForm.taskHistory ?? []).filter((entry) => freightStatusFlow.includes(entry.name)),
       plannedFreightCost: freight.plannedFreightCost ?? String(freight.value),
       value: String(savedForm.value ?? freight.value),
     })
@@ -1236,6 +1265,10 @@ export function FreightsPage() {
 
   function addFlowTask(taskName: string) {
     if (!canEditPage) { denyNoPrivilege(); return }
+    if (!canAdvanceToStatus(taskName)) {
+      showFreightNotice('Avanço de status bloqueado', statusRequirement(taskName))
+      return
+    }
     const now = new Date()
     const startDate = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const task: FreightTask = {
@@ -1374,24 +1407,29 @@ export function FreightsPage() {
     if (saved) showFreightNotice('Código gerado', 'O novo código foi salvo no mesmo frete.')
   }
 
-  function updateFreight(id: string, patch: Partial<(typeof freights)[number]>) {
-    if (!canEditPage) {
-      denyNoPrivilege()
-      return
-    }
-    const currentFreight = freights.find((freight) => freight.id === id)
-    if (currentFreight) {
-      void saveFreightRecord({ ...currentFreight, ...patch })
-    }
-    setOpenActionId(null)
-  }
-
   function duplicateFreight(freight: (typeof freights)[number]) {
     if (!canEditPage) {
       denyNoPrivilege()
       return
     }
-    void saveFreightRecord({ ...freight, id: nextId('fr'), number: `FRT-${String(freights.length + 1).padStart(6, '0')}`, process: nextProcessCode(), closing: undefined })
+    const duplicated = addFreightStatus({
+      ...freight,
+      id: nextId('fr'),
+      number: `FRT-${String(freights.length + 1).padStart(6, '0')}`,
+      process: nextProcessCode(),
+      closing: undefined,
+      operationalStatus: '',
+      taskHistory: [],
+      portWithdrawalDate: '',
+      destinationScheduleDate: '',
+      destinationScheduleTime: '',
+      destinationArrivalDate: '',
+      destinationArrivalTime: '',
+      destinationDepartureDate: '',
+      destinationDepartureTime: '',
+      cntrReturnDate: '',
+    }, initialFreightStatus, authUser?.name || authUser?.email || 'Sistema', 'Status inicial do frete.')
+    void saveFreightRecord(duplicated)
     setOpenActionId(null)
   }
 
@@ -2130,9 +2168,7 @@ export function FreightsPage() {
           {openActionId === freight.id && (
             <div className="absolute right-0 top-6 z-20 w-36 border border-zinc-300 bg-white py-1 text-xs shadow-lg">
               <button onClick={() => openFreightDetail(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Visualizar</button>
-              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Aprovado para faturamento' })} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Aprovar</button>
               <button onClick={() => duplicateFreight(freight)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100">Duplicar</button>
-              <button onClick={() => updateFreight(freight.id, { operationalStatus: 'Cancelado' })} className="block w-full px-3 py-2 text-left text-red-700 hover:bg-zinc-100">Cancelar</button>
             </div>
           )}
         </div>
@@ -2151,7 +2187,7 @@ export function FreightsPage() {
     const startDate = freight.deliveryForecast || freight.date || ''
     const values: Record<Exclude<FreightGridColumnKey, 'select' | 'code' | 'actions'>, string> = {
       dateStart: startDate,
-      status: freight.operationalStatus || 'OPERACAO ENCERRADA',
+      status: freight.operationalStatus || initialFreightStatus,
       customer: freight.customer,
       sender: freight.sender || '-',
       recipient: freight.recipient || '-',
@@ -2381,16 +2417,16 @@ export function FreightsPage() {
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DOCUMENTO / PORTO</div>
               <Field label="Dt. liberacao documento"><input type="date" value={form.documentReleaseDate} onChange={(event) => updateForm('documentReleaseDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Dt. retirada porto destino"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. Montagem"><input type="date" value={form.portWithdrawalDate} onChange={(event) => updateForm('portWithdrawalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. agendamento entrega" required><input type="date" value={form.destinationScheduleDate} onChange={(event) => updateForm('destinationScheduleDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Hr. agendamento entrega"><input type="time" value={form.destinationScheduleTime} onChange={(event) => updateForm('destinationScheduleTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
             </div>
             <div className="grid gap-1">
               <div className="border-b border-zinc-400 pb-1 text-xs font-semibold">DESTINATARIO / DEVOLUCAO</div>
-              <Field label="Dt.chegada destinatario"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Hr. chegada destinatario"><input type="time" value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Dt. saida destinatario"><input type="date" value={form.destinationDepartureDate} onChange={(event) => updateForm('destinationDepartureDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
-              <Field label="Hr. saida destinatario"><input type="time" value={form.destinationDepartureTime} onChange={(event) => updateForm('destinationDepartureTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. chegada cliente"><input type="date" value={form.destinationArrivalDate} onChange={(event) => updateForm('destinationArrivalDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. chegada cliente"><input type="time" value={form.destinationArrivalTime} onChange={(event) => updateForm('destinationArrivalTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Dt. saida cliente"><input type="date" value={form.destinationDepartureDate} onChange={(event) => updateForm('destinationDepartureDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
+              <Field label="Hr. saida cliente"><input type="time" value={form.destinationDepartureTime} onChange={(event) => updateForm('destinationDepartureTime', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
               <Field label="Dt. devolucao CNTR"><input type="date" value={form.cntrReturnDate} onChange={(event) => updateForm('cntrReturnDate', event.target.value)} className={textInputClass(dateLocked)} disabled={dateLocked} /></Field>
             </div>
           </div>
@@ -2733,7 +2769,7 @@ export function FreightsPage() {
               <div className="grid gap-x-24 gap-y-1 border-b-4 border-zinc-400 p-3 md:grid-cols-2">
                 <div className="grid gap-1">
                   <Field label="Código do frete" required><input value={form.process} className={textInputClass(true)} disabled /></Field>
-                  <Field label="Status"><input value={form.status} onChange={(event) => updateForm('status', event.target.value)} className={textInputClass()} /></Field>
+                  <Field label="Status"><input value={form.status} className={textInputClass(true)} disabled /></Field>
                   <Field label="CNPJ/CPF"><input value={form.serviceTakerDocument} className={textInputClass(true)} disabled /></Field>
                   <Field label="Tomador do servico"><input value={form.serviceTaker} className={textInputClass(true)} disabled /></Field>
                   <Field label="CNPJ/CPF"><input value={form.senderDocument} className={textInputClass(true)} disabled /></Field>
@@ -2849,7 +2885,7 @@ export function FreightsPage() {
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-zinc-950/20 px-4 py-10">
           <div className="w-full max-w-4xl border-4 border-red-700 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b-4 border-zinc-400 bg-zinc-100 px-2 py-1">
-              <h3 className="text-lg font-normal text-red-600">Tarefa</h3>
+              <h3 className="text-lg font-normal text-red-600">Status</h3>
               <button onClick={() => setTaskPickerOpen(false)} className="grid h-7 w-7 place-items-center rounded-full bg-black text-white"><X size={18} /></button>
             </div>
             <div className="h-8 border-b border-zinc-300 bg-zinc-400" />
@@ -2859,7 +2895,13 @@ export function FreightsPage() {
             </label>
             <div className="min-h-[360px] bg-white p-6 text-xs font-semibold">
               {availableTaskOptions.map((task) => (
-                <button key={task} onClick={() => addFlowTask(task)} className="block px-2 py-1 text-left hover:bg-sky-100">
+                <button
+                  key={task}
+                  onClick={() => addFlowTask(task)}
+                  disabled={!canAdvanceToStatus(task)}
+                  title={!canAdvanceToStatus(task) ? statusRequirement(task) : `Avançar para ${task}`}
+                  className="block px-2 py-1 text-left hover:bg-sky-100 disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent"
+                >
                   {task}
                 </button>
               ))}

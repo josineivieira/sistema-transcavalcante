@@ -1,6 +1,13 @@
-import { formatMoney } from '../services/localStore'
+import { formatMoney, type Freight } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { LoadingRow } from '../components/LoadingState'
+import { api } from '../services/api'
+import { getAuthUser } from '../services/authSession'
+import { addFreightStatus, freightStatuses } from '../services/freightStatus'
+
+type OperationalFreightsResponse = {
+  items: Freight[]
+}
 
 export function FinancePage() {
   const data = useLocalData()
@@ -27,7 +34,27 @@ export function FinancePage() {
     data.update({ ...data, receivables: [...data.receivables, ...newItems] })
   }
 
-  function markAsPaid(id: string) {
+  async function markAsPaid(id: string) {
+    const receivable = data.receivables.find((item) => item.id === id)
+    if (!receivable) return
+
+    try {
+      const response = await api.get<OperationalFreightsResponse>('/operational-freights', {
+        params: { closing: receivable.closing, all_results: true },
+      })
+      const authUser = getAuthUser()
+      const statusUser = authUser?.name || authUser?.email || 'Sistema'
+      await Promise.all((response.data.items || []).map((freight) => data.saveFreightRecord(addFreightStatus(
+        freight,
+        freightStatuses.paid,
+        statusUser,
+        `Recebimento do documento ${receivable.document} confirmado pelo financeiro.`,
+      ))))
+    } catch {
+      window.alert('Não foi possível atualizar os fretes deste recebimento.')
+      return
+    }
+
     data.update({
       ...data,
       receivables: data.receivables.map((item) => item.id === id ? { ...item, paidValue: item.netValue, status: 'Pago' } : item),
@@ -53,7 +80,7 @@ export function FinancePage() {
               <td className="border-b border-zinc-200 px-3 py-2">{formatMoney(item.paidValue)}</td>
               <td className="border-b border-zinc-200 px-3 py-2">{formatMoney(item.netValue - item.paidValue)}</td>
               <td className="border-b border-zinc-200 px-3 py-2">{item.status}</td>
-              <td className="border-b border-zinc-200 px-3 py-2"><button onClick={() => markAsPaid(item.id)} className="border border-zinc-300 px-2 py-1 text-xs">Baixar</button></td>
+              <td className="border-b border-zinc-200 px-3 py-2"><button onClick={() => void markAsPaid(item.id)} className="border border-zinc-300 px-2 py-1 text-xs">Baixar</button></td>
             </tr>
           ))}
           {data.loading && <LoadingRow colSpan={9} label="Carregando financeiro..." />}

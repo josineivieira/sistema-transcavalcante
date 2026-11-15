@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
 import { formatMoney, nextId, type Freight } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
-import { canEdit, denyNoPrivilege } from '../services/authSession'
+import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
 import { LoadingRow, LoadingState } from '../components/LoadingState'
 import { api } from '../services/api'
+import { addFreightStatus, freightStatuses } from '../services/freightStatus'
 
 const steps = [
   ['1', 'Selecao', 'Cliente e periodo'],
@@ -19,8 +20,8 @@ type OperationalFreightsResponse = {
   items: Freight[]
 }
 
-const CLOSING_ELIGIBLE_STATUS = 'ENTREGA CONCLUIDA 50'
-const CLOSING_LINKED_STATUS = 'INCLUIDO EM FECHAMENTO'
+const CLOSING_ELIGIBLE_STATUS = freightStatuses.deliveryCompleted
+const CLOSING_LINKED_STATUS = freightStatuses.includedInClosing
 
 type Notice = {
   title: string
@@ -57,6 +58,8 @@ export function ClosingsPage() {
   const data = useLocalData()
   const { closings, fiscalDocuments } = data
   const canEditPage = canEdit('closings')
+  const authUser = getAuthUser()
+  const statusUser = authUser?.name || authUser?.email || 'Sistema'
   const [eligibleFreights, setEligibleFreights] = useState<Freight[]>([])
   const [eligibleLoading, setEligibleLoading] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
@@ -181,7 +184,12 @@ export function ClosingsPage() {
     try {
       setSavingLabel('Confirmando fechamento...')
       await Promise.all(selectedFreights.map((freight) =>
-        data.saveFreightRecord({ ...freight, closing: number, operationalStatus: CLOSING_LINKED_STATUS }),
+        data.saveFreightRecord(addFreightStatus(
+          { ...freight, closing: number },
+          CLOSING_LINKED_STATUS,
+          statusUser,
+          `Frete incluído no fechamento ${number}.`,
+        )),
       ))
       data.setClosings([...closings, closing])
       setEligibleFreights((current) => current.filter((freight) => !selectedFreightIds.includes(freight.id)))
@@ -251,7 +259,12 @@ export function ClosingsPage() {
         params: { closing: closing.number, limit: 1000 },
       })
       const restoredFreights = (response.data.items || [])
-        .map((freight) => ({ ...freight, closing: undefined, operationalStatus: CLOSING_ELIGIBLE_STATUS }))
+        .map((freight) => addFreightStatus(
+          { ...freight, closing: undefined },
+          CLOSING_ELIGIBLE_STATUS,
+          statusUser,
+          `Fechamento ${closing.number} cancelado.`,
+        ))
 
       await Promise.all(restoredFreights.map((freight) => data.saveFreightRecord(freight)))
       data.setClosings(closings.map((item) => item.id === id ? { ...item, status: 'Cancelado' } : item))

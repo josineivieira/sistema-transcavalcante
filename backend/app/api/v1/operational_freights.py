@@ -18,6 +18,17 @@ from app.models.freight import Freight, FreightTask
 
 router = APIRouter()
 _freight_schema_checked = False
+FREIGHT_STATUSES = {
+    "NOVO FRETE",
+    "ENTREGA PROGRAMADA",
+    "CONTAINER MONTADO",
+    "CHEGADA NO CLIENTE",
+    "SAIDA DO CLIENTE",
+    "ENTREGA CONCLUIDA",
+    "INCLUIDO EM FECHAMENTO",
+    "AGUARDANDO PAGAMENTO",
+    "ENCERRADO - FRETE PAGO",
+}
 
 
 class OperationalFreightPayload(BaseModel):
@@ -51,6 +62,35 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS tractor_plate VARCHAR(20)",
         "ALTER TABLE freights ADD COLUMN IF NOT EXISTS trailer_plate VARCHAR(20)",
+        """
+        UPDATE freights
+        SET operational_status = CASE
+            WHEN COALESCE(closing_number, '') <> '' THEN 'INCLUIDO EM FECHAMENTO'
+            WHEN COALESCE(payload->>'destinationScheduleDate', '') <> ''
+             AND COALESCE(payload->>'portWithdrawalDate', '') <> ''
+             AND COALESCE(payload->>'destinationArrivalDate', '') <> ''
+             AND COALESCE(payload->>'destinationDepartureDate', '') <> ''
+             AND COALESCE(payload->>'documentReleaseDate', '') <> ''
+             AND COALESCE(payload->>'cntrReturnDate', '') <> '' THEN 'ENTREGA CONCLUIDA'
+            WHEN COALESCE(payload->>'destinationScheduleDate', '') <> ''
+             AND COALESCE(payload->>'portWithdrawalDate', '') <> ''
+             AND COALESCE(payload->>'destinationArrivalDate', '') <> ''
+             AND COALESCE(payload->>'destinationDepartureDate', '') <> '' THEN 'SAIDA DO CLIENTE'
+            WHEN COALESCE(payload->>'destinationScheduleDate', '') <> ''
+             AND COALESCE(payload->>'portWithdrawalDate', '') <> ''
+             AND COALESCE(payload->>'destinationArrivalDate', '') <> '' THEN 'CHEGADA NO CLIENTE'
+            WHEN COALESCE(payload->>'destinationScheduleDate', '') <> ''
+             AND COALESCE(payload->>'portWithdrawalDate', '') <> '' THEN 'CONTAINER MONTADO'
+            WHEN COALESCE(payload->>'destinationScheduleDate', '') <> '' THEN 'ENTREGA PROGRAMADA'
+            ELSE 'NOVO FRETE'
+        END
+        WHERE operational_status IN (
+            'AGENDAMENTO E CARREGAMENTO 15', 'NOTA(S) FISCAL(IS) RECEBIDA(S) 20',
+            'ENTREGA CONCLUIDA 50', 'OPERACAO ENCERRADA 55', 'PROCESSO INTERROMPIDO 60',
+            'AUDITORIA INICIADA 65', 'PROCESSO AUDITADO 70', 'AUDITORIA ENCERRADA 75',
+            'Em digitacao', 'Aguardando aprovação', 'Aprovado para faturamento'
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS freight_tasks (
             id UUID PRIMARY KEY,
@@ -290,7 +330,10 @@ def _upsert_freight_data(db: Session, data: dict) -> Freight:
     freight.destination_city = _city_from_value(data.get("destination"))
     freight.destination_state = _state_from_city(data.get("destination"))
     freight.total_value = _decimal(data.get("value"))
-    freight.operational_status = str(data.get("operationalStatus") or data.get("status") or "Em digitacao")
+    operational_status = str(data.get("operationalStatus") or data.get("status") or "NOVO FRETE")
+    if operational_status not in FREIGHT_STATUSES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Status de frete inválido")
+    freight.operational_status = operational_status
     freight.fiscal_status = str(data.get("fiscalStatus") or "Pendente")
     freight.closing_number = str(data.get("closing") or "") or None
     freight.approved_for_billing = freight.operational_status == "Aprovado para faturamento"

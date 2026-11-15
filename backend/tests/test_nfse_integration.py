@@ -27,6 +27,9 @@ from app.database.session import get_db
 from app.main import app
 from app.models.operational_data import OperationalSnapshot
 from app.models.nfse import NfseCertificate, NfseEmission, NfseSequence
+from app.models.company import Company
+from app.models.customer import Customer
+from app.models.freight import Freight, FreightTask
 from app.services.fiscal.certificates.a1 import CertificateError, certificate_cnpj, cipher, load_a1
 from app.services.fiscal.nfse import operational_service
 from app.services.fiscal.nfse.national_client import NationalClient, NationalError, encode_xml, parse_authorized, decode_xml, endpoint
@@ -95,7 +98,10 @@ def integration(monkeypatch, a1, issuer, customer):
     monkeypatch.setattr(settings, "encryption_key", "test-only-encryption-key-32-characters-or-more")
     monkeypatch.setattr(settings, "nfse_signature_algorithm", "rsa-sha1")
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(engine, tables=[OperationalSnapshot.__table__, NfseCertificate.__table__, NfseSequence.__table__, NfseEmission.__table__])
+    Base.metadata.create_all(engine, tables=[
+        OperationalSnapshot.__table__, NfseCertificate.__table__, NfseSequence.__table__, NfseEmission.__table__,
+        Company.__table__, Customer.__table__, Freight.__table__, FreightTask.__table__,
+    ])
     db = Session(engine)
     snapshot = OperationalSnapshot(company_key=DEFAULT_COMPANY_KEY, data={"issuerSettings": issuer, "customers": [customer], "closings": [{"id": "closing-1", "number": "FEC01", "customer": customer["name"], "subtotal": 100, "netTotal": 100, "status": "Aprovado"}], "users": [{"id": "u1", "email": "test@example.local", "name": "TESTE", "role": "Administrador", "status": "Ativo", "permissions": {}}]})
     db.add(snapshot); db.commit()

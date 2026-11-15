@@ -26,7 +26,7 @@ def save(db, external_id, data, regenerate=False):
 
 
 def test_regeneration_uses_all_company_codes_and_preserves_freight(db):
-    original = save(db, "first", {"process": "TR01", "value": 123, "operationalStatus": "CUSTOM STATUS", "routeName": "CUSTOM ROUTE", "taskHistory": [{"id": "history-1", "name": "CUSTOM STATUS", "user": "Operator"}]})
+    original = save(db, "first", {"process": "TR01", "value": 123, "operationalStatus": "CONTAINER MONTADO", "routeName": "CUSTOM ROUTE", "taskHistory": [{"id": "history-1", "name": "CONTAINER MONTADO", "user": "Operator"}]})
     save(db, "outside-filter", {"process": "tr500"})
     save(db, "another-company", {"process": "TR999", "serviceTakerDocument": "11111111000111"})
     before = deepcopy(original)

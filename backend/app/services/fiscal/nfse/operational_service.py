@@ -10,6 +10,7 @@ from app.api.v1.operational_data import DEFAULT_COMPANY_KEY, _find_user, _get_or
 from app.core.customer_document import normalize_document
 from app.core.config import settings
 from app.models.nfse import NfseCertificate, NfseEmission, NfseSequence
+from app.models.freight import Freight, FreightTask
 from app.models.operational_data import OperationalSnapshot
 from app.services.fiscal.certificates.a1 import CertificateError, decrypt_a1
 from app.services.fiscal.nfse.national_client import NationalClient, NationalError, endpoint
@@ -24,6 +25,7 @@ class OperationalNfseService:
         permission = (user or {}).get("permissions", {}).get(module, "none")
         if not user or user.get("status") != "Ativo" or (user.get("role") != "Administrador" and permission not in ({"edit"} if edit else {"view", "edit"})):
             raise HTTPException(403, "Sem permissão para esta operação fiscal.")
+        self.user_name = str(user.get("name") or user.get("email") or email)
         self.issuer = deepcopy(self.snapshot.data.get("issuerSettings") or {})
         self.cnpj = normalize_document(str(self.issuer.get("document", "")))
 
@@ -115,7 +117,7 @@ class OperationalNfseService:
         if note.substituted_access_key:
             original = self.db.query(NfseEmission).filter_by(company_key=DEFAULT_COMPANY_KEY, issuer_document=self.cnpj, access_key=note.substituted_access_key).filter(NfseEmission.id != note.id).first()
             if original: original.status = "substituted"
-        # Homologation must not turn a real operational closing into a production-issued invoice.
+        # Keep the operational closing and its freights synchronized with the authorized note.
         snapshot = self.db.query(OperationalSnapshot).filter_by(id=self.snapshot.id).with_for_update().one()
         self.db.refresh(snapshot)
         data = deepcopy(snapshot.data)
@@ -123,6 +125,35 @@ class OperationalNfseService:
             if str(closing.get("id")) == note.closing_id:
                 closing["nfseHomologationStatus"] = "Autorizado" if note.status == "authorized" else note.status
                 closing["nfseHomologationId"] = str(note.id)
+        if note.status == "authorized":
+            freights = self.db.query(Freight).filter(Freight.closing_number == note.closing_number).all()
+            now_label = datetime.now().strftime("%d/%m/%Y %H:%M")
+            for freight in freights:
+                freight.operational_status = "AGUARDANDO PAGAMENTO"
+                freight.payload = {
+                    **(freight.payload or {}),
+                    "operationalStatus": "AGUARDANDO PAGAMENTO",
+                    "status": "AGUARDANDO PAGAMENTO",
+                }
+                external_id = f"status-nfse-{note.id}"
+                task = self.db.query(FreightTask).filter_by(freight_id=freight.id, external_id=external_id).first()
+                if not task:
+                    task = FreightTask(
+                        company_id=freight.company_id,
+                        freight_id=freight.id,
+                        external_id=external_id,
+                    )
+                task.name = "AGUARDANDO PAGAMENTO"
+                task.description = f"Nota de serviço {note.number or note.dps_number} emitida."
+                task.status = "ENCERRADO"
+                task.send_to_customer = "N"
+                task.start_date = now_label
+                task.end_date = now_label
+                task.completion_percent = 100
+                task.internal_use = "S"
+                task.time_label = "Hoje"
+                task.user_name = self.user_name
+                self.db.add(task)
         snapshot.data = data
         self.db.commit(); self.db.refresh(note)
 
