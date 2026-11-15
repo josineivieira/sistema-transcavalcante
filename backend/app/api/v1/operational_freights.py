@@ -73,6 +73,7 @@ def _ensure_freight_operational_schema(db: Session) -> None:
         """,
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_freights_company_external_id ON freights (company_id, external_id)",
         "CREATE INDEX IF NOT EXISTS ix_freights_company_closing_number ON freights (company_id, closing_number)",
+        "CREATE INDEX IF NOT EXISTS ix_freights_execution_date_internal ON freights (execution_date DESC, internal_number DESC)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_freight_tasks_freight_external ON freight_tasks (freight_id, external_id)",
     ]
     for statement in statements:
@@ -351,6 +352,7 @@ def list_operational_freights(
     origin_date_end: str = "",
     closing: str = "",
     unclosed: bool = False,
+    all_results: bool = False,
     limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     email: str = Depends(_require_operational_auth),
@@ -435,8 +437,21 @@ def list_operational_freights(
     if parsed_origin_end:
         query = query.filter(Freight.execution_date <= parsed_origin_end)
 
+    if all_results:
+        has_filter = any((
+            search, status_filter, process_number, process_code, date_start, date_end,
+            process_description, customer, supplier, process_type, container,
+            origin_date_start, origin_date_end, closing, unclosed,
+        ))
+        if not has_filter:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Informe pelo menos um filtro")
+
     total = query.count()
-    freights = query.order_by(Freight.execution_date.desc(), Freight.internal_number.desc()).offset(offset).limit(limit).all()
+    ordered_query = query.order_by(Freight.execution_date.desc(), Freight.internal_number.desc())
+    if all_results:
+        freights = ordered_query.all()
+    else:
+        freights = ordered_query.offset(offset).limit(limit).all()
     freight_ids = [freight.id for freight in freights]
     tasks_by_freight: dict[UUID, list[FreightTask]] = {freight.id: [] for freight in freights}
     if freight_ids:
@@ -446,7 +461,7 @@ def list_operational_freights(
     return {
         "items": [_freight_to_dict(freight, tasks_by_freight.get(freight.id, [])) for freight in freights],
         "total": total,
-        "limit": limit,
+        "limit": total if all_results else limit,
         "offset": offset,
     }
 

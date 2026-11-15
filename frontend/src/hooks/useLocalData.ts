@@ -33,14 +33,19 @@ type FreightQuery = {
   container?: string
   origin_date_start?: string
   origin_date_end?: string
+  all_results?: boolean
   limit?: number
   offset?: number
 }
 
-export function useLocalData() {
+type UseLocalDataOptions = {
+  loadFreightsOnInit?: boolean
+}
+
+export function useLocalData({ loadFreightsOnInit = true }: UseLocalDataOptions = {}) {
   const [data, setData] = useState(loadData)
   const [loading, setLoading] = useState(true)
-  const [freightsLoading, setFreightsLoading] = useState(true)
+  const [freightsLoading, setFreightsLoading] = useState(loadFreightsOnInit)
   const [freightsTotal, setFreightsTotal] = useState(0)
   const [error, setError] = useState('')
   const deletedFreightIdsRef = useRef(new Set<string>())
@@ -91,17 +96,21 @@ export function useLocalData() {
         }
 
         try {
-          const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
-            params: { limit: 500 },
-          })
-          const freights = (freightsResponse.data.items || []).filter((freight) => (
-            !deletedFreightIdsRef.current.has(freight.id)
-            && !deletedFreightIdsRef.current.has(freight.process)
-            && !deletedFreightIdsRef.current.has(freight.number)
-          ))
-          nextData = normalizeData({ ...nextData, freights })
-          if (active) {
-            setFreightsTotal(freightsResponse.data.total ?? nextData.freights.length)
+          if (!loadFreightsOnInit) {
+            nextData = normalizeData({ ...nextData, freights: [] })
+          } else {
+            const freightsResponse = await api.get<OperationalFreightsResponse>('/operational-freights', {
+              params: { limit: 500 },
+            })
+            const freights = (freightsResponse.data.items || []).filter((freight) => (
+              !deletedFreightIdsRef.current.has(freight.id)
+              && !deletedFreightIdsRef.current.has(freight.process)
+              && !deletedFreightIdsRef.current.has(freight.number)
+            ))
+            nextData = normalizeData({ ...nextData, freights })
+            if (active) {
+              setFreightsTotal(freightsResponse.data.total ?? nextData.freights.length)
+            }
           }
         } catch {
           if (active) {
@@ -127,7 +136,7 @@ export function useLocalData() {
     return () => {
       active = false
     }
-  }, [])
+  }, [loadFreightsOnInit])
 
   function update(nextData: AppData) {
     const normalized = normalizeData(nextData)

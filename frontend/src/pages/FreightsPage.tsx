@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Check, Eraser, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
+import { Check, Eraser, FileSpreadsheet, Filter, Info, MoreVertical, Paperclip, Save, Search, Settings, X } from 'lucide-react'
 import { formatMoney, nextId, type Freight, type FreightCiotEntry, type FreightInvoiceEntry, type FreightTask } from '../services/localStore'
 import { useLocalData } from '../hooks/useLocalData'
 import { canEdit, denyNoPrivilege, getAuthUser } from '../services/authSession'
@@ -508,6 +508,23 @@ const freightTaskOptions = [
   'AUDITORIA ENCERRADA 75',
 ]
 
+function currentMonthDateRange() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const formatDate = (date: Date) => {
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  return {
+    dateStart: formatDate(new Date(year, month, 1)),
+    dateEnd: formatDate(new Date(year, month + 1, 0)),
+  }
+}
+
 export function FreightsPage() {
   const {
     vehicles,
@@ -520,7 +537,7 @@ export function FreightsPage() {
     loadFreights,
     saveFreightRecord,
     deleteFreightRecord,
-  } = useLocalData()
+  } = useLocalData({ loadFreightsOnInit: false })
   const canEditPage = canEdit('freights')
   const authUser = getAuthUser()
   const issuerName = issuerSettings.legalName || issuerSettings.tradeName || 'TRANSCAVALCANTE'
@@ -533,11 +550,10 @@ export function FreightsPage() {
   const [plannedExpenseEdit, setPlannedExpenseEdit] = useState<string | null>(null)
   const [savingFreightMode, setSavingFreightMode] = useState<'save' | 'save-close' | null>(null)
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => ({
     processNumber: '',
     processCode: '',
-    dateStart: '',
-    dateEnd: '',
+    ...currentMonthDateRange(),
     customer: '',
     status: '',
     supplier: '',
@@ -545,7 +561,7 @@ export function FreightsPage() {
     container: '',
     originDateStart: '',
     originDateEnd: '',
-  })
+  }))
   const [appliedFilters, setAppliedFilters] = useState<(typeof filters & { search: string }) | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
@@ -685,7 +701,7 @@ export function FreightsPage() {
       date_start: appliedFilters.dateStart,
       date_end: appliedFilters.dateEnd,
       customer: appliedFilters.customer,
-      limit: 500,
+      all_results: true,
     })
   }, [appliedFilters, loading, loadFreights])
 
@@ -1404,7 +1420,6 @@ export function FreightsPage() {
       setDeleteConfirmOpen(false)
       setShowForm(false)
       resetForm()
-      await loadFreights({ limit: 500 })
     } catch {
       window.alert('Nao foi possivel excluir este frete no banco. Tente novamente.')
     }
@@ -2093,11 +2108,6 @@ export function FreightsPage() {
   }
 
   function renderFreightCell(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
-    const date = freight.date || ''
-    const origin = cityState(freight.origin)
-    const destination = cityState(freight.destination)
-    const startDate = freight.deliveryForecast || freight.date || ''
-
     if (columnKey === 'select') {
       return <input type="checkbox" onClick={(event) => event.stopPropagation()} />
     }
@@ -2129,6 +2139,16 @@ export function FreightsPage() {
       )
     }
 
+    return freightCellValue(columnKey, freight)
+  }
+
+  function freightCellValue(columnKey: FreightGridColumnKey, freight: (typeof freights)[number]) {
+    if (columnKey === 'select' || columnKey === 'actions') return ''
+    if (columnKey === 'code') return freight.process || freight.number
+
+    const origin = cityState(freight.origin)
+    const destination = cityState(freight.destination)
+    const startDate = freight.deliveryForecast || freight.date || ''
     const values: Record<Exclude<FreightGridColumnKey, 'select' | 'code' | 'actions'>, string> = {
       dateStart: startDate,
       status: freight.operationalStatus || 'OPERACAO ENCERRADA',
@@ -2162,6 +2182,29 @@ export function FreightsPage() {
     }
 
     return values[columnKey]
+  }
+
+  function exportFreightsToExcel() {
+    if (!visibleFreights.length) return
+
+    const exportColumns = visibleFreightColumns.filter((column) => column.key !== 'select' && column.key !== 'actions')
+    const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const rows = [
+      exportColumns.map((column) => escapeCell(column.label)).join(';'),
+      ...visibleFreights.map((freight) => (
+        exportColumns.map((column) => escapeCell(String(freightCellValue(column.key, freight))).replace(/\r?\n/g, ' ')).join(';')
+      )),
+    ]
+    const fileContent = `\uFEFF${rows.join('\r\n')}`
+    const file = new Blob([fileContent], { type: 'text/csv;charset=utf-8' })
+    const link = document.createElement('a')
+    const period = appliedFilters?.dateStart && appliedFilters?.dateEnd
+      ? `${appliedFilters.dateStart}_${appliedFilters.dateEnd}`
+      : new Date().toISOString().slice(0, 10)
+    link.href = URL.createObjectURL(file)
+    link.download = `fretes_${period}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
   }
 
   function renderActiveTab() {
@@ -2603,7 +2646,16 @@ export function FreightsPage() {
                   )}
                   <span>&lt;-&gt;</span>
                   <span>1:1</span>
-                  <span>XLS</span>
+                  <button
+                    type="button"
+                    onClick={exportFreightsToExcel}
+                    disabled={freightListLoading || !visibleFreights.length}
+                    className="grid h-6 w-7 place-items-center text-green-800 disabled:opacity-40"
+                    title="Exportar resultados para Excel"
+                    aria-label="Exportar resultados para Excel"
+                  >
+                    <FileSpreadsheet size={19} />
+                  </button>
                   <button onClick={openNewFreight} className="grid h-6 w-6 place-items-center bg-black text-white">+</button>
                 </div>
               </div>
